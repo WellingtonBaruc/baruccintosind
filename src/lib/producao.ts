@@ -104,7 +104,7 @@ export async function criarPedidoCompleto(
   // 2. Create itens
   if (itens.length > 0) {
     const itensData = itens.map(i => ({ ...i, pedido_id: pedido.id }));
-    const { error: itensErr } = await supabase.from('pedido_itens').insert(itensData);
+    const { error: itensErr } = await supabase.from('pedido_itens').insert(itensData as any);
     if (itensErr) throw itensErr;
   }
 
