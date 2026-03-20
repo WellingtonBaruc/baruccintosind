@@ -14,16 +14,120 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      pipeline_etapas: {
+        Row: {
+          avanco_automatico: boolean
+          campos_obrigatorios: Json | null
+          id: string
+          nome: string
+          ordem: number
+          pipeline_id: string
+          requer_supervisor: boolean
+          setor_responsavel: string | null
+        }
+        Insert: {
+          avanco_automatico?: boolean
+          campos_obrigatorios?: Json | null
+          id?: string
+          nome: string
+          ordem?: number
+          pipeline_id: string
+          requer_supervisor?: boolean
+          setor_responsavel?: string | null
+        }
+        Update: {
+          avanco_automatico?: boolean
+          campos_obrigatorios?: Json | null
+          id?: string
+          nome?: string
+          ordem?: number
+          pipeline_id?: string
+          requer_supervisor?: boolean
+          setor_responsavel?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_etapas_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_producao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_producao: {
+        Row: {
+          ativo: boolean
+          criado_em: string
+          descricao: string | null
+          id: string
+          nome: string
+          padrao: boolean
+        }
+        Insert: {
+          ativo?: boolean
+          criado_em?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          padrao?: boolean
+        }
+        Update: {
+          ativo?: boolean
+          criado_em?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          padrao?: boolean
+        }
+        Relationships: []
+      }
+      usuarios: {
+        Row: {
+          ativo: boolean
+          criado_em: string
+          email: string
+          id: string
+          nome: string
+          perfil: Database["public"]["Enums"]["perfil_usuario"]
+          setor: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          criado_em?: string
+          email: string
+          id: string
+          nome: string
+          perfil?: Database["public"]["Enums"]["perfil_usuario"]
+          setor?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          criado_em?: string
+          email?: string
+          id?: string
+          nome?: string
+          perfil?: Database["public"]["Enums"]["perfil_usuario"]
+          setor?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      perfil_usuario:
+        | "admin"
+        | "gestor"
+        | "supervisor_producao"
+        | "operador_producao"
+        | "comercial"
+        | "financeiro"
+        | "logistica"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +254,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      perfil_usuario: [
+        "admin",
+        "gestor",
+        "supervisor_producao",
+        "operador_producao",
+        "comercial",
+        "financeiro",
+        "logistica",
+      ],
+    },
   },
 } as const
