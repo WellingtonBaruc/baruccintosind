@@ -29,6 +29,7 @@ interface LogEntry {
   total_recebidos: number;
   total_inseridos: number;
   total_atualizados: number;
+  total_ignorados: number;
   total_erros: number;
   paginas_processadas: number;
   erro_detalhes: string | null;
