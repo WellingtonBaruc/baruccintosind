@@ -310,6 +310,7 @@ export const STATUS_PEDIDO_CONFIG: Record<string, { label: string; color: string
   ENTREGUE: { label: 'Entregue', color: 'bg-success/20 text-success' },
   BLOQUEADO: { label: 'Bloqueado', color: 'bg-destructive/15 text-destructive' },
   CANCELADO: { label: 'Cancelado', color: 'bg-destructive/15 text-destructive' },
+  FINALIZADO_SIMPLIFICA: { label: 'Finalizado (Simplifica)', color: 'bg-muted text-muted-foreground' },
 };
 
 export const STATUS_ORDEM_CONFIG: Record<string, { label: string; color: string }> = {
