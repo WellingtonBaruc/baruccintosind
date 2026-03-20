@@ -14,6 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      integracao_configuracao: {
+        Row: {
+          ativa: boolean
+          criado_em: string
+          dias_importacao_inicial: number
+          id: string
+          intervalo_minutos: number
+          ultima_sincronizacao: string | null
+        }
+        Insert: {
+          ativa?: boolean
+          criado_em?: string
+          dias_importacao_inicial?: number
+          id?: string
+          intervalo_minutos?: number
+          ultima_sincronizacao?: string | null
+        }
+        Update: {
+          ativa?: boolean
+          criado_em?: string
+          dias_importacao_inicial?: number
+          id?: string
+          intervalo_minutos?: number
+          ultima_sincronizacao?: string | null
+        }
+        Relationships: []
+      }
+      integracao_logs: {
+        Row: {
+          duracao_ms: number | null
+          erro_detalhes: string | null
+          executado_em: string
+          id: string
+          paginas_processadas: number | null
+          status: string
+          tipo: string
+          total_atualizados: number | null
+          total_erros: number | null
+          total_inseridos: number | null
+          total_recebidos: number | null
+        }
+        Insert: {
+          duracao_ms?: number | null
+          erro_detalhes?: string | null
+          executado_em?: string
+          id?: string
+          paginas_processadas?: number | null
+          status?: string
+          tipo?: string
+          total_atualizados?: number | null
+          total_erros?: number | null
+          total_inseridos?: number | null
+          total_recebidos?: number | null
+        }
+        Update: {
+          duracao_ms?: number | null
+          erro_detalhes?: string | null
+          executado_em?: string
+          id?: string
+          paginas_processadas?: number | null
+          status?: string
+          tipo?: string
+          total_atualizados?: number | null
+          total_erros?: number | null
+          total_inseridos?: number | null
+          total_recebidos?: number | null
+        }
+        Relationships: []
+      }
       op_etapas: {
         Row: {
           concluido_em: string | null
@@ -240,6 +309,8 @@ export type Database = {
       }
       pedido_itens: {
         Row: {
+          api_item_id: string | null
+          categoria_produto: string | null
           conferido: boolean
           descricao_produto: string
           disponivel: boolean | null
@@ -249,11 +320,15 @@ export type Database = {
           pedido_id: string
           produto_api_id: string | null
           quantidade: number
+          referencia_produto: string | null
           unidade_medida: string | null
           valor_total: number
           valor_unitario: number
+          valor_unitario_liquido: number | null
         }
         Insert: {
+          api_item_id?: string | null
+          categoria_produto?: string | null
           conferido?: boolean
           descricao_produto: string
           disponivel?: boolean | null
@@ -263,11 +338,15 @@ export type Database = {
           pedido_id: string
           produto_api_id?: string | null
           quantidade?: number
+          referencia_produto?: string | null
           unidade_medida?: string | null
           valor_total?: number
           valor_unitario?: number
+          valor_unitario_liquido?: number | null
         }
         Update: {
+          api_item_id?: string | null
+          categoria_produto?: string | null
           conferido?: boolean
           descricao_produto?: string
           disponivel?: boolean | null
@@ -277,9 +356,11 @@ export type Database = {
           pedido_id?: string
           produto_api_id?: string | null
           quantidade?: number
+          referencia_produto?: string | null
           unidade_medida?: string | null
           valor_total?: number
           valor_unitario?: number
+          valor_unitario_liquido?: number | null
         }
         Relationships: [
           {
@@ -344,8 +425,10 @@ export type Database = {
       }
       pedidos: {
         Row: {
+          api_cliente_id: string | null
           api_venda_id: string | null
           atualizado_em: string
+          canal_venda: string | null
           cliente_cpf_cnpj: string | null
           cliente_email: string | null
           cliente_endereco: string | null
@@ -354,14 +437,19 @@ export type Database = {
           codigo_rastreio: string | null
           criado_em: string
           data_entrega: string | null
+          data_entrega_api: string | null
           data_envio: string | null
           data_pagamento_confirmado: string | null
+          data_previsao_entrega: string | null
+          data_venda_api: string | null
           forma_envio: string | null
           forma_pagamento: string | null
           id: string
           numero_pedido: string
+          observacao_api: string | null
           observacao_comercial: string | null
           observacao_financeiro: string | null
+          observacao_interna_api: string | null
           observacao_logistica: string | null
           pagamento_confirmado: boolean
           sincronizacao_bloqueada: boolean
@@ -370,14 +458,20 @@ export type Database = {
           subtipo_pronta_entrega: string | null
           tipo_fluxo: string | null
           usuario_responsavel_id: string | null
+          valor_acrescimo: number | null
           valor_bruto: number
           valor_desconto: number
+          valor_frete: number | null
           valor_liquido: number
+          valor_produtos: number | null
+          vendedor_codigo: string | null
           vendedor_nome: string | null
         }
         Insert: {
+          api_cliente_id?: string | null
           api_venda_id?: string | null
           atualizado_em?: string
+          canal_venda?: string | null
           cliente_cpf_cnpj?: string | null
           cliente_email?: string | null
           cliente_endereco?: string | null
@@ -386,14 +480,19 @@ export type Database = {
           codigo_rastreio?: string | null
           criado_em?: string
           data_entrega?: string | null
+          data_entrega_api?: string | null
           data_envio?: string | null
           data_pagamento_confirmado?: string | null
+          data_previsao_entrega?: string | null
+          data_venda_api?: string | null
           forma_envio?: string | null
           forma_pagamento?: string | null
           id?: string
           numero_pedido: string
+          observacao_api?: string | null
           observacao_comercial?: string | null
           observacao_financeiro?: string | null
+          observacao_interna_api?: string | null
           observacao_logistica?: string | null
           pagamento_confirmado?: boolean
           sincronizacao_bloqueada?: boolean
@@ -402,14 +501,20 @@ export type Database = {
           subtipo_pronta_entrega?: string | null
           tipo_fluxo?: string | null
           usuario_responsavel_id?: string | null
+          valor_acrescimo?: number | null
           valor_bruto?: number
           valor_desconto?: number
+          valor_frete?: number | null
           valor_liquido?: number
+          valor_produtos?: number | null
+          vendedor_codigo?: string | null
           vendedor_nome?: string | null
         }
         Update: {
+          api_cliente_id?: string | null
           api_venda_id?: string | null
           atualizado_em?: string
+          canal_venda?: string | null
           cliente_cpf_cnpj?: string | null
           cliente_email?: string | null
           cliente_endereco?: string | null
@@ -418,14 +523,19 @@ export type Database = {
           codigo_rastreio?: string | null
           criado_em?: string
           data_entrega?: string | null
+          data_entrega_api?: string | null
           data_envio?: string | null
           data_pagamento_confirmado?: string | null
+          data_previsao_entrega?: string | null
+          data_venda_api?: string | null
           forma_envio?: string | null
           forma_pagamento?: string | null
           id?: string
           numero_pedido?: string
+          observacao_api?: string | null
           observacao_comercial?: string | null
           observacao_financeiro?: string | null
+          observacao_interna_api?: string | null
           observacao_logistica?: string | null
           pagamento_confirmado?: boolean
           sincronizacao_bloqueada?: boolean
@@ -434,9 +544,13 @@ export type Database = {
           subtipo_pronta_entrega?: string | null
           tipo_fluxo?: string | null
           usuario_responsavel_id?: string | null
+          valor_acrescimo?: number | null
           valor_bruto?: number
           valor_desconto?: number
+          valor_frete?: number | null
           valor_liquido?: number
+          valor_produtos?: number | null
+          vendedor_codigo?: string | null
           vendedor_nome?: string | null
         }
         Relationships: [

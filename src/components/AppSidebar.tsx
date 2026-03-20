@@ -1,4 +1,4 @@
-import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, PlusCircle, Store, DollarSign, Truck } from 'lucide-react';
+import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, PlusCircle, Store, DollarSign, Truck, RefreshCw } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {
@@ -31,6 +31,7 @@ const navItems: NavItem[] = [
   { title: 'Logística', url: '/logistica', icon: Truck, perfis: ['admin', 'gestor', 'logistica'] },
   { title: 'Usuários', url: '/usuarios', icon: Users, perfis: ['admin'] },
   { title: 'Pipelines', url: '/pipelines', icon: Settings, perfis: ['admin'] },
+  { title: 'Integração', url: '/integracao', icon: RefreshCw, perfis: ['admin'] },
 ];
 
 export function AppSidebar() {
