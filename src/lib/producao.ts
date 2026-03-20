@@ -303,6 +303,7 @@ export const STATUS_PEDIDO_CONFIG: Record<string, { label: string; color: string
   AGUARDANDO_COMERCIAL: { label: 'Aguardando Comercial', color: 'bg-warning/15 text-warning' },
   VALIDADO_COMERCIAL: { label: 'Validado Comercial', color: 'bg-success/15 text-success' },
   AGUARDANDO_FINANCEIRO: { label: 'Aguardando Financeiro', color: 'bg-warning/15 text-warning' },
+  VALIDADO_FINANCEIRO: { label: 'Validado Financeiro', color: 'bg-success/15 text-success' },
   LIBERADO_LOGISTICA: { label: 'Liberado Logística', color: 'bg-primary/15 text-primary' },
   EM_SEPARACAO: { label: 'Em Separação', color: 'bg-primary/15 text-primary' },
   ENVIADO: { label: 'Enviado', color: 'bg-success/15 text-success' },
