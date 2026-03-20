@@ -271,7 +271,7 @@ async function processarVenda(
       forma_envio: null,
       observacao_api: venda.ds_observacao || null,
       observacao_interna_api: venda.ds_observacao_interna || null,
-      data_venda_api: parseDateBR(venda.dte_venda),
+      data_venda_api: venda.dte_venda ? venda.dte_venda.split('T')[0] : null,
       data_previsao_entrega: parseDateBR(venda.dt_previsao_entrega),
       data_entrega_api: parseDateBR(venda.dt_entrega),
     })
