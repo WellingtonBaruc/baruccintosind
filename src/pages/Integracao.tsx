@@ -365,6 +365,7 @@ export default function Integracao() {
                   <TableHead className="text-right">Recebidos</TableHead>
                   <TableHead className="text-right">Inseridos</TableHead>
                   <TableHead className="text-right">Atualizados</TableHead>
+                  <TableHead className="text-right">Ignorados</TableHead>
                   <TableHead className="text-right">Erros</TableHead>
                   <TableHead className="text-right">Duração</TableHead>
                 </TableRow>
