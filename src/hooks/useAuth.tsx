@@ -31,41 +31,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('usuarios')
-      .select('*')
-      .eq('id', userId)
-      .eq('ativo', true)
-      .single();
-    setProfile(data);
+    try {
+      const { data } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('id', userId)
+        .eq('ativo', true)
+        .single();
+      setProfile(data);
+    } catch {
+      setProfile(null);
+    }
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    let mounted = true;
+
+    // Get initial session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         await fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
       }
-      setLoading(false);
+      if (mounted) setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Listen for auth changes (sign in, sign out, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
+        // Don't await — let it update profile in background
         fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
       }
-      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error) {
+      // Fetch profile after successful sign in
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await fetchProfile(user.id);
+    }
     return { error: error as Error | null };
   };
 
