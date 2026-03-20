@@ -16,7 +16,13 @@ import { ptBR } from 'date-fns/locale';
 
 const PERFIS_PRODUCAO = ['operador_producao', 'supervisor_producao', 'gestor', 'admin'];
 
-interface OrdemView extends OrdemProducao {
+interface OrdemView {
+  id: string;
+  pedido_id: string;
+  pipeline_id: string;
+  sequencia: number;
+  status: string;
+  criado_em: string;
   pedidos: { numero_pedido: string; cliente_nome: string; valor_liquido: number; criado_em: string };
   pipeline_producao: { nome: string };
   etapa_atual?: string;
