@@ -8,7 +8,6 @@ import {
   confirmarLojaOk,
   definirCaminhoLoja,
   finalizarVerificacaoLoja,
-  criarPedidoCompleto,
 } from '@/lib/producao';
 import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
