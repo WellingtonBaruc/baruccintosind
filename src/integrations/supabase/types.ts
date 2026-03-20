@@ -189,8 +189,12 @@ export type Database = {
       }
       pedido_itens: {
         Row: {
+          conferido: boolean
           descricao_produto: string
+          disponivel: boolean | null
           id: string
+          item_faltante_tipo: string | null
+          observacao_producao: string | null
           pedido_id: string
           produto_api_id: string | null
           quantidade: number
@@ -199,8 +203,12 @@ export type Database = {
           valor_unitario: number
         }
         Insert: {
+          conferido?: boolean
           descricao_produto: string
+          disponivel?: boolean | null
           id?: string
+          item_faltante_tipo?: string | null
+          observacao_producao?: string | null
           pedido_id: string
           produto_api_id?: string | null
           quantidade?: number
@@ -209,8 +217,12 @@ export type Database = {
           valor_unitario?: number
         }
         Update: {
+          conferido?: boolean
           descricao_produto?: string
+          disponivel?: boolean | null
           id?: string
+          item_faltante_tipo?: string | null
+          observacao_producao?: string | null
           pedido_id?: string
           produto_api_id?: string | null
           quantidade?: number
@@ -250,7 +262,11 @@ export type Database = {
           observacao_financeiro: string | null
           observacao_logistica: string | null
           pagamento_confirmado: boolean
+          sincronizacao_bloqueada: boolean
+          status_api: string | null
           status_atual: Database["public"]["Enums"]["status_pedido"]
+          subtipo_pronta_entrega: string | null
+          tipo_fluxo: string | null
           usuario_responsavel_id: string | null
           valor_bruto: number
           valor_desconto: number
@@ -278,7 +294,11 @@ export type Database = {
           observacao_financeiro?: string | null
           observacao_logistica?: string | null
           pagamento_confirmado?: boolean
+          sincronizacao_bloqueada?: boolean
+          status_api?: string | null
           status_atual?: Database["public"]["Enums"]["status_pedido"]
+          subtipo_pronta_entrega?: string | null
+          tipo_fluxo?: string | null
           usuario_responsavel_id?: string | null
           valor_bruto?: number
           valor_desconto?: number
@@ -306,7 +326,11 @@ export type Database = {
           observacao_financeiro?: string | null
           observacao_logistica?: string | null
           pagamento_confirmado?: boolean
+          sincronizacao_bloqueada?: boolean
+          status_api?: string | null
           status_atual?: Database["public"]["Enums"]["status_pedido"]
+          subtipo_pronta_entrega?: string | null
+          tipo_fluxo?: string | null
           usuario_responsavel_id?: string | null
           valor_bruto?: number
           valor_desconto?: number
@@ -391,6 +415,74 @@ export type Database = {
         }
         Relationships: []
       }
+      solicitacoes_almoxarifado: {
+        Row: {
+          atendido_em: string | null
+          atendido_por: string | null
+          criado_em: string
+          descricao: string
+          id: string
+          pedido_id: string
+          pedido_item_id: string | null
+          quantidade: number
+          solicitado_por: string | null
+          status: string
+        }
+        Insert: {
+          atendido_em?: string | null
+          atendido_por?: string | null
+          criado_em?: string
+          descricao: string
+          id?: string
+          pedido_id: string
+          pedido_item_id?: string | null
+          quantidade?: number
+          solicitado_por?: string | null
+          status?: string
+        }
+        Update: {
+          atendido_em?: string | null
+          atendido_por?: string | null
+          criado_em?: string
+          descricao?: string
+          id?: string
+          pedido_id?: string
+          pedido_item_id?: string | null
+          quantidade?: number
+          solicitado_por?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitacoes_almoxarifado_atendido_por_fkey"
+            columns: ["atendido_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_almoxarifado_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_almoxarifado_pedido_item_id_fkey"
+            columns: ["pedido_item_id"]
+            isOneToOne: false
+            referencedRelation: "pedido_itens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_almoxarifado_solicitado_por_fkey"
+            columns: ["solicitado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuarios: {
         Row: {
           ativo: boolean
@@ -438,6 +530,7 @@ export type Database = {
         | "comercial"
         | "financeiro"
         | "logistica"
+        | "loja"
       status_op_etapa: "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDA" | "REJEITADA"
       status_ordem:
         | "AGUARDANDO"
@@ -458,6 +551,11 @@ export type Database = {
         | "ENTREGUE"
         | "BLOQUEADO"
         | "CANCELADO"
+        | "AGUARDANDO_LOJA"
+        | "LOJA_VERIFICANDO"
+        | "AGUARDANDO_OP_COMPLEMENTAR"
+        | "AGUARDANDO_ALMOXARIFADO"
+        | "LOJA_OK"
       tipo_acao_historico:
         | "TRANSICAO"
         | "EDICAO"
@@ -599,6 +697,7 @@ export const Constants = {
         "comercial",
         "financeiro",
         "logistica",
+        "loja",
       ],
       status_op_etapa: ["PENDENTE", "EM_ANDAMENTO", "CONCLUIDA", "REJEITADA"],
       status_ordem: [
@@ -621,6 +720,11 @@ export const Constants = {
         "ENTREGUE",
         "BLOQUEADO",
         "CANCELADO",
+        "AGUARDANDO_LOJA",
+        "LOJA_VERIFICANDO",
+        "AGUARDANDO_OP_COMPLEMENTAR",
+        "AGUARDANDO_ALMOXARIFADO",
+        "LOJA_OK",
       ],
       tipo_acao_historico: [
         "TRANSICAO",

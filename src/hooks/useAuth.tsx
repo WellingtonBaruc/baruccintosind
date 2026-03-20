@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { supabase } from '@/lib/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 
-export type PerfilUsuario = 'admin' | 'gestor' | 'supervisor_producao' | 'operador_producao' | 'comercial' | 'financeiro' | 'logistica';
+export type PerfilUsuario = 'admin' | 'gestor' | 'supervisor_producao' | 'operador_producao' | 'comercial' | 'financeiro' | 'logistica' | 'loja';
 
 export interface UsuarioProfile {
   id: string;

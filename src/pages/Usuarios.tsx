@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
-const PERFIS: PerfilUsuario[] = ['admin', 'gestor', 'supervisor_producao', 'operador_producao', 'comercial', 'financeiro', 'logistica'];
+const PERFIS: PerfilUsuario[] = ['admin', 'gestor', 'supervisor_producao', 'operador_producao', 'comercial', 'financeiro', 'logistica', 'loja'];
 
 const PERFIL_LABELS: Record<PerfilUsuario, string> = {
   admin: 'Admin',
@@ -24,6 +24,7 @@ const PERFIL_LABELS: Record<PerfilUsuario, string> = {
   comercial: 'Comercial',
   financeiro: 'Financeiro',
   logistica: 'Logística',
+  loja: 'Loja/Expedição',
 };
 
 interface UsuarioRow {
