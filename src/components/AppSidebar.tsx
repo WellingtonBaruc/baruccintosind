@@ -1,4 +1,4 @@
-import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, PlusCircle, Store } from 'lucide-react';
+import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, PlusCircle, Store, DollarSign, Truck } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {
@@ -27,6 +27,8 @@ const navItems: NavItem[] = [
   { title: 'Fila de Produção', url: '/producao', icon: ClipboardList, perfis: ['admin', 'gestor', 'supervisor_producao', 'operador_producao'] },
   { title: 'Novo Pedido', url: '/producao/novo', icon: PlusCircle, perfis: ['admin', 'gestor'] },
   { title: 'Fila da Loja', url: '/loja', icon: Store, perfis: ['admin', 'gestor', 'loja'] },
+  { title: 'Financeiro', url: '/financeiro', icon: DollarSign, perfis: ['admin', 'gestor', 'financeiro'] },
+  { title: 'Logística', url: '/logistica', icon: Truck, perfis: ['admin', 'gestor', 'logistica'] },
   { title: 'Usuários', url: '/usuarios', icon: Users, perfis: ['admin'] },
   { title: 'Pipelines', url: '/pipelines', icon: Settings, perfis: ['admin'] },
 ];

@@ -139,6 +139,57 @@ export type Database = {
           },
         ]
       }
+      pedido_financeiro: {
+        Row: {
+          confirmado_por: string | null
+          criado_em: string
+          data_confirmacao: string | null
+          forma_pagamento_confirmada: string | null
+          id: string
+          motivo_bloqueio: string | null
+          observacao: string | null
+          pagamento_confirmado: boolean
+          pedido_id: string
+        }
+        Insert: {
+          confirmado_por?: string | null
+          criado_em?: string
+          data_confirmacao?: string | null
+          forma_pagamento_confirmada?: string | null
+          id?: string
+          motivo_bloqueio?: string | null
+          observacao?: string | null
+          pagamento_confirmado?: boolean
+          pedido_id: string
+        }
+        Update: {
+          confirmado_por?: string | null
+          criado_em?: string
+          data_confirmacao?: string | null
+          forma_pagamento_confirmada?: string | null
+          id?: string
+          motivo_bloqueio?: string | null
+          observacao?: string | null
+          pagamento_confirmado?: boolean
+          pedido_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_financeiro_confirmado_por_fkey"
+            columns: ["confirmado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_financeiro_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: true
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedido_historico: {
         Row: {
           criado_em: string
@@ -236,6 +287,57 @@ export type Database = {
             columns: ["pedido_id"]
             isOneToOne: false
             referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedido_logistica: {
+        Row: {
+          codigo_rastreio: string | null
+          criado_em: string
+          data_entrega_confirmada: string | null
+          data_envio: string | null
+          id: string
+          observacao: string | null
+          pedido_id: string
+          responsavel_envio_id: string | null
+          transportadora: string | null
+        }
+        Insert: {
+          codigo_rastreio?: string | null
+          criado_em?: string
+          data_entrega_confirmada?: string | null
+          data_envio?: string | null
+          id?: string
+          observacao?: string | null
+          pedido_id: string
+          responsavel_envio_id?: string | null
+          transportadora?: string | null
+        }
+        Update: {
+          codigo_rastreio?: string | null
+          criado_em?: string
+          data_entrega_confirmada?: string | null
+          data_envio?: string | null
+          id?: string
+          observacao?: string | null
+          pedido_id?: string
+          responsavel_envio_id?: string | null
+          transportadora?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_logistica_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: true
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_logistica_responsavel_envio_id_fkey"
+            columns: ["responsavel_envio_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
         ]
@@ -556,6 +658,7 @@ export type Database = {
         | "AGUARDANDO_OP_COMPLEMENTAR"
         | "AGUARDANDO_ALMOXARIFADO"
         | "LOJA_OK"
+        | "VALIDADO_FINANCEIRO"
       tipo_acao_historico:
         | "TRANSICAO"
         | "EDICAO"
@@ -725,6 +828,7 @@ export const Constants = {
         "AGUARDANDO_OP_COMPLEMENTAR",
         "AGUARDANDO_ALMOXARIFADO",
         "LOJA_OK",
+        "VALIDADO_FINANCEIRO",
       ],
       tipo_acao_historico: [
         "TRANSICAO",
