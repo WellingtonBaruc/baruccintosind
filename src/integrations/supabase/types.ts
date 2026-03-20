@@ -14,6 +14,315 @@ export type Database = {
   }
   public: {
     Tables: {
+      op_etapas: {
+        Row: {
+          concluido_em: string | null
+          id: string
+          iniciado_em: string | null
+          motivo_rejeicao: string | null
+          nome_etapa: string
+          observacao: string | null
+          operador_id: string | null
+          ordem_id: string
+          ordem_sequencia: number
+          pipeline_etapa_id: string | null
+          status: Database["public"]["Enums"]["status_op_etapa"]
+        }
+        Insert: {
+          concluido_em?: string | null
+          id?: string
+          iniciado_em?: string | null
+          motivo_rejeicao?: string | null
+          nome_etapa: string
+          observacao?: string | null
+          operador_id?: string | null
+          ordem_id: string
+          ordem_sequencia?: number
+          pipeline_etapa_id?: string | null
+          status?: Database["public"]["Enums"]["status_op_etapa"]
+        }
+        Update: {
+          concluido_em?: string | null
+          id?: string
+          iniciado_em?: string | null
+          motivo_rejeicao?: string | null
+          nome_etapa?: string
+          observacao?: string | null
+          operador_id?: string | null
+          ordem_id?: string
+          ordem_sequencia?: number
+          pipeline_etapa_id?: string | null
+          status?: Database["public"]["Enums"]["status_op_etapa"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "op_etapas_operador_id_fkey"
+            columns: ["operador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "op_etapas_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_producao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "op_etapas_pipeline_etapa_id_fkey"
+            columns: ["pipeline_etapa_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_etapas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ordens_producao: {
+        Row: {
+          aprovado_em: string | null
+          criado_em: string
+          id: string
+          observacao: string | null
+          pedido_id: string
+          pipeline_id: string
+          sequencia: number
+          status: Database["public"]["Enums"]["status_ordem"]
+          supervisor_id: string | null
+          tipo_produto: string | null
+        }
+        Insert: {
+          aprovado_em?: string | null
+          criado_em?: string
+          id?: string
+          observacao?: string | null
+          pedido_id: string
+          pipeline_id: string
+          sequencia?: number
+          status?: Database["public"]["Enums"]["status_ordem"]
+          supervisor_id?: string | null
+          tipo_produto?: string | null
+        }
+        Update: {
+          aprovado_em?: string | null
+          criado_em?: string
+          id?: string
+          observacao?: string | null
+          pedido_id?: string
+          pipeline_id?: string
+          sequencia?: number
+          status?: Database["public"]["Enums"]["status_ordem"]
+          supervisor_id?: string | null
+          tipo_produto?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_producao_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_producao_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_producao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_producao_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedido_historico: {
+        Row: {
+          criado_em: string
+          id: string
+          observacao: string | null
+          pedido_id: string
+          status_anterior: string | null
+          status_novo: string | null
+          tipo_acao: Database["public"]["Enums"]["tipo_acao_historico"]
+          usuario_id: string | null
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          observacao?: string | null
+          pedido_id: string
+          status_anterior?: string | null
+          status_novo?: string | null
+          tipo_acao: Database["public"]["Enums"]["tipo_acao_historico"]
+          usuario_id?: string | null
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          observacao?: string | null
+          pedido_id?: string
+          status_anterior?: string | null
+          status_novo?: string | null
+          tipo_acao?: Database["public"]["Enums"]["tipo_acao_historico"]
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_historico_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_historico_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedido_itens: {
+        Row: {
+          descricao_produto: string
+          id: string
+          pedido_id: string
+          produto_api_id: string | null
+          quantidade: number
+          unidade_medida: string | null
+          valor_total: number
+          valor_unitario: number
+        }
+        Insert: {
+          descricao_produto: string
+          id?: string
+          pedido_id: string
+          produto_api_id?: string | null
+          quantidade?: number
+          unidade_medida?: string | null
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Update: {
+          descricao_produto?: string
+          id?: string
+          pedido_id?: string
+          produto_api_id?: string | null
+          quantidade?: number
+          unidade_medida?: string | null
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_itens_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedidos: {
+        Row: {
+          api_venda_id: string | null
+          atualizado_em: string
+          cliente_cpf_cnpj: string | null
+          cliente_email: string | null
+          cliente_endereco: string | null
+          cliente_nome: string
+          cliente_telefone: string | null
+          codigo_rastreio: string | null
+          criado_em: string
+          data_entrega: string | null
+          data_envio: string | null
+          data_pagamento_confirmado: string | null
+          forma_envio: string | null
+          forma_pagamento: string | null
+          id: string
+          numero_pedido: string
+          observacao_comercial: string | null
+          observacao_financeiro: string | null
+          observacao_logistica: string | null
+          pagamento_confirmado: boolean
+          status_atual: Database["public"]["Enums"]["status_pedido"]
+          usuario_responsavel_id: string | null
+          valor_bruto: number
+          valor_desconto: number
+          valor_liquido: number
+          vendedor_nome: string | null
+        }
+        Insert: {
+          api_venda_id?: string | null
+          atualizado_em?: string
+          cliente_cpf_cnpj?: string | null
+          cliente_email?: string | null
+          cliente_endereco?: string | null
+          cliente_nome: string
+          cliente_telefone?: string | null
+          codigo_rastreio?: string | null
+          criado_em?: string
+          data_entrega?: string | null
+          data_envio?: string | null
+          data_pagamento_confirmado?: string | null
+          forma_envio?: string | null
+          forma_pagamento?: string | null
+          id?: string
+          numero_pedido: string
+          observacao_comercial?: string | null
+          observacao_financeiro?: string | null
+          observacao_logistica?: string | null
+          pagamento_confirmado?: boolean
+          status_atual?: Database["public"]["Enums"]["status_pedido"]
+          usuario_responsavel_id?: string | null
+          valor_bruto?: number
+          valor_desconto?: number
+          valor_liquido?: number
+          vendedor_nome?: string | null
+        }
+        Update: {
+          api_venda_id?: string | null
+          atualizado_em?: string
+          cliente_cpf_cnpj?: string | null
+          cliente_email?: string | null
+          cliente_endereco?: string | null
+          cliente_nome?: string
+          cliente_telefone?: string | null
+          codigo_rastreio?: string | null
+          criado_em?: string
+          data_entrega?: string | null
+          data_envio?: string | null
+          data_pagamento_confirmado?: string | null
+          forma_envio?: string | null
+          forma_pagamento?: string | null
+          id?: string
+          numero_pedido?: string
+          observacao_comercial?: string | null
+          observacao_financeiro?: string | null
+          observacao_logistica?: string | null
+          pagamento_confirmado?: boolean
+          status_atual?: Database["public"]["Enums"]["status_pedido"]
+          usuario_responsavel_id?: string | null
+          valor_bruto?: number
+          valor_desconto?: number
+          valor_liquido?: number
+          vendedor_nome?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_usuario_responsavel_id_fkey"
+            columns: ["usuario_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_etapas: {
         Row: {
           avanco_automatico: boolean
@@ -117,6 +426,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_user_perfil: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
@@ -128,6 +438,32 @@ export type Database = {
         | "comercial"
         | "financeiro"
         | "logistica"
+      status_op_etapa: "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDA" | "REJEITADA"
+      status_ordem:
+        | "AGUARDANDO"
+        | "EM_ANDAMENTO"
+        | "CONCLUIDA"
+        | "REJEITADA"
+        | "CANCELADA"
+      status_pedido:
+        | "AGUARDANDO_PRODUCAO"
+        | "EM_PRODUCAO"
+        | "PRODUCAO_CONCLUIDA"
+        | "AGUARDANDO_COMERCIAL"
+        | "VALIDADO_COMERCIAL"
+        | "AGUARDANDO_FINANCEIRO"
+        | "LIBERADO_LOGISTICA"
+        | "EM_SEPARACAO"
+        | "ENVIADO"
+        | "ENTREGUE"
+        | "BLOQUEADO"
+        | "CANCELADO"
+      tipo_acao_historico:
+        | "TRANSICAO"
+        | "EDICAO"
+        | "COMENTARIO"
+        | "REJEICAO"
+        | "APROVACAO"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -263,6 +599,35 @@ export const Constants = {
         "comercial",
         "financeiro",
         "logistica",
+      ],
+      status_op_etapa: ["PENDENTE", "EM_ANDAMENTO", "CONCLUIDA", "REJEITADA"],
+      status_ordem: [
+        "AGUARDANDO",
+        "EM_ANDAMENTO",
+        "CONCLUIDA",
+        "REJEITADA",
+        "CANCELADA",
+      ],
+      status_pedido: [
+        "AGUARDANDO_PRODUCAO",
+        "EM_PRODUCAO",
+        "PRODUCAO_CONCLUIDA",
+        "AGUARDANDO_COMERCIAL",
+        "VALIDADO_COMERCIAL",
+        "AGUARDANDO_FINANCEIRO",
+        "LIBERADO_LOGISTICA",
+        "EM_SEPARACAO",
+        "ENVIADO",
+        "ENTREGUE",
+        "BLOQUEADO",
+        "CANCELADO",
+      ],
+      tipo_acao_historico: [
+        "TRANSICAO",
+        "EDICAO",
+        "COMENTARIO",
+        "REJEICAO",
+        "APROVACAO",
       ],
     },
   },
