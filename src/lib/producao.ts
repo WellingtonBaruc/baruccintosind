@@ -88,15 +88,15 @@ export async function gerarNumeroPedido(): Promise<string> {
 
 // Create pedido + itens + ordem + etapas in one flow
 export async function criarPedidoCompleto(
-  pedidoData: Omit<Pedido, 'id' | 'criado_em' | 'atualizado_em'>,
-  itens: Omit<PedidoItem, 'id' | 'pedido_id'>[],
+  pedidoData: Record<string, any>,
+  itens: Record<string, any>[],
   pipelineId: string,
   userId: string
 ) {
   // 1. Create pedido
   const { data: pedido, error: pedidoErr } = await supabase
     .from('pedidos')
-    .insert(pedidoData)
+    .insert(pedidoData as any)
     .select()
     .single();
   if (pedidoErr || !pedido) throw pedidoErr || new Error('Falha ao criar pedido');
