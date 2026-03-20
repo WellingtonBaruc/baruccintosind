@@ -273,6 +273,78 @@ export default function Integracao() {
         </Card>
       </div>
 
+      {/* Diagnostics */}
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" /> Diagnóstico da Base Importada
+          </CardTitle>
+          <CardDescription>Contagem de pedidos agrupados por status da API Simplifica.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Count by status_api */}
+          <div>
+            <h4 className="text-sm font-medium mb-2">Pedidos por status_api</h4>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Status API</TableHead>
+                  <TableHead className="text-right">Quantidade</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {diagCounts.map(row => (
+                  <TableRow key={row.status_api}>
+                    <TableCell>{row.status_api}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{row.count}</TableCell>
+                  </TableRow>
+                ))}
+                {diagCounts.length === 0 && (
+                  <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground py-4">Nenhum pedido importado.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mismatch: Finalizado but still active */}
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-medium mb-1">Pedidos "Finalizado" no Simplifica ainda ativos internamente</h4>
+            <p className="text-xs text-muted-foreground mb-3">Pedidos com status_api = Finalizado cujo status_atual não é ENTREGUE, CANCELADO ou FINALIZADO_SIMPLIFICA.</p>
+            {mismatch.total === 0 ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-600">
+                <CheckCircle2 className="h-4 w-4" /> Nenhuma inconsistência encontrada.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="destructive">{mismatch.total} pedidos inconsistentes</Badge>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Status Atual (interno)</TableHead>
+                      <TableHead className="text-right">Quantidade</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {mismatch.statuses.map(s => (
+                      <TableRow key={s.status_atual}>
+                        <TableCell><Badge variant="outline">{s.status_atual}</Badge></TableCell>
+                        <TableCell className="text-right tabular-nums font-medium">{s.count}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <Button onClick={handleFixFinalized} disabled={fixing} variant="destructive" size="sm">
+                  {fixing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                  {fixing ? 'Corrigindo...' : `Corrigir ${mismatch.total} pedidos finalizados`}
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Logs */}
       <Card className="border-border/60 shadow-sm">
         <CardHeader className="pb-3">
