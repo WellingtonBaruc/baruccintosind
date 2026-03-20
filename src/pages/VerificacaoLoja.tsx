@@ -56,6 +56,8 @@ export default function VerificacaoLoja() {
   const [descricaoSolicitacao, setDescricaoSolicitacao] = useState('');
   const [qtdSolicitacao, setQtdSolicitacao] = useState(1);
 
+  const [opComplementarDone, setOpComplementarDone] = useState(false);
+
   const fetchData = useCallback(async () => {
     if (!pedidoId) return;
     const [pedidoRes, itensRes, solicRes] = await Promise.all([
@@ -73,6 +75,20 @@ export default function VerificacaoLoja() {
   }, [pedidoId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!pedidoId) return;
+    supabase.from('ordens_producao').select('id, status, aprovado_em')
+      .eq('pedido_id', pedidoId)
+      .eq('tipo_produto', 'OP_COMPLEMENTAR')
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setOpComplementarDone(data.every(o => o.aprovado_em !== null));
+        } else {
+          setOpComplementarDone(true);
+        }
+      });
+  }, [pedidoId, pedido?.status_atual]);
 
   if (!profile || !PERFIS_LOJA.includes(profile.perfil)) {
     return <Navigate to="/dashboard" replace />;
