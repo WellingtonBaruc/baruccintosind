@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      hasMore = data.hasMore === true && vendasArray.length === limit;
+      hasMore = apiHasMore && vendasArray.length === limit;
       offset += limit;
     }
 
