@@ -36,6 +36,9 @@ interface LogEntry {
   executado_em: string;
 }
 
+interface DiagRow { status_api: string | null; count: number }
+interface MismatchInfo { total: number; statuses: { status_atual: string; count: number }[] }
+
 export default function Integracao() {
   const { profile } = useAuth();
   const [config, setConfig] = useState<Config | null>(null);
@@ -43,6 +46,9 @@ export default function Integracao() {
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [diagCounts, setDiagCounts] = useState<DiagRow[]>([]);
+  const [mismatch, setMismatch] = useState<MismatchInfo>({ total: 0, statuses: [] });
+  const [fixing, setFixing] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -56,6 +62,71 @@ export default function Integracao() {
     setConfig(cfg as any);
     setLogs((logData || []) as any);
     setLoading(false);
+    fetchDiagnostics();
+  };
+
+  const fetchDiagnostics = async () => {
+    // Count by status_api
+    const { data: allPedidos } = await supabase.from('pedidos').select('status_api, status_atual');
+    if (!allPedidos) return;
+
+    const apiCounts: Record<string, number> = {};
+    const mismatchStatuses: Record<string, number> = {};
+    let mismatchTotal = 0;
+
+    for (const p of allPedidos) {
+      const key = p.status_api || '(vazio)';
+      apiCounts[key] = (apiCounts[key] || 0) + 1;
+
+      if (p.status_api === 'Finalizado' && p.status_atual !== 'ENTREGUE' && p.status_atual !== 'CANCELADO' && p.status_atual !== 'FINALIZADO_SIMPLIFICA') {
+        mismatchTotal++;
+        mismatchStatuses[p.status_atual] = (mismatchStatuses[p.status_atual] || 0) + 1;
+      }
+    }
+
+    setDiagCounts(Object.entries(apiCounts).map(([status_api, count]) => ({ status_api, count })).sort((a, b) => b.count - a.count));
+    setMismatch({
+      total: mismatchTotal,
+      statuses: Object.entries(mismatchStatuses).map(([status_atual, count]) => ({ status_atual, count })).sort((a, b) => b.count - a.count),
+    });
+  };
+
+  const handleFixFinalized = async () => {
+    setFixing(true);
+    try {
+      const { data: toFix } = await supabase
+        .from('pedidos')
+        .select('id, status_atual')
+        .eq('status_api', 'Finalizado')
+        .not('status_atual', 'in', '("ENTREGUE","CANCELADO","FINALIZADO_SIMPLIFICA")');
+
+      if (!toFix || toFix.length === 0) {
+        toast.info('Nenhum pedido para corrigir.');
+        setFixing(false);
+        return;
+      }
+
+      let corrected = 0;
+      for (const p of toFix) {
+        const { error } = await supabase.from('pedidos').update({ status_atual: 'FINALIZADO_SIMPLIFICA' as any }).eq('id', p.id);
+        if (!error) {
+          await supabase.from('pedido_historico').insert({
+            pedido_id: p.id,
+            tipo_acao: 'TRANSICAO' as any,
+            status_anterior: p.status_atual,
+            status_novo: 'FINALIZADO_SIMPLIFICA',
+            observacao: 'Corrigido automaticamente — já estava Finalizado no Simplifica na importação',
+          });
+          corrected++;
+        }
+      }
+
+      toast.success(`${corrected} pedidos corrigidos para FINALIZADO_SIMPLIFICA.`);
+      fetchDiagnostics();
+    } catch (err: any) {
+      toast.error(`Erro ao corrigir: ${err.message}`);
+    }
+    setFixing(false);
   };
 
   if (!profile || profile.perfil !== 'admin') {
