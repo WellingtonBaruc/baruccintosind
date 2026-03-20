@@ -374,9 +374,9 @@ export async function definirCaminhoLoja(
   novoStatus: string
 ) {
   await supabase.from('pedidos').update({
-    status_atual: novoStatus,
+    status_atual: novoStatus as any,
     subtipo_pronta_entrega: subtipo,
-  }).eq('id', pedidoId);
+  } as any).eq('id', pedidoId);
 
   await supabase.from('pedido_historico').insert({
     pedido_id: pedidoId,
