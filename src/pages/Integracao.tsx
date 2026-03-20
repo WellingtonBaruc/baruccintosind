@@ -29,6 +29,7 @@ interface LogEntry {
   total_recebidos: number;
   total_inseridos: number;
   total_atualizados: number;
+  total_ignorados: number;
   total_erros: number;
   paginas_processadas: number;
   erro_detalhes: string | null;
@@ -364,6 +365,7 @@ export default function Integracao() {
                   <TableHead className="text-right">Recebidos</TableHead>
                   <TableHead className="text-right">Inseridos</TableHead>
                   <TableHead className="text-right">Atualizados</TableHead>
+                  <TableHead className="text-right">Ignorados</TableHead>
                   <TableHead className="text-right">Erros</TableHead>
                   <TableHead className="text-right">Duração</TableHead>
                 </TableRow>
@@ -388,6 +390,7 @@ export default function Integracao() {
                     <TableCell className="text-right tabular-nums">{log.total_recebidos}</TableCell>
                     <TableCell className="text-right tabular-nums font-medium">{log.total_inseridos}</TableCell>
                     <TableCell className="text-right tabular-nums">{log.total_atualizados}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">{log.total_ignorados || 0}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {log.total_erros > 0 ? (
                         <span className="text-destructive font-medium">{log.total_erros}</span>

@@ -11,6 +11,7 @@ interface SyncResult {
   total_recebidos: number;
   total_inseridos: number;
   total_atualizados: number;
+  total_ignorados: number;
   total_erros: number;
   paginas_processadas: number;
   erros: string[];
@@ -19,12 +20,13 @@ interface SyncResult {
 
 function parseDateBR(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
-  // DD/MM/YYYY → YYYY-MM-DD
   const parts = dateStr.split('/');
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
+  if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
   return dateStr;
+}
+
+function fmtBRL(v: number): string {
+  return `R$ ${v.toFixed(2).replace('.', ',')}`;
 }
 
 Deno.serve(async (req) => {
@@ -47,6 +49,7 @@ Deno.serve(async (req) => {
     total_recebidos: 0,
     total_inseridos: 0,
     total_atualizados: 0,
+    total_ignorados: 0,
     total_erros: 0,
     paginas_processadas: 0,
     erros: [],
@@ -54,7 +57,6 @@ Deno.serve(async (req) => {
   };
 
   try {
-    // Get config
     const { data: config } = await supabase
       .from('integracao_configuracao')
       .select('*')
@@ -68,7 +70,6 @@ Deno.serve(async (req) => {
     dataInicio.setDate(dataInicio.getDate() - diasImportacao);
     const dataInicioStr = `${String(dataInicio.getDate()).padStart(2, '0')}/${String(dataInicio.getMonth() + 1).padStart(2, '0')}/${dataInicio.getFullYear()}`;
 
-    // Get default pipeline
     const { data: pipeline } = await supabase
       .from('pipeline_producao')
       .select('id')
@@ -78,8 +79,6 @@ Deno.serve(async (req) => {
       .single();
 
     const pipelineId = pipeline?.id;
-
-    // Get pipeline steps if we have a pipeline
     let pipelineEtapas: any[] = [];
     if (pipelineId) {
       const { data: etapas } = await supabase
@@ -90,7 +89,6 @@ Deno.serve(async (req) => {
       pipelineEtapas = etapas || [];
     }
 
-    // Paginate through API
     let offset = 0;
     const limit = 100;
     let hasMore = true;
@@ -116,28 +114,15 @@ Deno.serve(async (req) => {
           const statusApi = venda.situacao_texto || '';
           const apiVendaId = String(venda.id_venda);
 
-          // Check if already exists
           const { data: existente } = await supabase
             .from('pedidos')
-            .select('id, status_atual, sincronizacao_bloqueada, status_api')
+            .select('id, status_atual, sincronizacao_bloqueada, status_api, numero_pedido')
             .eq('api_venda_id', apiVendaId)
             .maybeSingle();
 
           if (existente) {
-            // Existing: only update status_api if changed
-            if (existente.status_api !== statusApi) {
-              await supabase.from('pedidos').update({ status_api: statusApi }).eq('id', existente.id);
-              if (statusApi === 'Finalizado' && ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO'].includes(existente.status_atual)) {
-                await supabase.from('pedido_historico').insert({
-                  pedido_id: existente.id,
-                  tipo_acao: 'COMENTARIO',
-                  observacao: `⚠️ ALERTA: Simplifica marcou como Finalizado mas produção interna ainda está em ${existente.status_atual}.`,
-                });
-              }
-            }
-            result.total_atualizados++;
+            await processarExistente(supabase, venda, existente, statusApi, result);
           } else if (statusApi === 'Em Produção' || statusApi === 'Pedido Enviado') {
-            // New: only import these two statuses
             await inserirNovoPedido(supabase, venda, statusApi, pipelineId, pipelineEtapas, result);
           }
           // Any other status for new records → skip entirely
@@ -151,7 +136,6 @@ Deno.serve(async (req) => {
       offset += limit;
     }
 
-    // Update ultima_sincronizacao
     if (config?.id) {
       await supabase
         .from('integracao_configuracao')
@@ -159,7 +143,6 @@ Deno.serve(async (req) => {
         .eq('id', config.id);
     }
 
-    // Log result
     const duracao = Date.now() - startTime;
     const logStatus = result.total_erros > 0
       ? (result.total_inseridos > 0 || result.total_atualizados > 0 ? 'PARCIAL' : 'ERRO')
@@ -171,9 +154,10 @@ Deno.serve(async (req) => {
       total_recebidos: result.total_recebidos,
       total_inseridos: result.total_inseridos,
       total_atualizados: result.total_atualizados,
+      total_ignorados: result.total_ignorados,
       total_erros: result.total_erros,
       paginas_processadas: result.paginas_processadas,
-      erro_detalhes: result.erros.length > 0 ? result.erros.join('\\n') : null,
+      erro_detalhes: result.erros.length > 0 ? result.erros.join('\n') : null,
       duracao_ms: duracao,
     });
 
@@ -191,6 +175,7 @@ Deno.serve(async (req) => {
       total_recebidos: result.total_recebidos,
       total_inseridos: result.total_inseridos,
       total_atualizados: result.total_atualizados,
+      total_ignorados: result.total_ignorados,
       total_erros: result.total_erros + 1,
       paginas_processadas: result.paginas_processadas,
       erro_detalhes: err.message,
@@ -203,6 +188,239 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+// ── Process existing order: detect changes, diff items ──
+
+async function processarExistente(
+  supabase: any,
+  venda: any,
+  existente: any,
+  statusApi: string,
+  result: SyncResult
+) {
+  let hadChanges = false;
+
+  // 1. Check status_api change
+  if (existente.status_api !== statusApi) {
+    await supabase.from('pedidos').update({ status_api: statusApi }).eq('id', existente.id);
+    hadChanges = true;
+
+    if (statusApi === 'Finalizado' && ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO'].includes(existente.status_atual)) {
+      await supabase.from('pedido_historico').insert({
+        pedido_id: existente.id,
+        tipo_acao: 'COMENTARIO',
+        observacao: `⚠️ ALERTA: Simplifica marcou como Finalizado mas produção interna ainda está em ${existente.status_atual}.`,
+      });
+    }
+  }
+
+  // 2. Detect item-level changes (only if bloqueada — means we manage it)
+  if (existente.sincronizacao_bloqueada) {
+    const apiItens = (venda.itens2 || venda.itens || []) as any[];
+    const { data: dbItens } = await supabase
+      .from('pedido_itens')
+      .select('*')
+      .eq('pedido_id', existente.id);
+
+    const itemChanges = detectItemChanges(dbItens || [], apiItens);
+
+    if (itemChanges.hasChanges) {
+      hadChanges = true;
+
+      // Build human-readable diff
+      const diffLines: string[] = [];
+      const beforeItems: any[] = [];
+      const afterItems: any[] = [];
+
+      for (const changed of itemChanges.changed) {
+        const lines = [`Item alterado: ${changed.descricao}`];
+        if (changed.qtdBefore !== changed.qtdAfter) {
+          lines.push(`  Quantidade: ${changed.qtdBefore} → ${changed.qtdAfter}`);
+        }
+        if (changed.vlBefore !== changed.vlAfter) {
+          lines.push(`  Valor unitário: ${fmtBRL(changed.vlBefore)} → ${fmtBRL(changed.vlAfter)}`);
+        }
+        if (changed.obsBefore !== changed.obsAfter) {
+          lines.push(`  Observação produção alterada`);
+        }
+        diffLines.push(lines.join('\n'));
+        beforeItems.push(changed.before);
+        afterItems.push(changed.after);
+      }
+
+      for (const added of itemChanges.added) {
+        diffLines.push(
+          `Item adicionado: ${added.descricao}\n  Quantidade: ${added.qtd} — Valor: ${fmtBRL(added.vl)}`
+        );
+        afterItems.push(added.raw);
+      }
+
+      for (const removed of itemChanges.removed) {
+        diffLines.push(
+          `Item removido: ${removed.descricao}\n  Quantidade era: ${removed.qtd}`
+        );
+        beforeItems.push(removed.raw);
+      }
+
+      // Register in history
+      await supabase.from('pedido_historico').insert({
+        pedido_id: existente.id,
+        tipo_acao: 'ALTERACAO_ITENS',
+        observacao: diffLines.join('\n\n'),
+      });
+
+      // Apply item changes to DB
+      await applyItemChanges(supabase, existente.id, dbItens || [], apiItens);
+
+      // Alert if order is in production or beyond
+      const activeStatuses = [
+        'EM_PRODUCAO', 'PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL',
+        'AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR',
+      ];
+      if (activeStatuses.includes(existente.status_atual)) {
+        await supabase.from('pedido_historico').insert({
+          pedido_id: existente.id,
+          tipo_acao: 'COMENTARIO',
+          observacao: `🔔 ATENÇÃO: Pedido ${existente.numero_pedido} teve itens alterados no Simplifica — verifique antes de prosseguir.`,
+        });
+        result.alertas.push(`Pedido ${existente.numero_pedido}: itens alterados enquanto em ${existente.status_atual}`);
+      }
+    }
+  }
+
+  if (hadChanges) {
+    result.total_atualizados++;
+  } else {
+    result.total_ignorados++;
+  }
+}
+
+// ── Detect item changes by comparing DB items with API items ──
+
+interface ItemChange {
+  hasChanges: boolean;
+  changed: { descricao: string; qtdBefore: number; qtdAfter: number; vlBefore: number; vlAfter: number; obsBefore: string | null; obsAfter: string | null; before: any; after: any }[];
+  added: { descricao: string; qtd: number; vl: number; raw: any }[];
+  removed: { descricao: string; qtd: number; raw: any }[];
+}
+
+function detectItemChanges(dbItens: any[], apiItens: any[]): ItemChange {
+  const result: ItemChange = { hasChanges: false, changed: [], added: [], removed: [] };
+
+  // Map DB items by api_item_id
+  const dbMap = new Map<string, any>();
+  for (const item of dbItens) {
+    if (item.api_item_id) dbMap.set(item.api_item_id, item);
+  }
+
+  // Map API items by id_item
+  const apiMap = new Map<string, any>();
+  for (const item of apiItens) {
+    const key = item.id_item ? String(item.id_item) : null;
+    if (key) apiMap.set(key, item);
+  }
+
+  // Check for changed and added items
+  for (const [apiId, apiItem] of apiMap) {
+    const dbItem = dbMap.get(apiId);
+    if (dbItem) {
+      const qtdApi = parseInt(apiItem.qt_item) || 1;
+      const vlApi = parseFloat(apiItem.vl_unitario) || 0;
+      const obsApi = apiItem.ds_observacao || null;
+
+      const qtdDb = dbItem.quantidade;
+      const vlDb = parseFloat(dbItem.valor_unitario) || 0;
+      const obsDb = dbItem.observacao_producao || null;
+
+      if (qtdApi !== qtdDb || Math.abs(vlApi - vlDb) > 0.001 || obsApi !== obsDb) {
+        result.hasChanges = true;
+        result.changed.push({
+          descricao: apiItem.nm_produto || dbItem.descricao_produto,
+          qtdBefore: qtdDb, qtdAfter: qtdApi,
+          vlBefore: vlDb, vlAfter: vlApi,
+          obsBefore: obsDb, obsAfter: obsApi,
+          before: { api_item_id: apiId, quantidade: qtdDb, valor_unitario: vlDb, observacao_producao: obsDb },
+          after: { api_item_id: apiId, quantidade: qtdApi, valor_unitario: vlApi, observacao_producao: obsApi },
+        });
+      }
+    } else {
+      result.hasChanges = true;
+      result.added.push({
+        descricao: apiItem.nm_produto || 'Sem descrição',
+        qtd: parseInt(apiItem.qt_item) || 1,
+        vl: parseFloat(apiItem.vl_unitario) || 0,
+        raw: apiItem,
+      });
+    }
+  }
+
+  // Check for removed items
+  for (const [apiId, dbItem] of dbMap) {
+    if (!apiMap.has(apiId)) {
+      result.hasChanges = true;
+      result.removed.push({
+        descricao: dbItem.descricao_produto,
+        qtd: dbItem.quantidade,
+        raw: dbItem,
+      });
+    }
+  }
+
+  return result;
+}
+
+// ── Apply detected item changes to DB ──
+
+async function applyItemChanges(supabase: any, pedidoId: string, dbItens: any[], apiItens: any[]) {
+  const dbMap = new Map<string, any>();
+  for (const item of dbItens) {
+    if (item.api_item_id) dbMap.set(item.api_item_id, item);
+  }
+
+  for (const apiItem of apiItens) {
+    const apiId = apiItem.id_item ? String(apiItem.id_item) : null;
+    if (!apiId) continue;
+
+    const dbItem = dbMap.get(apiId);
+    if (dbItem) {
+      // Update existing item
+      await supabase.from('pedido_itens').update({
+        quantidade: parseInt(apiItem.qt_item) || 1,
+        valor_unitario: parseFloat(apiItem.vl_unitario) || 0,
+        valor_unitario_liquido: parseFloat(apiItem.vl_unitario_com_desconto) || 0,
+        valor_total: parseFloat(apiItem.vl_total_com_desconto) || 0,
+        observacao_producao: apiItem.ds_observacao || null,
+        descricao_produto: apiItem.nm_produto || dbItem.descricao_produto,
+        referencia_produto: apiItem.nm_referencia || null,
+        categoria_produto: apiItem.nm_categoria || null,
+      }).eq('id', dbItem.id);
+      dbMap.delete(apiId);
+    } else {
+      // Insert new item
+      await supabase.from('pedido_itens').insert({
+        pedido_id: pedidoId,
+        api_item_id: apiId,
+        produto_api_id: apiItem.id_produto ? String(apiItem.id_produto) : null,
+        descricao_produto: apiItem.nm_produto || 'Sem descrição',
+        referencia_produto: apiItem.nm_referencia || null,
+        categoria_produto: apiItem.nm_categoria || null,
+        quantidade: parseInt(apiItem.qt_item) || 1,
+        valor_unitario: parseFloat(apiItem.vl_unitario) || 0,
+        valor_unitario_liquido: parseFloat(apiItem.vl_unitario_com_desconto) || 0,
+        valor_total: parseFloat(apiItem.vl_total_com_desconto) || 0,
+        observacao_producao: apiItem.ds_observacao || null,
+        unidade_medida: 'UN',
+      });
+    }
+  }
+
+  // Remove items no longer in API
+  for (const [, dbItem] of dbMap) {
+    await supabase.from('pedido_itens').delete().eq('id', dbItem.id);
+  }
+}
+
+// ── Insert new order ──
 
 async function inserirNovoPedido(
   supabase: any,
@@ -251,7 +469,6 @@ async function inserirNovoPedido(
 
   if (pedidoErr) throw pedidoErr;
 
-  // Insert items
   const itens = venda.itens2 || venda.itens || [];
   if (Array.isArray(itens) && itens.length > 0) {
     const itensData = itens.map((item: any) => ({
@@ -271,7 +488,6 @@ async function inserirNovoPedido(
     await supabase.from('pedido_itens').insert(itensData);
   }
 
-  // Create production order if PRODUCAO flow
   if (tipoFluxo === 'PRODUCAO' && pipelineId) {
     const { data: ordem } = await supabase
       .from('ordens_producao')

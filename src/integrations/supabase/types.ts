@@ -52,6 +52,7 @@ export type Database = {
           tipo: string
           total_atualizados: number | null
           total_erros: number | null
+          total_ignorados: number | null
           total_inseridos: number | null
           total_recebidos: number | null
         }
@@ -65,6 +66,7 @@ export type Database = {
           tipo?: string
           total_atualizados?: number | null
           total_erros?: number | null
+          total_ignorados?: number | null
           total_inseridos?: number | null
           total_recebidos?: number | null
         }
@@ -78,6 +80,7 @@ export type Database = {
           tipo?: string
           total_atualizados?: number | null
           total_erros?: number | null
+          total_ignorados?: number | null
           total_inseridos?: number | null
           total_recebidos?: number | null
         }
@@ -780,6 +783,7 @@ export type Database = {
         | "COMENTARIO"
         | "REJEICAO"
         | "APROVACAO"
+        | "ALTERACAO_ITENS"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -952,6 +956,7 @@ export const Constants = {
         "COMENTARIO",
         "REJEICAO",
         "APROVACAO",
+        "ALTERACAO_ITENS",
       ],
     },
   },
