@@ -17,6 +17,7 @@ import FilaFinanceira from "./pages/FilaFinanceira";
 import ValidacaoFinanceira from "./pages/ValidacaoFinanceira";
 import FilaLogistica from "./pages/FilaLogistica";
 import RegistroEnvio from "./pages/RegistroEnvio";
+import Integracao from "./pages/Integracao";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 
