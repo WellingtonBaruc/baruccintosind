@@ -16,7 +16,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 const PERFIS_LOJA = ['loja', 'admin', 'gestor'];
-const STATUS_LOJA = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO'];
+const STATUS_LOJA = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO'] as const;
 
 interface PedidoLoja {
   id: string;

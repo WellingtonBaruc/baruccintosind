@@ -11,6 +11,8 @@ import Pipelines from "./pages/Pipelines";
 import FilaProducao from "./pages/FilaProducao";
 import NovoPedido from "./pages/NovoPedido";
 import DetalheOrdem from "./pages/DetalheOrdem";
+import FilaLoja from "./pages/FilaLoja";
+import VerificacaoLoja from "./pages/VerificacaoLoja";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 
@@ -32,6 +34,8 @@ const App = () => (
               <Route path="/producao" element={<FilaProducao />} />
               <Route path="/producao/novo" element={<NovoPedido />} />
               <Route path="/producao/ordem/:id" element={<DetalheOrdem />} />
+              <Route path="/loja" element={<FilaLoja />} />
+              <Route path="/loja/verificar/:id" element={<VerificacaoLoja />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFound />} />
