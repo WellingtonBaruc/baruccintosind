@@ -105,8 +105,8 @@ Deno.serve(async (req) => {
       }
 
       const data = await response.json();
-      const vendas = data.data || data.vendas || data || [];
-      const vendasArray = Array.isArray(vendas) ? vendas : [];
+      const vendasArray = Array.isArray(data.items) ? data.items : [];
+      const apiHasMore = data.hasMore === true;
 
       result.paginas_processadas++;
       result.total_recebidos += vendasArray.length;
