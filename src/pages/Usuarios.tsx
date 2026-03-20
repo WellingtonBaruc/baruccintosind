@@ -51,8 +51,6 @@ export default function Usuarios() {
   const [perfil, setPerfil] = useState<PerfilUsuario>('operador_producao');
   const [setor, setSetor] = useState('');
 
-  if (profile?.perfil !== 'admin') return <Navigate to="/dashboard" replace />;
-
   const fetchUsuarios = async () => {
     const { data } = await supabase.from('usuarios').select('*').order('criado_em', { ascending: false });
     setUsuarios(data || []);
@@ -60,6 +58,8 @@ export default function Usuarios() {
   };
 
   useEffect(() => { fetchUsuarios(); }, []);
+
+  if (profile?.perfil !== 'admin') return <Navigate to="/dashboard" replace />;
 
   const openCreate = () => {
     setEditing(null);

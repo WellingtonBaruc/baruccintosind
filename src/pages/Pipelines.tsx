@@ -58,8 +58,6 @@ export default function Pipelines() {
   const [etapaRequerSupervisor, setEtapaRequerSupervisor] = useState(false);
   const [etapaAvancoAutomatico, setEtapaAvancoAutomatico] = useState(false);
 
-  if (profile?.perfil !== 'admin') return <Navigate to="/dashboard" replace />;
-
   const fetchPipelines = async () => {
     const { data } = await supabase.from('pipeline_producao').select('*').order('criado_em', { ascending: false });
     setPipelines(data || []);
@@ -78,6 +76,8 @@ export default function Pipelines() {
   useEffect(() => {
     if (selectedPipeline) fetchEtapas(selectedPipeline.id);
   }, [selectedPipeline, fetchEtapas]);
+
+  if (profile?.perfil !== 'admin') return <Navigate to="/dashboard" replace />;
 
   const openCreate = () => {
     setEditing(null); setNome(''); setDescricao('');
