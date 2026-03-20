@@ -1,4 +1,4 @@
-import { Factory, Users, Settings, LayoutDashboard, LogOut } from 'lucide-react';
+import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, PlusCircle } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {
