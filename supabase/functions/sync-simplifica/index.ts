@@ -113,7 +113,34 @@ Deno.serve(async (req) => {
 
       for (const venda of vendasArray) {
         try {
-          await processarVenda(supabase, venda, pipelineId, pipelineEtapas, result);
+          const statusApi = venda.situacao_texto || '';
+          const apiVendaId = String(venda.id_venda);
+
+          // Check if already exists
+          const { data: existente } = await supabase
+            .from('pedidos')
+            .select('id, status_atual, sincronizacao_bloqueada, status_api')
+            .eq('api_venda_id', apiVendaId)
+            .maybeSingle();
+
+          if (existente) {
+            // Existing: only update status_api if changed
+            if (existente.status_api !== statusApi) {
+              await supabase.from('pedidos').update({ status_api: statusApi }).eq('id', existente.id);
+              if (statusApi === 'Finalizado' && ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO'].includes(existente.status_atual)) {
+                await supabase.from('pedido_historico').insert({
+                  pedido_id: existente.id,
+                  tipo_acao: 'COMENTARIO',
+                  observacao: `⚠️ ALERTA: Simplifica marcou como Finalizado mas produção interna ainda está em ${existente.status_atual}.`,
+                });
+              }
+            }
+            result.total_atualizados++;
+          } else if (statusApi === 'Em Produção' || statusApi === 'Pedido Enviado') {
+            // New: only import these two statuses
+            await inserirNovoPedido(supabase, venda, statusApi, pipelineId, pipelineEtapas, result);
+          }
+          // Any other status for new records → skip entirely
         } catch (err: any) {
           result.total_erros++;
           result.erros.push(`Venda ${venda.id_venda}: ${err.message}`);
