@@ -31,6 +31,7 @@ const navItems: NavItem[] = [
   { title: 'Logística', url: '/logistica', icon: Truck, perfis: ['admin', 'gestor', 'logistica'] },
   { title: 'Usuários', url: '/usuarios', icon: Users, perfis: ['admin'] },
   { title: 'Pipelines', url: '/pipelines', icon: Settings, perfis: ['admin'] },
+  { title: 'Integração', url: '/integracao', icon: RefreshCw, perfis: ['admin'] },
 ];
 
 export function AppSidebar() {

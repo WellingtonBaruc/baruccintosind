@@ -45,6 +45,7 @@ const App = () => (
               <Route path="/financeiro/validar/:id" element={<ValidacaoFinanceira />} />
               <Route path="/logistica" element={<FilaLogistica />} />
               <Route path="/logistica/envio/:id" element={<RegistroEnvio />} />
+              <Route path="/integracao" element={<Integracao />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFound />} />
