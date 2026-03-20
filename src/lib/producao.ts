@@ -1,0 +1,322 @@
+import { supabase } from '@/lib/supabase';
+
+// Types
+export interface Pedido {
+  id: string;
+  numero_pedido: string;
+  api_venda_id: string | null;
+  status_atual: string;
+  cliente_nome: string;
+  cliente_cpf_cnpj: string | null;
+  cliente_telefone: string | null;
+  cliente_email: string | null;
+  cliente_endereco: string | null;
+  vendedor_nome: string | null;
+  valor_bruto: number;
+  valor_desconto: number;
+  valor_liquido: number;
+  forma_pagamento: string | null;
+  forma_envio: string | null;
+  pagamento_confirmado: boolean;
+  observacao_comercial: string | null;
+  observacao_financeiro: string | null;
+  observacao_logistica: string | null;
+  usuario_responsavel_id: string | null;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+export interface PedidoItem {
+  id: string;
+  pedido_id: string;
+  produto_api_id: string | null;
+  descricao_produto: string;
+  unidade_medida: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+}
+
+export interface OrdemProducao {
+  id: string;
+  pedido_id: string;
+  pipeline_id: string;
+  sequencia: number;
+  status: string;
+  tipo_produto: string | null;
+  observacao: string | null;
+  supervisor_id: string | null;
+  aprovado_em: string | null;
+  criado_em: string;
+  pedidos?: Pedido;
+  pipeline_producao?: { nome: string };
+}
+
+export interface OpEtapa {
+  id: string;
+  ordem_id: string;
+  pipeline_etapa_id: string | null;
+  nome_etapa: string;
+  ordem_sequencia: number;
+  status: string;
+  operador_id: string | null;
+  iniciado_em: string | null;
+  concluido_em: string | null;
+  observacao: string | null;
+  motivo_rejeicao: string | null;
+  usuarios?: { nome: string } | null;
+}
+
+export interface PedidoHistorico {
+  id: string;
+  pedido_id: string;
+  usuario_id: string | null;
+  tipo_acao: string;
+  status_anterior: string | null;
+  status_novo: string | null;
+  observacao: string | null;
+  criado_em: string;
+  usuarios?: { nome: string } | null;
+}
+
+// Generate sequential order number
+export async function gerarNumeroPedido(): Promise<string> {
+  const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true });
+  const seq = (count || 0) + 1;
+  return `PED-${String(seq).padStart(5, '0')}`;
+}
+
+// Create pedido + itens + ordem + etapas in one flow
+export async function criarPedidoCompleto(
+  pedidoData: Omit<Pedido, 'id' | 'criado_em' | 'atualizado_em'>,
+  itens: Omit<PedidoItem, 'id' | 'pedido_id'>[],
+  pipelineId: string,
+  userId: string
+) {
+  // 1. Create pedido
+  const { data: pedido, error: pedidoErr } = await supabase
+    .from('pedidos')
+    .insert(pedidoData)
+    .select()
+    .single();
+  if (pedidoErr || !pedido) throw pedidoErr || new Error('Falha ao criar pedido');
+
+  // 2. Create itens
+  if (itens.length > 0) {
+    const itensData = itens.map(i => ({ ...i, pedido_id: pedido.id }));
+    const { error: itensErr } = await supabase.from('pedido_itens').insert(itensData);
+    if (itensErr) throw itensErr;
+  }
+
+  // 3. Create ordem_producao
+  const { data: ordem, error: ordemErr } = await supabase
+    .from('ordens_producao')
+    .insert({
+      pedido_id: pedido.id,
+      pipeline_id: pipelineId,
+      sequencia: 1,
+      status: 'EM_ANDAMENTO',
+    })
+    .select()
+    .single();
+  if (ordemErr || !ordem) throw ordemErr || new Error('Falha ao criar ordem');
+
+  // 4. Get pipeline steps
+  const { data: etapas } = await supabase
+    .from('pipeline_etapas')
+    .select('*')
+    .eq('pipeline_id', pipelineId)
+    .order('ordem');
+
+  if (etapas && etapas.length > 0) {
+    const opEtapas = etapas.map((e, idx) => ({
+      ordem_id: ordem.id,
+      pipeline_etapa_id: e.id,
+      nome_etapa: e.nome,
+      ordem_sequencia: e.ordem,
+      status: idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE',
+      ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
+    }));
+    const { error: etapasErr } = await supabase.from('op_etapas').insert(opEtapas);
+    if (etapasErr) throw etapasErr;
+  }
+
+  // 5. Update pedido status
+  await supabase.from('pedidos').update({ status_atual: 'EM_PRODUCAO' }).eq('id', pedido.id);
+
+  // 6. Register history
+  await supabase.from('pedido_historico').insert({
+    pedido_id: pedido.id,
+    usuario_id: userId,
+    tipo_acao: 'TRANSICAO',
+    status_anterior: 'AGUARDANDO_PRODUCAO',
+    status_novo: 'EM_PRODUCAO',
+    observacao: 'Pedido criado e ordem de produção gerada automaticamente.',
+  });
+
+  return { pedido, ordem };
+}
+
+// Iniciar etapa (operador)
+export async function iniciarEtapa(etapaId: string, operadorId: string, pedidoId: string) {
+  const { error } = await supabase.from('op_etapas').update({
+    status: 'EM_ANDAMENTO',
+    operador_id: operadorId,
+    iniciado_em: new Date().toISOString(),
+  }).eq('id', etapaId);
+  if (error) throw error;
+
+  await supabase.from('pedido_historico').insert({
+    pedido_id: pedidoId,
+    usuario_id: operadorId,
+    tipo_acao: 'TRANSICAO',
+    observacao: 'Etapa iniciada.',
+  });
+}
+
+// Concluir etapa (operador)
+export async function concluirEtapa(
+  etapaId: string,
+  ordemId: string,
+  pedidoId: string,
+  userId: string,
+  observacao?: string
+) {
+  // Mark current step done
+  await supabase.from('op_etapas').update({
+    status: 'CONCLUIDA',
+    concluido_em: new Date().toISOString(),
+    observacao: observacao || null,
+  }).eq('id', etapaId);
+
+  // Get all steps for this order
+  const { data: allEtapas } = await supabase
+    .from('op_etapas')
+    .select('*')
+    .eq('ordem_id', ordemId)
+    .order('ordem_sequencia');
+
+  if (!allEtapas) return;
+
+  const currentIdx = allEtapas.findIndex(e => e.id === etapaId);
+  const nextEtapa = allEtapas[currentIdx + 1];
+
+  if (nextEtapa) {
+    // Start next step
+    await supabase.from('op_etapas').update({
+      status: 'EM_ANDAMENTO',
+      iniciado_em: new Date().toISOString(),
+    }).eq('id', nextEtapa.id);
+  } else {
+    // All steps done — order awaits supervisor approval
+    await supabase.from('ordens_producao').update({ status: 'CONCLUIDA' }).eq('id', ordemId);
+  }
+
+  await supabase.from('pedido_historico').insert({
+    pedido_id: pedidoId,
+    usuario_id: userId,
+    tipo_acao: 'TRANSICAO',
+    observacao: `Etapa concluída.${observacao ? ' ' + observacao : ''}`,
+  });
+}
+
+// Supervisor aprova ordem
+export async function aprovarOrdem(ordemId: string, pedidoId: string, supervisorId: string) {
+  await supabase.from('ordens_producao').update({
+    status: 'CONCLUIDA',
+    supervisor_id: supervisorId,
+    aprovado_em: new Date().toISOString(),
+  }).eq('id', ordemId);
+
+  // Check if ALL orders for this pedido are approved
+  const { data: allOrdens } = await supabase
+    .from('ordens_producao')
+    .select('id, status, aprovado_em')
+    .eq('pedido_id', pedidoId);
+
+  const allApproved = allOrdens?.every(o => o.aprovado_em !== null);
+
+  if (allApproved) {
+    await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', pedidoId);
+    await supabase.from('pedido_historico').insert({
+      pedido_id: pedidoId,
+      usuario_id: supervisorId,
+      tipo_acao: 'APROVACAO',
+      status_anterior: 'EM_PRODUCAO',
+      status_novo: 'AGUARDANDO_COMERCIAL',
+      observacao: 'Todas as ordens aprovadas. Pedido encaminhado para comercial.',
+    });
+  } else {
+    await supabase.from('pedido_historico').insert({
+      pedido_id: pedidoId,
+      usuario_id: supervisorId,
+      tipo_acao: 'APROVACAO',
+      observacao: 'Ordem de produção aprovada pelo supervisor.',
+    });
+  }
+}
+
+// Supervisor rejeita etapa
+export async function rejeitarOrdem(
+  ordemId: string,
+  pedidoId: string,
+  supervisorId: string,
+  motivo: string
+) {
+  // Set order back to EM_ANDAMENTO
+  await supabase.from('ordens_producao').update({ status: 'EM_ANDAMENTO' }).eq('id', ordemId);
+
+  // Get last step and set to EM_ANDAMENTO with rejection reason
+  const { data: etapas } = await supabase
+    .from('op_etapas')
+    .select('*')
+    .eq('ordem_id', ordemId)
+    .order('ordem_sequencia', { ascending: false })
+    .limit(1);
+
+  if (etapas && etapas[0]) {
+    await supabase.from('op_etapas').update({
+      status: 'EM_ANDAMENTO',
+      concluido_em: null,
+      motivo_rejeicao: motivo,
+    }).eq('id', etapas[0].id);
+  }
+
+  await supabase.from('pedido_historico').insert({
+    pedido_id: pedidoId,
+    usuario_id: supervisorId,
+    tipo_acao: 'REJEICAO',
+    observacao: `Ordem rejeitada: ${motivo}`,
+  });
+}
+
+// Status labels and colors
+export const STATUS_PEDIDO_CONFIG: Record<string, { label: string; color: string }> = {
+  AGUARDANDO_PRODUCAO: { label: 'Aguardando Produção', color: 'bg-muted text-muted-foreground' },
+  EM_PRODUCAO: { label: 'Em Produção', color: 'bg-primary/15 text-primary' },
+  PRODUCAO_CONCLUIDA: { label: 'Produção Concluída', color: 'bg-success/15 text-success' },
+  AGUARDANDO_COMERCIAL: { label: 'Aguardando Comercial', color: 'bg-warning/15 text-warning' },
+  VALIDADO_COMERCIAL: { label: 'Validado Comercial', color: 'bg-success/15 text-success' },
+  AGUARDANDO_FINANCEIRO: { label: 'Aguardando Financeiro', color: 'bg-warning/15 text-warning' },
+  LIBERADO_LOGISTICA: { label: 'Liberado Logística', color: 'bg-primary/15 text-primary' },
+  EM_SEPARACAO: { label: 'Em Separação', color: 'bg-primary/15 text-primary' },
+  ENVIADO: { label: 'Enviado', color: 'bg-success/15 text-success' },
+  ENTREGUE: { label: 'Entregue', color: 'bg-success/20 text-success' },
+  BLOQUEADO: { label: 'Bloqueado', color: 'bg-destructive/15 text-destructive' },
+  CANCELADO: { label: 'Cancelado', color: 'bg-destructive/15 text-destructive' },
+};
+
+export const STATUS_ORDEM_CONFIG: Record<string, { label: string; color: string }> = {
+  AGUARDANDO: { label: 'Aguardando', color: 'bg-muted text-muted-foreground' },
+  EM_ANDAMENTO: { label: 'Em Andamento', color: 'bg-primary/15 text-primary' },
+  CONCLUIDA: { label: 'Concluída', color: 'bg-success/15 text-success' },
+  REJEITADA: { label: 'Rejeitada', color: 'bg-destructive/15 text-destructive' },
+  CANCELADA: { label: 'Cancelada', color: 'bg-destructive/15 text-destructive' },
+};
+
+export const STATUS_ETAPA_CONFIG: Record<string, { label: string; color: string }> = {
+  PENDENTE: { label: 'Pendente', color: 'bg-muted text-muted-foreground' },
+  EM_ANDAMENTO: { label: 'Em Andamento', color: 'bg-primary/15 text-primary' },
+  CONCLUIDA: { label: 'Concluída', color: 'bg-success/15 text-success' },
+  REJEITADA: { label: 'Rejeitada', color: 'bg-destructive/15 text-destructive' },
+};
