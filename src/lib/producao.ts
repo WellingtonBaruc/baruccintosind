@@ -295,6 +295,11 @@ export const STATUS_PEDIDO_CONFIG: Record<string, { label: string; color: string
   AGUARDANDO_PRODUCAO: { label: 'Aguardando Produção', color: 'bg-muted text-muted-foreground' },
   EM_PRODUCAO: { label: 'Em Produção', color: 'bg-primary/15 text-primary' },
   PRODUCAO_CONCLUIDA: { label: 'Produção Concluída', color: 'bg-success/15 text-success' },
+  AGUARDANDO_LOJA: { label: 'Aguardando Loja', color: 'bg-warning/15 text-warning' },
+  LOJA_VERIFICANDO: { label: 'Loja Verificando', color: 'bg-primary/15 text-primary' },
+  AGUARDANDO_OP_COMPLEMENTAR: { label: 'Aguardando OP Complementar', color: 'bg-warning/15 text-warning' },
+  AGUARDANDO_ALMOXARIFADO: { label: 'Aguardando Almoxarifado', color: 'bg-warning/15 text-warning' },
+  LOJA_OK: { label: 'Loja OK', color: 'bg-success/15 text-success' },
   AGUARDANDO_COMERCIAL: { label: 'Aguardando Comercial', color: 'bg-warning/15 text-warning' },
   VALIDADO_COMERCIAL: { label: 'Validado Comercial', color: 'bg-success/15 text-success' },
   AGUARDANDO_FINANCEIRO: { label: 'Aguardando Financeiro', color: 'bg-warning/15 text-warning' },
@@ -320,3 +325,78 @@ export const STATUS_ETAPA_CONFIG: Record<string, { label: string; color: string 
   CONCLUIDA: { label: 'Concluída', color: 'bg-success/15 text-success' },
   REJEITADA: { label: 'Rejeitada', color: 'bg-destructive/15 text-destructive' },
 };
+
+export const SUBTIPO_PRONTA_ENTREGA_CONFIG: Record<string, { label: string; description: string }> = {
+  A_CINTOS: { label: 'A — Cintos', description: 'Tudo em estoque, pronto para envio' },
+  B_OP_COMPLEMENTAR: { label: 'B — OP Complementar', description: 'Itens faltantes precisam de produção' },
+  C_FIVELAS: { label: 'C — Fivelas', description: 'Solicitar fivelas ao almoxarifado' },
+  D_MISTO: { label: 'D — Misto', description: 'Combinação de produção + almoxarifado' },
+};
+
+// Loja: iniciar verificação
+export async function iniciarVerificacaoLoja(pedidoId: string, userId: string) {
+  await supabase.from('pedidos').update({ status_atual: 'LOJA_VERIFICANDO' }).eq('id', pedidoId);
+  await supabase.from('pedido_historico').insert({
+    pedido_id: pedidoId,
+    usuario_id: userId,
+    tipo_acao: 'TRANSICAO',
+    status_anterior: 'AGUARDANDO_LOJA',
+    status_novo: 'LOJA_VERIFICANDO',
+    observacao: 'Loja iniciou a verificação do pedido.',
+  });
+}
+
+// Loja: confirmar caminho A (tudo ok)
+export async function confirmarLojaOk(pedidoId: string, userId: string, subtipo: string) {
+  await supabase.from('pedidos').update({
+    status_atual: 'LOJA_OK',
+    subtipo_pronta_entrega: subtipo,
+  }).eq('id', pedidoId);
+
+  // Auto-advance to AGUARDANDO_COMERCIAL
+  await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', pedidoId);
+
+  await supabase.from('pedido_historico').insert({
+    pedido_id: pedidoId,
+    usuario_id: userId,
+    tipo_acao: 'TRANSICAO',
+    status_anterior: 'LOJA_VERIFICANDO',
+    status_novo: 'AGUARDANDO_COMERCIAL',
+    observacao: `Loja confirmou OK (${subtipo}). Pedido encaminhado para comercial.`,
+  });
+}
+
+// Loja: definir caminho e subtipo
+export async function definirCaminhoLoja(
+  pedidoId: string,
+  userId: string,
+  subtipo: string,
+  novoStatus: string
+) {
+  await supabase.from('pedidos').update({
+    status_atual: novoStatus,
+    subtipo_pronta_entrega: subtipo,
+  }).eq('id', pedidoId);
+
+  await supabase.from('pedido_historico').insert({
+    pedido_id: pedidoId,
+    usuario_id: userId,
+    tipo_acao: 'TRANSICAO',
+    status_anterior: 'LOJA_VERIFICANDO',
+    status_novo: novoStatus,
+    observacao: `Loja definiu caminho ${subtipo}.`,
+  });
+}
+
+// Loja: finalizar verificação (todos os itens resolvidos)
+export async function finalizarVerificacaoLoja(pedidoId: string, userId: string) {
+  await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', pedidoId);
+  await supabase.from('pedido_historico').insert({
+    pedido_id: pedidoId,
+    usuario_id: userId,
+    tipo_acao: 'TRANSICAO',
+    status_anterior: 'LOJA_OK',
+    status_novo: 'AGUARDANDO_COMERCIAL',
+    observacao: 'Verificação concluída. Pedido encaminhado para comercial.',
+  });
+}
