@@ -390,6 +390,7 @@ export default function Integracao() {
                     <TableCell className="text-right tabular-nums">{log.total_recebidos}</TableCell>
                     <TableCell className="text-right tabular-nums font-medium">{log.total_inseridos}</TableCell>
                     <TableCell className="text-right tabular-nums">{log.total_atualizados}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">{log.total_ignorados || 0}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {log.total_erros > 0 ? (
                         <span className="text-destructive font-medium">{log.total_erros}</span>
