@@ -204,75 +204,21 @@ Deno.serve(async (req) => {
   }
 });
 
-async function processarVenda(
+async function inserirNovoPedido(
   supabase: any,
   venda: any,
+  statusApi: string,
   pipelineId: string | null,
   pipelineEtapas: any[],
   result: SyncResult
 ) {
   const apiVendaId = String(venda.id_venda);
-  const statusApi = venda.situacao_texto || '';
+  const tipoFluxo = statusApi === 'Em Produção' ? 'PRODUCAO' : 'PRONTA_ENTREGA';
+  const statusAtual = statusApi === 'Em Produção' ? 'AGUARDANDO_PRODUCAO' : 'AGUARDANDO_LOJA';
 
-  // Check if pedido already exists
-  const { data: existente } = await supabase
-    .from('pedidos')
-    .select('id, status_atual, sincronizacao_bloqueada, status_api')
-    .eq('api_venda_id', apiVendaId)
-    .maybeSingle();
-
-  if (existente) {
-    // Already exists — only update status_api
-    if (existente.status_api !== statusApi) {
-      await supabase
-        .from('pedidos')
-        .update({ status_api: statusApi })
-        .eq('id', existente.id);
-
-      // Alert: Simplifica marked as Finalizado but production not done
-      if (statusApi === 'Finalizado' &&
-        ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO'].includes(existente.status_atual)) {
-        result.alertas.push(
-          `Pedido ${apiVendaId}: Simplifica marcou como Finalizado mas produção ainda não concluiu (status: ${existente.status_atual})`
-        );
-        // Register alert in history
-        await supabase.from('pedido_historico').insert({
-          pedido_id: existente.id,
-          tipo_acao: 'COMENTARIO',
-          observacao: `⚠️ ALERTA: Simplifica marcou como Finalizado mas produção interna ainda está em ${existente.status_atual}.`,
-        });
-      }
-    }
-    result.total_atualizados++;
-    return;
-  }
-
-  // New pedido — determine flow
-  let tipoFluxo: string;
-  let statusAtual: string;
-
-  if (statusApi === 'Em Produção') {
-    tipoFluxo = 'PRODUCAO';
-    statusAtual = 'AGUARDANDO_PRODUCAO';
-  } else if (statusApi === 'Pedido Enviado') {
-    tipoFluxo = 'PRONTA_ENTREGA';
-    statusAtual = 'AGUARDANDO_LOJA';
-  } else {
-    // Other statuses: import as PRODUCAO by default
-    tipoFluxo = 'PRODUCAO';
-    statusAtual = 'AGUARDANDO_PRODUCAO';
-  }
-
-  // Generate numero_pedido
   const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true });
-  const seq = (count || 0) + 1;
-  const numeroPedido = `PED-${String(seq).padStart(5, '0')}`;
+  const numeroPedido = `PED-${String((count || 0) + 1).padStart(5, '0')}`;
 
-  const valorTotal = parseFloat(venda.vl_total) || 0;
-  const valorDesconto = parseFloat(venda.vl_desconto) || 0;
-  const valorProdutos = parseFloat(venda.vl_produtos) || 0;
-
-  // Insert pedido
   const { data: pedido, error: pedidoErr } = await supabase
     .from('pedidos')
     .insert({
@@ -288,14 +234,12 @@ async function processarVenda(
       vendedor_codigo: venda.cd_responsavel_venda || null,
       vendedor_nome: venda.cd_responsavel_venda || null,
       canal_venda: venda.nm_origem_venda || null,
-      valor_bruto: valorTotal,
-      valor_desconto: valorDesconto,
-      valor_liquido: valorTotal,
-      valor_produtos: valorProdutos,
+      valor_bruto: parseFloat(venda.vl_total) || 0,
+      valor_desconto: parseFloat(venda.vl_desconto) || 0,
+      valor_liquido: parseFloat(venda.vl_total) || 0,
+      valor_produtos: parseFloat(venda.vl_produtos) || 0,
       valor_frete: parseFloat(venda.vl_frete) || 0,
       valor_acrescimo: parseFloat(venda.vl_acrescimo) || 0,
-      forma_pagamento: null,
-      forma_envio: null,
       observacao_api: venda.ds_observacao || null,
       observacao_interna_api: venda.ds_observacao_interna || null,
       data_venda_api: venda.dte_venda ? venda.dte_venda.split('T')[0] : null,
@@ -327,16 +271,11 @@ async function processarVenda(
     await supabase.from('pedido_itens').insert(itensData);
   }
 
-  // If PRODUCAO flow and we have a pipeline, create production order
+  // Create production order if PRODUCAO flow
   if (tipoFluxo === 'PRODUCAO' && pipelineId) {
     const { data: ordem } = await supabase
       .from('ordens_producao')
-      .insert({
-        pedido_id: pedido.id,
-        pipeline_id: pipelineId,
-        sequencia: 1,
-        status: 'EM_ANDAMENTO',
-      })
+      .insert({ pedido_id: pedido.id, pipeline_id: pipelineId, sequencia: 1, status: 'EM_ANDAMENTO' })
       .select('id')
       .single();
 
@@ -352,11 +291,9 @@ async function processarVenda(
       await supabase.from('op_etapas').insert(opEtapas);
     }
 
-    // Update status to EM_PRODUCAO
     await supabase.from('pedidos').update({ status_atual: 'EM_PRODUCAO' }).eq('id', pedido.id);
   }
 
-  // Register history
   await supabase.from('pedido_historico').insert({
     pedido_id: pedido.id,
     tipo_acao: 'TRANSICAO',
