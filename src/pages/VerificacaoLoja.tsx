@@ -282,22 +282,6 @@ export default function VerificacaoLoja() {
     setActionLoading(false);
   };
 
-  // Check if OP complementar is done
-  const [opComplementarDone, setOpComplementarDone] = useState(false);
-  useEffect(() => {
-    if (!pedidoId) return;
-    supabase.from('ordens_producao').select('id, status, aprovado_em')
-      .eq('pedido_id', pedidoId)
-      .eq('tipo_produto', 'OP_COMPLEMENTAR')
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setOpComplementarDone(data.every(o => o.aprovado_em !== null));
-        } else {
-          setOpComplementarDone(true);
-        }
-      });
-  }, [pedidoId, pedido?.status_atual]);
-
   const canFinalizar = (isAguardandoOp || isAguardandoAlmox) && opComplementarDone && allSolicitacoesAtendidas;
 
   return (
