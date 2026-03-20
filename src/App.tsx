@@ -8,6 +8,9 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Usuarios from "./pages/Usuarios";
 import Pipelines from "./pages/Pipelines";
+import FilaProducao from "./pages/FilaProducao";
+import NovoPedido from "./pages/NovoPedido";
+import DetalheOrdem from "./pages/DetalheOrdem";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 
@@ -26,6 +29,9 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/usuarios" element={<Usuarios />} />
               <Route path="/pipelines" element={<Pipelines />} />
+              <Route path="/producao" element={<FilaProducao />} />
+              <Route path="/producao/novo" element={<NovoPedido />} />
+              <Route path="/producao/ordem/:id" element={<DetalheOrdem />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFound />} />

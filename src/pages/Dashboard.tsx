@@ -1,5 +1,5 @@
 import { useAuth } from '@/hooks/useAuth';
-import { Factory, Users, Settings } from 'lucide-react';
+import { Factory, Users, Settings, ClipboardList, PlusCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,13 +7,17 @@ export default function Dashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
 
+  const isAdmin = profile?.perfil === 'admin';
+  const isGestor = profile?.perfil === 'gestor';
+  const isProducao = ['operador_producao', 'supervisor_producao', 'admin', 'gestor'].includes(profile?.perfil || '');
+
   const cards = [
-    ...(profile?.perfil === 'admin'
-      ? [
-          { title: 'Gestão de Usuários', desc: 'Criar e gerenciar contas', icon: Users, url: '/usuarios' },
-          { title: 'Pipelines', desc: 'Configurar fluxos de produção', icon: Settings, url: '/pipelines' },
-        ]
-      : []),
+    ...(isProducao ? [{ title: 'Fila de Produção', desc: 'Ver ordens em andamento', icon: ClipboardList, url: '/producao' }] : []),
+    ...(isAdmin || isGestor ? [{ title: 'Novo Pedido', desc: 'Criar pedido manualmente', icon: PlusCircle, url: '/producao/novo' }] : []),
+    ...(isAdmin ? [
+      { title: 'Gestão de Usuários', desc: 'Criar e gerenciar contas', icon: Users, url: '/usuarios' },
+      { title: 'Pipelines', desc: 'Configurar fluxos de produção', icon: Settings, url: '/pipelines' },
+    ] : []),
   ];
 
   return (
