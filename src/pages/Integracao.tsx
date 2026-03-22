@@ -51,6 +51,10 @@ export default function Integracao() {
   const [mismatch, setMismatch] = useState<MismatchInfo>({ total: 0, statuses: [] });
   const [fixing, setFixing] = useState(false);
   const [reclassifying, setReclassifying] = useState(false);
+  const [historicLoading, setHistoricLoading] = useState(false);
+  const [historicProgress, setHistoricProgress] = useState<string | null>(null);
+  const [historicDone, setHistoricDone] = useState<{ date: string; count: number } | null>(null);
+  const [lastDailyLog, setLastDailyLog] = useState<LogEntry | null>(null);
 
   useEffect(() => {
     fetchData();
