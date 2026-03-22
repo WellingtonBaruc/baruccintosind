@@ -294,7 +294,7 @@ export default function KanbanProducao() {
   };
 
   const getCardsForColumn = (tipoCards: KanbanCard[], column: string) =>
-    tipoCards.filter(c => mapEtapaToColumn(c.nome_etapa, c.etapa_status, c.ordem_status) === column);
+    tipoCards.filter(c => mapEtapaToColumn(c.nome_etapa, c.etapa_status, c.ordem_status, c.tipo_produto) === column);
 
   const prazoClasses: Record<string, string> = {
     ATRASADO: 'border-l-destructive bg-destructive/5',
