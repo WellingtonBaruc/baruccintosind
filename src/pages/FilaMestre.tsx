@@ -123,11 +123,16 @@ export default function FilaMestre() {
       supabase.from('pedido_historico').select('*, usuarios(nome)').eq('pedido_id', pedidoId).order('criado_em', { ascending: false }),
       supabase.from('ordens_producao').select('*, pipeline_producao(nome)').eq('pedido_id', pedidoId),
     ]);
+    // Fetch losses for all ordens of this pedido
+    const ordemIds = (rOrdens.data || []).map((o: any) => o.id);
+    const { data: perdas } = await supabase.from('ordem_perdas').select('*, usuarios:registrado_por(nome)').in('ordem_id', ordemIds.length > 0 ? ordemIds : ['none']);
     setDetail({
       pedido: rPedido.data,
       itens: rItens.data || [],
       historico: rHist.data || [],
       ordens: rOrdens.data || [],
+      perdas: perdas || [],
+    });
     });
     setDetailLoading(false);
   };
