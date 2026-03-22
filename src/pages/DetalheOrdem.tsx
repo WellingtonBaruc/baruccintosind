@@ -49,6 +49,10 @@ export default function DetalheOrdem() {
   // Tecido→Sintetico transfer dialog
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
 
+  // Atribuir operador dialog
+  const [atribuirDialogOpen, setAtribuirDialogOpen] = useState(false);
+  const [selectedOperadorId, setSelectedOperadorId] = useState('');
+
   // Preparação sub-etapas state
   const [subEtapas, setSubEtapas] = useState<{ nome: string; checked: boolean; operadorId: string; quantidade: number }[]>([
     { nome: 'Costura', checked: false, operadorId: '', quantidade: 0 },
