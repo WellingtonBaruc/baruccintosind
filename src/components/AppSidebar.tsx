@@ -1,4 +1,4 @@
-import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, ListTodo, Monitor, CalendarDays, ShoppingBag, History } from 'lucide-react';
+import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, ListTodo, Monitor, CalendarDays, ShoppingBag, History, Eye } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {
@@ -48,6 +48,11 @@ const navItems: NavItem[] = [
 
   // Admin / Gestor — full menu
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, perfis: ['admin', 'gestor'] },
+  { title: 'Painel Supervisor', url: '/painel-supervisor', icon: Eye, perfis: ['admin', 'gestor'] },
+  { title: 'Painel Operador', url: '/painel-operador', icon: Eye, perfis: ['admin', 'gestor'] },
+  { title: 'Painel Loja', url: '/painel-loja', icon: Eye, perfis: ['admin', 'gestor'] },
+  { title: 'Painel Comercial', url: '/painel-comercial', icon: Eye, perfis: ['admin', 'gestor'] },
+  { title: 'Painel Financeiro', url: '/painel-financeiro', icon: Eye, perfis: ['admin', 'gestor'] },
   { title: 'Fila de Produção', url: '/producao', icon: ClipboardList, perfis: ['admin', 'gestor'] },
   { title: 'Minha Fila', url: '/minha-fila', icon: ListTodo, perfis: ['admin', 'gestor'] },
   { title: 'Programação do Dia', url: '/programacao', icon: CalendarDays, perfis: ['admin', 'gestor'] },
