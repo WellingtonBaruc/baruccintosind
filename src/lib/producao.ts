@@ -35,6 +35,10 @@ export interface PedidoItem {
   quantidade: number;
   valor_unitario: number;
   valor_total: number;
+  referencia_produto?: string | null;
+  observacao_producao?: string | null;
+  conferido?: boolean;
+  disponivel?: boolean | null;
 }
 
 export interface OrdemProducao {
