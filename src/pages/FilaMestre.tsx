@@ -369,6 +369,86 @@ export default function FilaMestre() {
                     ))}
                   </div>
                 )}
+
+                {/* Piloto Toggle */}
+                {canEdit && (
+                  <div className="rounded-lg border border-border/60 p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Marcar como Piloto</Label>
+                      <Switch
+                        checked={detail.pedido.is_piloto || false}
+                        onCheckedChange={async (checked) => {
+                          await supabase.from('pedidos').update({ is_piloto: checked, status_piloto: checked ? 'ENVIADO' : null }).eq('id', detail.pedido.id);
+                          toast.success(checked ? 'Marcado como piloto' : 'Piloto removido');
+                          openDetail(detail.pedido.id);
+                          fetchRows();
+                        }}
+                      />
+                    </div>
+                    {detail.pedido.is_piloto && (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Select value={detail.pedido.status_piloto || 'ENVIADO'} onValueChange={async (v) => {
+                            const update: any = { status_piloto: v };
+                            if (v === 'REPROVADO' && !detail.pedido.observacao_piloto) {
+                              toast.error('Preencha o motivo da reprovação antes');
+                              return;
+                            }
+                            await supabase.from('pedidos').update(update).eq('id', detail.pedido.id);
+                            await supabase.from('pedido_historico').insert({
+                              pedido_id: detail.pedido.id, usuario_id: profile!.id, tipo_acao: 'EDICAO',
+                              observacao: `Piloto ${v === 'APROVADO' ? 'aprovado' : v === 'REPROVADO' ? 'reprovado' : 'enviado'} por ${profile!.nome}`,
+                            });
+                            toast.success(`Piloto marcado como ${v}`);
+                            openDetail(detail.pedido.id);
+                            fetchRows();
+                          }}>
+                            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ENVIADO">Enviado</SelectItem>
+                              <SelectItem value="APROVADO">Aprovado</SelectItem>
+                              <SelectItem value="REPROVADO">Reprovado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Badge className={`text-xs self-center ${
+                            detail.pedido.status_piloto === 'APROVADO' ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]' :
+                            detail.pedido.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive' :
+                            'bg-purple-500/15 text-purple-600'
+                          }`}>
+                            {detail.pedido.status_piloto || 'ENVIADO'}
+                          </Badge>
+                        </div>
+                        <Textarea
+                          placeholder="Observação do piloto..."
+                          defaultValue={detail.pedido.observacao_piloto || ''}
+                          onBlur={async (e) => {
+                            if (e.target.value !== (detail.pedido.observacao_piloto || '')) {
+                              await supabase.from('pedidos').update({ observacao_piloto: e.target.value }).eq('id', detail.pedido.id);
+                            }
+                          }}
+                          className="text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Perdas confirmadas */}
+                {detail.perdas.filter((p: any) => p.status === 'CONFIRMADA').length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 text-destructive" /> Perdas Confirmadas</p>
+                    {detail.perdas.filter((p: any) => p.status === 'CONFIRMADA').map((p: any) => (
+                      <div key={p.id} className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm">
+                        <p className="font-medium">{p.nm_item}</p>
+                        <div className="flex gap-3 text-muted-foreground mt-1">
+                          <span>{p.quantidade_perdida} un perdida{p.quantidade_perdida > 1 ? 's' : ''}</span>
+                          <span>Etapa: {p.etapa}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">Motivo: {p.motivo}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </TabsContent>
               <TabsContent value="itens" className="mt-4">
                 <div className="space-y-2">
