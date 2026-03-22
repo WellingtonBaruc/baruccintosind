@@ -40,10 +40,15 @@ const PIPELINE_COLUMNS: Record<string, string[]> = {
   FIVELA_COBERTA: ['Aguardando Início', 'Em Andamento', 'Concluído'],
 };
 
-function mapEtapaToColumn(etapaName: string, etapaStatus: string, ordemStatus: string): string {
+function mapEtapaToColumn(etapaName: string, etapaStatus: string, ordemStatus: string, tipoProduto?: string): string {
   if (ordemStatus === 'AGUARDANDO') return 'Aguardando Início';
-  // If the ordem is fully concluded, card goes to Concluído
   if (ordemStatus === 'CONCLUIDA') return 'Concluído';
+
+  // Fivela Coberta: all active etapas map to "Em Andamento"
+  if (tipoProduto === 'FIVELA_COBERTA') {
+    return 'Em Andamento';
+  }
+
   if (etapaName === 'Produção') return 'Em Andamento';
   if (etapaName === 'Produção Finalizada') return 'Concluído';
   if (etapaName === 'Concluído') return 'Concluído';
