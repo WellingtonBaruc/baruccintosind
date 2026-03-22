@@ -189,6 +189,7 @@ export default function FilaProducao() {
                         )}
                       </TableCell>
                       <TableCell className="font-medium">{o.pedidos.numero_pedido}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{o.pedidos.api_venda_id || '—'}</TableCell>
                       <TableCell className="text-muted-foreground">{o.pedidos.cliente_nome}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs font-normal">{tipoLabel}</Badge>
