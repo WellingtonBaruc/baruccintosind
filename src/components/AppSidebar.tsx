@@ -1,4 +1,4 @@
-import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, PlusCircle, Store, DollarSign, Truck, RefreshCw, Calendar, ListTodo, Monitor, CalendarDays } from 'lucide-react';
+import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, ListTodo, Monitor, CalendarDays, ShoppingBag, History } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {
@@ -23,16 +23,39 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, perfis: 'all' },
-  { title: 'Fila de Produção', url: '/producao', icon: ClipboardList, perfis: ['admin', 'gestor', 'supervisor_producao', 'operador_producao'] },
-  { title: 'Minha Fila', url: '/minha-fila', icon: ListTodo, perfis: ['admin', 'gestor', 'supervisor_producao', 'operador_producao'] },
-  { title: 'Programação do Dia', url: '/programacao', icon: CalendarDays, perfis: ['admin', 'gestor', 'supervisor_producao'] },
-  { title: 'Painel TV', url: '/painel', icon: Monitor, perfis: ['admin', 'gestor', 'supervisor_producao'] },
-  { title: 'Novo Pedido', url: '/producao/novo', icon: PlusCircle, perfis: ['admin', 'gestor'] },
-  { title: 'Fila da Loja', url: '/loja', icon: Store, perfis: ['admin', 'gestor', 'loja'] },
-  { title: 'Financeiro', url: '/financeiro', icon: DollarSign, perfis: ['admin', 'gestor', 'financeiro'] },
-  { title: 'Logística', url: '/logistica', icon: Truck, perfis: ['admin', 'gestor', 'logistica'] },
-  { title: 'PCP', url: '/pcp', icon: Calendar, perfis: ['admin', 'gestor', 'supervisor_producao'] },
+  // Supervisor
+  { title: 'Painel', url: '/dashboard', icon: LayoutDashboard, perfis: ['supervisor_producao'] },
+  { title: 'Programação do Dia', url: '/programacao', icon: CalendarDays, perfis: ['supervisor_producao'] },
+  { title: 'Fila de Produção', url: '/producao', icon: ClipboardList, perfis: ['supervisor_producao'] },
+  { title: 'PCP', url: '/pcp', icon: Calendar, perfis: ['supervisor_producao'] },
+
+  // Operador
+  { title: 'Minha Fila', url: '/dashboard', icon: ListTodo, perfis: ['operador_producao'] },
+  { title: 'Histórico', url: '/producao', icon: History, perfis: ['operador_producao'] },
+
+  // Loja
+  { title: 'Verificar Pedidos', url: '/dashboard', icon: Store, perfis: ['loja'] },
+  { title: 'Histórico', url: '/loja', icon: History, perfis: ['loja'] },
+
+  // Comercial
+  { title: 'Para Validar', url: '/dashboard', icon: ShoppingBag, perfis: ['comercial'] },
+  { title: 'Todos os Pedidos', url: '/producao', icon: ClipboardList, perfis: ['comercial'] },
+  { title: 'Histórico', url: '/financeiro', icon: History, perfis: ['comercial'] },
+
+  // Financeiro
+  { title: 'Para Aprovar', url: '/dashboard', icon: DollarSign, perfis: ['financeiro'] },
+  { title: 'Histórico', url: '/financeiro', icon: History, perfis: ['financeiro'] },
+
+  // Admin / Gestor — full menu
+  { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, perfis: ['admin', 'gestor'] },
+  { title: 'Fila de Produção', url: '/producao', icon: ClipboardList, perfis: ['admin', 'gestor'] },
+  { title: 'Minha Fila', url: '/minha-fila', icon: ListTodo, perfis: ['admin', 'gestor'] },
+  { title: 'Programação do Dia', url: '/programacao', icon: CalendarDays, perfis: ['admin', 'gestor'] },
+  { title: 'Painel TV', url: '/painel', icon: Monitor, perfis: ['admin', 'gestor'] },
+  { title: 'Fila da Loja', url: '/loja', icon: Store, perfis: ['admin', 'gestor'] },
+  { title: 'Financeiro', url: '/financeiro', icon: DollarSign, perfis: ['admin', 'gestor'] },
+  { title: 'Logística', url: '/logistica', icon: Truck, perfis: ['admin', 'gestor'] },
+  { title: 'PCP', url: '/pcp', icon: Calendar, perfis: ['admin', 'gestor'] },
   { title: 'Usuários', url: '/usuarios', icon: Users, perfis: ['admin'] },
   { title: 'Pipelines', url: '/pipelines', icon: Settings, perfis: ['admin'] },
   { title: 'Integração', url: '/integracao', icon: RefreshCw, perfis: ['admin'] },
@@ -65,13 +88,13 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navegação</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleItems.map((item) => (
-                <SidebarMenuItem key={item.url}>
+              {visibleItems.map((item, idx) => (
+                <SidebarMenuItem key={`${item.url}-${idx}`}>
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
                       end={item.url === '/dashboard'}
-                      className="hover:bg-sidebar-accent/60"
+                      className="hover:bg-sidebar-accent/60 min-h-[44px]"
                       activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                     >
                       <item.icon className="mr-2 h-4 w-4" />
@@ -96,7 +119,7 @@ export function AppSidebar() {
           variant="ghost"
           size={collapsed ? 'icon' : 'sm'}
           onClick={signOut}
-          className="w-full justify-start text-muted-foreground hover:text-destructive"
+          className="w-full justify-start text-muted-foreground hover:text-destructive min-h-[48px]"
         >
           <LogOut className="h-4 w-4" />
           {!collapsed && <span className="ml-2">Sair</span>}
