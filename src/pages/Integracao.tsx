@@ -67,6 +67,17 @@ export default function Integracao() {
     ]);
     setConfig(cfg as any);
     setLogs((logData || []) as any);
+
+    // Check if historic load was already done
+    const historicLog = (logData || []).find((l: any) => l.tipo === 'HISTORICO_90D' && l.status !== 'ERRO');
+    if (historicLog) {
+      setHistoricDone({ date: (historicLog as any).executado_em, count: (historicLog as any).total_inseridos });
+    }
+
+    // Find latest daily log
+    const dailyLog = (logData || []).find((l: any) => l.tipo === 'HISTORICO_DIARIO');
+    if (dailyLog) setLastDailyLog(dailyLog as any);
+
     setLoading(false);
     fetchDiagnostics();
   };
