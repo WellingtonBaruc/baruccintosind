@@ -472,6 +472,59 @@ export default function Integracao() {
         </Card>
       </div>
 
+      {/* Historical load + Daily sync */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Layers className="h-4 w-4" /> Carga Histórica (90 dias)
+            </CardTitle>
+            <CardDescription>Importa vendas Finalizadas dos últimos 90 dias para análise. Não afeta a fila de produção.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {historicDone ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-600">
+                <CheckCircle2 className="h-4 w-4" />
+                Histórico carregado em {format(new Date(historicDone.date), "dd/MM/yyyy", { locale: ptBR })} — {historicDone.count} vendas
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">Pode demorar alguns minutos. Só pode ser executada uma vez.</p>
+                <Button onClick={handleHistoricLoad} disabled={historicLoading} className="w-full" variant="outline">
+                  {historicLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Layers className="h-4 w-4 mr-2" />}
+                  {historicLoading ? 'Importando...' : 'Carregar histórico 90 dias'}
+                </Button>
+                {historicProgress && (
+                  <p className="text-sm text-muted-foreground animate-pulse">{historicProgress}</p>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4" /> Atualização Diária do Histórico
+            </CardTitle>
+            <CardDescription>Importa vendas finalizadas do dia anterior automaticamente às 02:00.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2 text-sm">
+              <Badge className={historicDone ? 'bg-emerald-500/15 text-emerald-600 border-0' : 'bg-muted text-muted-foreground border-0'}>
+                {historicDone ? 'Ativa' : 'Aguardando carga inicial'}
+              </Badge>
+            </div>
+            {lastDailyLog && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                Última execução: {format(new Date(lastDailyLog.executado_em), "dd/MM 'às' HH:mm", { locale: ptBR })} — {lastDailyLog.total_inseridos} vendas adicionadas
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Diagnostics */}
       <Card className="border-border/60 shadow-sm">
         <CardHeader className="pb-3">
