@@ -1,4 +1,4 @@
-import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, ListTodo, Monitor, CalendarDays, ShoppingBag, History } from 'lucide-react';
+import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, ListTodo, Monitor, CalendarDays, ShoppingBag, History, Eye } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {

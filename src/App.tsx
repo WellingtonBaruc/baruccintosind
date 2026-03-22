@@ -6,6 +6,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import Login from "./pages/Login";
 import DashboardRouter from "./pages/DashboardRouter";
+import DashboardSupervisor from "./pages/DashboardSupervisor";
+import DashboardOperador from "./pages/DashboardOperador";
+import DashboardLoja from "./pages/DashboardLoja";
+import DashboardComercial from "./pages/DashboardComercial";
+import DashboardFinanceiro from "./pages/DashboardFinanceiro";
 import Usuarios from "./pages/Usuarios";
 import Pipelines from "./pages/Pipelines";
 import FilaProducao from "./pages/FilaProducao";
@@ -38,6 +43,11 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardRouter />} />
+              <Route path="/painel-supervisor" element={<DashboardSupervisor />} />
+              <Route path="/painel-operador" element={<DashboardOperador />} />
+              <Route path="/painel-loja" element={<DashboardLoja />} />
+              <Route path="/painel-comercial" element={<DashboardComercial />} />
+              <Route path="/painel-financeiro" element={<DashboardFinanceiro />} />
               <Route path="/usuarios" element={<Usuarios />} />
               <Route path="/pipelines" element={<Pipelines />} />
               <Route path="/producao" element={<FilaProducao />} />
