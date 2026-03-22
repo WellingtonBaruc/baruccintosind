@@ -6,11 +6,13 @@ import { TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, User, Search, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface KanbanCard {
@@ -32,6 +34,12 @@ interface KanbanCard {
   has_sintetico_order: boolean;
   sintetico_ordem_id: string | null;
   transferred: boolean;
+  pedido_status: string;
+  perdas_pendentes: number;
+  is_piloto: boolean;
+  status_piloto: string | null;
+  // Track when card moved to financeiro for 5min green badge
+  sent_to_financeiro_at: number | null;
 }
 
 const PIPELINE_COLUMNS: Record<string, string[]> = {
@@ -43,12 +51,7 @@ const PIPELINE_COLUMNS: Record<string, string[]> = {
 function mapEtapaToColumn(etapaName: string, etapaStatus: string, ordemStatus: string, tipoProduto?: string): string {
   if (ordemStatus === 'AGUARDANDO') return 'Aguardando Início';
   if (ordemStatus === 'CONCLUIDA') return 'Concluído';
-
-  // Fivela Coberta: all active etapas map to "Em Andamento"
-  if (tipoProduto === 'FIVELA_COBERTA') {
-    return 'Em Andamento';
-  }
-
+  if (tipoProduto === 'FIVELA_COBERTA') return 'Em Andamento';
   if (etapaName === 'Produção') return 'Em Andamento';
   if (etapaName === 'Produção Finalizada') return 'Concluído';
   if (etapaName === 'Concluído') return 'Concluído';
@@ -65,9 +68,35 @@ export default function KanbanProducao() {
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; type: string; card: KanbanCard | null }>({ open: false, type: '', card: null });
   const [transferDialog, setTransferDialog] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
 
+  // Loss registration
+  const [lossDialog, setLossDialog] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
+  const [lossItems, setLossItems] = useState<any[]>([]);
+  const [lossForm, setLossForm] = useState({ pedido_item_id: '', nm_item: '', quantidade_perdida: '', motivo: '', etapa: '' });
+  const [lossEtapas, setLossEtapas] = useState<string[]>([]);
+
+  // Recently sent to financeiro — store card IDs with timestamp
+  const [recentFinanceiro, setRecentFinanceiro] = useState<Map<string, number>>(new Map());
+
   useEffect(() => { fetchCards(); }, []);
 
+  // Cleanup timer for 5-min green badges
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setRecentFinanceiro(prev => {
+        const next = new Map(prev);
+        let changed = false;
+        for (const [k, t] of next) {
+          if (now - t > 5 * 60 * 1000) { next.delete(k); changed = true; }
+        }
+        return changed ? next : prev;
+      });
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchCards = async () => {
+    // Fetch all orders that are NOT past financeiro
     const { data: etapas } = await supabase
       .from('op_etapas')
       .select(`
@@ -75,44 +104,57 @@ export default function KanbanProducao() {
         usuarios(nome),
         ordens_producao!inner(
           id, pedido_id, tipo_produto, status,
-          pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api)
+          pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto)
         )
       `)
-      .in('status', ['EM_ANDAMENTO', 'CONCLUIDA', 'PENDENTE'])
-      .neq('ordens_producao.pedidos.status_api', 'Finalizado');
+      .in('status', ['EM_ANDAMENTO', 'CONCLUIDA', 'PENDENTE']);
 
     if (!etapas) { setLoading(false); return; }
 
-    const pedidoIds = [...new Set(etapas.map((e: any) => e.ordens_producao.pedido_id))];
-    const { data: itens } = await supabase
-      .from('pedido_itens')
-      .select('pedido_id, quantidade, categoria_produto, descricao_produto')
-      .in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']);
-
-    // Fetch all ordens_producao for these pedidos to find linked Sintético orders
-    const { data: allOrdens } = await supabase
-      .from('ordens_producao')
-      .select('id, pedido_id, tipo_produto, status')
-      .in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']);
-
-    const sinteticoMap = new Map<string, string>(); // pedido_id → sintetico_ordem_id
-    for (const o of (allOrdens || [])) {
-      if (o.tipo_produto === 'SINTETICO') {
-        sinteticoMap.set(o.pedido_id, o.id);
+    // Filter: keep cards where pedido is NOT yet at AGUARDANDO_FINANCEIRO or beyond
+    const HIDDEN_STATUSES = ['AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA'];
+    const visibleEtapas = (etapas as any[]).filter(e => {
+      const pedidoStatus = e.ordens_producao.pedidos.status_atual;
+      // Show for 5 min after going to financeiro
+      if (pedidoStatus === 'AGUARDANDO_FINANCEIRO') {
+        const cardKey = e.ordem_id;
+        if (!recentFinanceiro.has(cardKey)) {
+          setRecentFinanceiro(prev => new Map(prev).set(cardKey, Date.now()));
+        }
+        return recentFinanceiro.has(cardKey);
       }
+      return !HIDDEN_STATUSES.includes(pedidoStatus);
+    });
+
+    const pedidoIds = [...new Set(visibleEtapas.map((e: any) => e.ordens_producao.pedido_id))];
+    
+    const [itensRes, allOrdensRes, perdasRes] = await Promise.all([
+      supabase.from('pedido_itens').select('pedido_id, quantidade, categoria_produto, descricao_produto').in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
+      supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status').in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
+      supabase.from('ordem_perdas').select('ordem_id, status').eq('status', 'PENDENTE_CONFIRMACAO'),
+    ]);
+
+    const sinteticoMap = new Map<string, string>();
+    for (const o of (allOrdensRes.data || [])) {
+      if (o.tipo_produto === 'SINTETICO') sinteticoMap.set(o.pedido_id, o.id);
     }
 
     const qtdMap = new Map<string, number>();
-    for (const item of (itens || [])) {
+    for (const item of (itensRes.data || [])) {
       const cat = (item.categoria_produto || '').toUpperCase();
       const desc = (item.descricao_produto || '').toUpperCase();
       if (cat === 'ADICIONAIS' || desc.includes('ADICIONAL')) continue;
       qtdMap.set(item.pedido_id, (qtdMap.get(item.pedido_id) || 0) + item.quantidade);
     }
 
-    // For each ordem, pick the active etapa (EM_ANDAMENTO) or last CONCLUIDA
+    // Count pending losses per ordem
+    const perdasCount = new Map<string, number>();
+    for (const p of (perdasRes.data || [])) {
+      perdasCount.set(p.ordem_id, (perdasCount.get(p.ordem_id) || 0) + 1);
+    }
+
     const ordemMap = new Map<string, any>();
-    for (const e of etapas as any[]) {
+    for (const e of visibleEtapas as any[]) {
       const key = e.ordem_id;
       const existing = ordemMap.get(key);
       if (!existing) { ordemMap.set(key, e); continue; }
@@ -144,6 +186,11 @@ export default function KanbanProducao() {
         has_sintetico_order: hasSintetico,
         sintetico_ordem_id: hasSintetico ? sinteticoMap.get(pedidoId)! : null,
         transferred: false,
+        pedido_status: e.ordens_producao.pedidos.status_atual,
+        perdas_pendentes: perdasCount.get(e.ordem_id) || 0,
+        is_piloto: e.ordens_producao.pedidos.is_piloto || false,
+        status_piloto: e.ordens_producao.pedidos.status_piloto || null,
+        sent_to_financeiro_at: recentFinanceiro.get(e.ordem_id) || null,
       };
     });
 
@@ -170,7 +217,6 @@ export default function KanbanProducao() {
     if (destIdx !== srcIdx + 1) { toast.error('Só é possível avançar uma etapa por vez.'); return; }
     if (!isSupervisor) { toast.error('Apenas supervisores podem arrastar cards.'); return; }
 
-    // Cross-pipeline notifications for Tecido
     if (destCol === 'Concluído' && activeTab === 'TECIDO') {
       setConfirmDialog({ open: true, type: 'TECIDO_CONCLUIDO', card });
       return;
@@ -189,91 +235,104 @@ export default function KanbanProducao() {
     }
   };
 
-  // Handle Tecido cross-pipeline confirm
   const handleCrossPipelineConfirm = async () => {
     const { card, type } = confirmDialog;
     if (!card || !profile) return;
-
     await advanceCard(card, type === 'TECIDO_CONCLUIDO'
       ? `Tecido concluído — encaminhado para Preparação do Sintético. Confirmado por ${profile.nome}`
       : `Concluído. Confirmado por ${profile.nome}`
     );
-
-    if (type === 'TECIDO_CONCLUIDO') {
-      toast.success(`Tecido concluído — card enviado para Preparação do Sintético (#${card.api_venda_id})`);
-    }
-
     setConfirmDialog({ open: false, type: '', card: null });
   };
 
-  // Handle Fivela → Sintético Embalagem transfer
   const handleFivelaTransfer = async () => {
     const card = transferDialog.card;
     if (!card || !profile || !card.sintetico_ordem_id) return;
-
     try {
-      // Find the Embalagem etapa in the Sintético order
-      const { data: sinteticoEtapas } = await supabase
-        .from('op_etapas')
-        .select('id, nome_etapa, ordem_sequencia, status')
-        .eq('ordem_id', card.sintetico_ordem_id)
-        .order('ordem_sequencia');
-
-      if (!sinteticoEtapas) {
-        toast.error('Não foi possível encontrar as etapas do Sintético');
-        return;
-      }
-
-      // Find Embalagem etapa
-      const embalagemEtapa = sinteticoEtapas.find(e => e.nome_etapa === 'Embalagem');
-      if (!embalagemEtapa) {
-        toast.error('Etapa de Embalagem não encontrada no Sintético');
-        return;
-      }
-
-      // Mark fivelas_recebidas on the Sintético order
-      await supabase.from('ordens_producao')
-        .update({ fivelas_recebidas: true })
-        .eq('id', card.sintetico_ordem_id);
-
-      // Register history
+      await supabase.from('ordens_producao').update({ fivelas_recebidas: true }).eq('id', card.sintetico_ordem_id);
       await supabase.from('pedido_historico').insert({
-        pedido_id: card.pedido_id,
-        usuario_id: profile.id,
-        tipo_acao: 'TRANSICAO',
+        pedido_id: card.pedido_id, usuario_id: profile.id, tipo_acao: 'TRANSICAO',
         observacao: `Fivelas transferidas para Embalagem Sintético — confirmado pelo supervisor ${profile.nome}`,
       });
-
       toast.success(`Fivelas transferidas para Embalagem do Sintético (#${card.api_venda_id})`);
       setTransferDialog({ open: false, card: null });
       fetchCards();
-    } catch {
-      toast.error('Erro ao transferir fivelas');
-    }
+    } catch { toast.error('Erro ao transferir fivelas'); }
   };
 
-  // Handle Fivela concluded without Sintético → advance pedido
   const handleFivelaSoloComplete = async (card: KanbanCard) => {
     if (!profile) return;
     try {
-      await supabase.from('pedidos')
-        .update({ status_atual: 'AGUARDANDO_COMERCIAL' })
-        .eq('id', card.pedido_id);
-
+      await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', card.pedido_id);
       await supabase.from('pedido_historico').insert({
-        pedido_id: card.pedido_id,
-        usuario_id: profile.id,
-        tipo_acao: 'TRANSICAO',
-        status_anterior: 'EM_PRODUCAO',
-        status_novo: 'AGUARDANDO_COMERCIAL',
+        pedido_id: card.pedido_id, usuario_id: profile.id, tipo_acao: 'TRANSICAO',
+        status_anterior: 'EM_PRODUCAO', status_novo: 'AGUARDANDO_COMERCIAL',
         observacao: `Produção de fivelas concluída (sem sintético). Encaminhado para comercial por ${profile.nome}`,
       });
-
       toast.success('Pedido encaminhado para comercial');
       fetchCards();
-    } catch {
-      toast.error('Erro ao avançar pedido');
+    } catch { toast.error('Erro ao avançar pedido'); }
+  };
+
+  // --- Loss Registration ---
+  const openLossDialog = async (card: KanbanCard) => {
+    setLossDialog({ open: true, card });
+    setLossForm({ pedido_item_id: '', nm_item: '', quantidade_perdida: '', motivo: '', etapa: '' });
+
+    const [itemsRes, etapasRes] = await Promise.all([
+      supabase.from('pedido_itens').select('id, descricao_produto').eq('pedido_id', card.pedido_id),
+      supabase.from('op_etapas').select('nome_etapa').eq('ordem_id', card.ordem_id).order('ordem_sequencia'),
+    ]);
+    setLossItems(itemsRes.data || []);
+    setLossEtapas([...new Set((etapasRes.data || []).map(e => e.nome_etapa))]);
+  };
+
+  const submitLoss = async () => {
+    const card = lossDialog.card;
+    if (!card || !profile) return;
+    if (!lossForm.pedido_item_id || !lossForm.quantidade_perdida || !lossForm.motivo || !lossForm.etapa) {
+      toast.error('Preencha todos os campos'); return;
     }
+    try {
+      await supabase.from('ordem_perdas').insert({
+        ordem_id: card.ordem_id,
+        pedido_item_id: lossForm.pedido_item_id,
+        nm_item: lossForm.nm_item,
+        quantidade_perdida: parseInt(lossForm.quantidade_perdida),
+        motivo: lossForm.motivo,
+        etapa: lossForm.etapa,
+        registrado_por: profile.id,
+        status: 'PENDENTE_CONFIRMACAO',
+      });
+      toast.success('Perda registrada — aguardando confirmação do supervisor');
+      setLossDialog({ open: false, card: null });
+      fetchCards();
+    } catch { toast.error('Erro ao registrar perda'); }
+  };
+
+  const confirmLoss = async (perdaId: string, action: 'CONFIRMADA' | 'REJEITADA', card: KanbanCard) => {
+    if (!profile) return;
+    try {
+      await supabase.from('ordem_perdas').update({
+        status: action,
+        confirmado_por: profile.id,
+        confirmado_em: new Date().toISOString(),
+      }).eq('id', perdaId);
+
+      if (action === 'CONFIRMADA') {
+        // Fetch the loss to log
+        const { data: perda } = await supabase.from('ordem_perdas').select('*').eq('id', perdaId).single();
+        if (perda) {
+          await supabase.from('pedido_historico').insert({
+            pedido_id: card.pedido_id, usuario_id: profile.id, tipo_acao: 'EDICAO',
+            observacao: `Perda registrada — ${perda.nm_item} — ${perda.quantidade_perdida} unidades — motivo: ${perda.motivo} — confirmado por ${profile.nome}`,
+          });
+        }
+      }
+
+      toast.success(action === 'CONFIRMADA' ? 'Perda confirmada' : 'Perda rejeitada');
+      fetchCards();
+    } catch { toast.error('Erro ao processar perda'); }
   };
 
   // Filter logic
@@ -286,9 +345,7 @@ export default function KanbanProducao() {
     if (filterMode === 'SEM_OPERADOR') filtered = filtered.filter(c => !c.operador_id);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(c =>
-        c.api_venda_id.toLowerCase().includes(q) || c.cliente_nome.toLowerCase().includes(q)
-      );
+      filtered = filtered.filter(c => c.api_venda_id.toLowerCase().includes(q) || c.cliente_nome.toLowerCase().includes(q));
     }
     return filtered;
   };
@@ -311,10 +368,19 @@ export default function KanbanProducao() {
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
   const tabTypes = ['SINTETICO', 'TECIDO', 'FIVELA_COBERTA'] as const;
-
   const isConcluido = (card: KanbanCard) => card.ordem_status === 'CONCLUIDA';
   const isFivelaInConcluido = (card: KanbanCard, col: string) =>
     col === 'Concluído' && card.tipo_produto === 'FIVELA_COBERTA' && isConcluido(card);
+
+  const getConcluidoBadge = (card: KanbanCard) => {
+    if (card.pedido_status === 'AGUARDANDO_FINANCEIRO') {
+      return { label: 'Enviado ao Financeiro', cls: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30' };
+    }
+    if (card.pedido_status === 'AGUARDANDO_COMERCIAL' || card.pedido_status === 'PRODUCAO_CONCLUIDA' || card.pedido_status === 'EM_PRODUCAO') {
+      return { label: 'Aguardando Comercial', cls: 'bg-orange-500/15 text-orange-600 border-orange-500/30' };
+    }
+    return { label: 'Concluído', cls: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30' };
+  };
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -323,12 +389,7 @@ export default function KanbanProducao() {
         <div className="flex gap-2 items-center flex-wrap">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar venda ou cliente..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9 w-[220px]"
-            />
+            <Input placeholder="Buscar venda ou cliente..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 w-[220px]" />
           </div>
           <Select value={filterMode} onValueChange={setFilterMode}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
@@ -403,15 +464,30 @@ export default function KanbanProducao() {
                                           </Badge>
                                         </div>
 
-                                        {/* Status badges for Concluído column */}
+                                        {/* Piloto badge */}
+                                        {card.is_piloto && (
+                                          <Badge className={`mt-1.5 text-[10px] ${card.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
+                                            {card.status_piloto === 'REPROVADO' ? 'PILOTO REPROVADO' : 'PILOTO'}
+                                          </Badge>
+                                        )}
+
+                                        {/* Pending losses badge */}
+                                        {card.perdas_pendentes > 0 && (
+                                          <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30">
+                                            <AlertTriangle className="h-3 w-3 mr-0.5" />
+                                            {card.perdas_pendentes} perda{card.perdas_pendentes > 1 ? 's' : ''} pendente{card.perdas_pendentes > 1 ? 's' : ''}
+                                          </Badge>
+                                        )}
+
+                                        {/* Concluído lifecycle badges */}
+                                        {inConcluido && !fivelaWithSintetico && (() => {
+                                          const badge = getConcluidoBadge(card);
+                                          return <Badge className={`mt-2 text-[10px] ${badge.cls}`}>{badge.label}</Badge>;
+                                        })()}
+
                                         {inConcluido && fivelaWithSintetico && (
                                           <Badge className="mt-2 text-[10px] bg-orange-500/15 text-orange-600 border-orange-500/30">
                                             Aguardando transferência
-                                          </Badge>
-                                        )}
-                                        {inConcluido && !fivelaWithSintetico && (
-                                          <Badge className="mt-2 text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
-                                            Concluído
                                           </Badge>
                                         )}
 
@@ -428,36 +504,29 @@ export default function KanbanProducao() {
                                           }
                                         </div>
 
-                                        {/* Fivela transfer button for supervisor */}
+                                        {/* Fivela transfer button */}
                                         {fivelaWithSintetico && isSupervisor && (
-                                          <Button
-                                            size="sm"
-                                            className="w-full mt-2 h-8 text-xs bg-orange-600 hover:bg-orange-700"
-                                            onClick={() => setTransferDialog({ open: true, card })}
-                                          >
+                                          <Button size="sm" className="w-full mt-2 h-8 text-xs bg-orange-600 hover:bg-orange-700" onClick={() => setTransferDialog({ open: true, card })}>
                                             <ArrowRight className="h-3 w-3 mr-1" /> Transferir para Embalagem Sintético
                                           </Button>
                                         )}
 
-                                        {/* Fivela solo (no sintético) — finalize button */}
                                         {fivelaSolo && isSupervisor && (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="w-full mt-2 h-8 text-xs"
-                                            onClick={() => handleFivelaSoloComplete(card)}
-                                          >
+                                          <Button size="sm" variant="outline" className="w-full mt-2 h-8 text-xs" onClick={() => handleFivelaSoloComplete(card)}>
                                             <CheckCircle2 className="h-3 w-3 mr-1" /> Encaminhar para Comercial
                                           </Button>
                                         )}
 
-                                        {/* Operator confirm button (non-concluído, non-aguardando) */}
+                                        {/* Register loss button */}
+                                        {!inConcluido && col !== 'Aguardando Início' && (
+                                          <Button size="sm" variant="ghost" className="w-full mt-1 h-7 text-[10px] text-muted-foreground" onClick={() => openLossDialog(card)}>
+                                            + Registrar Perda
+                                          </Button>
+                                        )}
+
+                                        {/* Operator confirm button */}
                                         {profile?.perfil === 'operador_producao' && card.operador_id === profile.id && !inConcluido && col !== 'Aguardando Início' && (
-                                          <Button
-                                            size="sm"
-                                            className="w-full mt-2 h-8 text-xs"
-                                            onClick={() => advanceCard(card, `Concluído pelo operador ${profile.nome}`)}
-                                          >
+                                          <Button size="sm" className="w-full mt-2 h-8 text-xs" onClick={() => advanceCard(card, `Concluído pelo operador ${profile.nome}`)}>
                                             <CheckCircle2 className="h-3 w-3 mr-1" /> Confirmar conclusão
                                           </Button>
                                         )}
@@ -480,15 +549,11 @@ export default function KanbanProducao() {
         })}
       </Tabs>
 
-      {/* Tecido cross-pipeline confirmation dialog */}
+      {/* Tecido cross-pipeline dialog */}
       <Dialog open={confirmDialog.open} onOpenChange={o => !o && setConfirmDialog({ open: false, type: '', card: null })}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Tecido concluído — confirmar entrada no Sintético</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Confirmar que o tecido do pedido #{confirmDialog.card?.api_venda_id} está pronto e deve entrar na Preparação do Kanban Sintético?
-          </p>
+          <DialogHeader><DialogTitle>Tecido concluído — confirmar entrada no Sintético</DialogTitle></DialogHeader>
+          <DialogDescription>Confirmar que o tecido do pedido #{confirmDialog.card?.api_venda_id} está pronto e deve entrar na Preparação do Kanban Sintético?</DialogDescription>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDialog({ open: false, type: '', card: null })}>Cancelar</Button>
             <Button onClick={handleCrossPipelineConfirm}>Confirmar</Button>
@@ -496,23 +561,58 @@ export default function KanbanProducao() {
         </DialogContent>
       </Dialog>
 
-      {/* Fivela transfer confirmation dialog */}
+      {/* Fivela transfer dialog */}
       <Dialog open={transferDialog.open} onOpenChange={o => !o && setTransferDialog({ open: false, card: null })}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar entrega das fivelas para Embalagem</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Confirmar entrega das fivelas para o setor de Embalagem do pedido #{transferDialog.card?.api_venda_id}?
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            O card do Sintético vinculado será marcado com fivelas recebidas.
-          </p>
+          <DialogHeader><DialogTitle>Confirmar entrega das fivelas para Embalagem</DialogTitle></DialogHeader>
+          <DialogDescription>Confirmar entrega das fivelas para o setor de Embalagem do pedido #{transferDialog.card?.api_venda_id}?</DialogDescription>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTransferDialog({ open: false, card: null })}>Cancelar</Button>
             <Button className="bg-orange-600 hover:bg-orange-700" onClick={handleFivelaTransfer}>
               <ArrowRight className="h-4 w-4 mr-1" /> Confirmar Transferência
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Loss registration dialog */}
+      <Dialog open={lossDialog.open} onOpenChange={o => !o && setLossDialog({ open: false, card: null })}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Registrar Perda — Venda #{lossDialog.card?.api_venda_id}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Item</Label>
+              <Select value={lossForm.pedido_item_id} onValueChange={v => {
+                const item = lossItems.find(i => i.id === v);
+                setLossForm({ ...lossForm, pedido_item_id: v, nm_item: item?.descricao_produto || '' });
+              }}>
+                <SelectTrigger><SelectValue placeholder="Selecione o item" /></SelectTrigger>
+                <SelectContent>
+                  {lossItems.map(i => <SelectItem key={i.id} value={i.id}>{i.descricao_produto}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Quantidade perdida</Label>
+              <Input type="number" min="1" value={lossForm.quantidade_perdida} onChange={e => setLossForm({ ...lossForm, quantidade_perdida: e.target.value })} />
+            </div>
+            <div>
+              <Label>Motivo da perda</Label>
+              <Textarea placeholder="Ex: defeito no corte, mancha no material..." value={lossForm.motivo} onChange={e => setLossForm({ ...lossForm, motivo: e.target.value })} />
+            </div>
+            <div>
+              <Label>Etapa onde ocorreu</Label>
+              <Select value={lossForm.etapa} onValueChange={v => setLossForm({ ...lossForm, etapa: v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione a etapa" /></SelectTrigger>
+                <SelectContent>
+                  {lossEtapas.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLossDialog({ open: false, card: null })}>Cancelar</Button>
+            <Button onClick={submitLoss}>Registrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

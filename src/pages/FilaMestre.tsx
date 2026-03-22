@@ -8,16 +8,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, X, Calendar } from 'lucide-react';
+import { Search, Loader2, X, Calendar, AlertTriangle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface VendaRow {
-  id: string; // pedido id
+  id: string;
   api_venda_id: string | null;
   numero_pedido: string;
   cliente_nome: string;
@@ -28,13 +32,14 @@ interface VendaRow {
   status_prazo: string | null;
   status_api: string | null;
   criado_em: string;
-  // from ordens
   ordem_id: string | null;
   tipo_produto: string | null;
   etapa_atual: string;
   operador_atual: string;
   data_inicio_pcp: string | null;
   data_fim_pcp: string | null;
+  is_piloto: boolean;
+  status_piloto: string | null;
 }
 
 interface PedidoDetail {
@@ -42,6 +47,7 @@ interface PedidoDetail {
   itens: any[];
   historico: any[];
   ordens: any[];
+  perdas: any[];
 }
 
 export default function FilaMestre() {
@@ -69,7 +75,7 @@ export default function FilaMestre() {
     // Fetch pedidos that are not finalized
     const { data: pedidos } = await supabase
       .from('pedidos')
-      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em')
+      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em, is_piloto, status_piloto')
       .not('status_api', 'eq', 'Finalizado')
       .order('criado_em', { ascending: false });
 
@@ -101,6 +107,8 @@ export default function FilaMestre() {
         operador_atual: (etapa?.usuarios as any)?.nome || '—',
         data_inicio_pcp: (ordem as any)?.data_inicio_pcp || null,
         data_fim_pcp: (ordem as any)?.data_fim_pcp || null,
+        is_piloto: (p as any).is_piloto || false,
+        status_piloto: (p as any).status_piloto || null,
       };
     });
 
@@ -117,11 +125,15 @@ export default function FilaMestre() {
       supabase.from('pedido_historico').select('*, usuarios(nome)').eq('pedido_id', pedidoId).order('criado_em', { ascending: false }),
       supabase.from('ordens_producao').select('*, pipeline_producao(nome)').eq('pedido_id', pedidoId),
     ]);
+    // Fetch losses for all ordens of this pedido
+    const ordemIds = (rOrdens.data || []).map((o: any) => o.id);
+    const { data: perdas } = await supabase.from('ordem_perdas').select('*, usuarios:registrado_por(nome)').in('ordem_id', ordemIds.length > 0 ? ordemIds : ['none']);
     setDetail({
       pedido: rPedido.data,
       itens: rItens.data || [],
       historico: rHist.data || [],
       ordens: rOrdens.data || [],
+      perdas: perdas || [],
     });
     setDetailLoading(false);
   };
@@ -280,7 +292,14 @@ export default function FilaMestre() {
                         </TableCell>
                         <TableCell className="text-sm">{r.etapa_atual}</TableCell>
                         <TableCell>
-                          <Badge className={`font-normal text-xs ${statusCfg.color}`}>{statusCfg.label}</Badge>
+                          <div className="flex items-center gap-1">
+                            <Badge className={`font-normal text-xs ${statusCfg.color}`}>{statusCfg.label}</Badge>
+                            {r.is_piloto && (
+                              <Badge className={`text-[10px] ${r.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
+                                {r.status_piloto === 'REPROVADO' ? 'PILOTO ✗' : 'PILOTO'}
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -348,6 +367,86 @@ export default function FilaMestre() {
                         <Badge className={`text-xs font-normal ${TIPO_PRODUTO_BADGE[o.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border'}`}>
                           {TIPO_PRODUTO_LABELS[o.tipo_produto || ''] || 'A classificar'}
                         </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Piloto Toggle */}
+                {canEdit && (
+                  <div className="rounded-lg border border-border/60 p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Marcar como Piloto</Label>
+                      <Switch
+                        checked={detail.pedido.is_piloto || false}
+                        onCheckedChange={async (checked) => {
+                          await supabase.from('pedidos').update({ is_piloto: checked, status_piloto: checked ? 'ENVIADO' : null }).eq('id', detail.pedido.id);
+                          toast.success(checked ? 'Marcado como piloto' : 'Piloto removido');
+                          openDetail(detail.pedido.id);
+                          fetchRows();
+                        }}
+                      />
+                    </div>
+                    {detail.pedido.is_piloto && (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Select value={detail.pedido.status_piloto || 'ENVIADO'} onValueChange={async (v) => {
+                            const update: any = { status_piloto: v };
+                            if (v === 'REPROVADO' && !detail.pedido.observacao_piloto) {
+                              toast.error('Preencha o motivo da reprovação antes');
+                              return;
+                            }
+                            await supabase.from('pedidos').update(update).eq('id', detail.pedido.id);
+                            await supabase.from('pedido_historico').insert({
+                              pedido_id: detail.pedido.id, usuario_id: profile!.id, tipo_acao: 'EDICAO',
+                              observacao: `Piloto ${v === 'APROVADO' ? 'aprovado' : v === 'REPROVADO' ? 'reprovado' : 'enviado'} por ${profile!.nome}`,
+                            });
+                            toast.success(`Piloto marcado como ${v}`);
+                            openDetail(detail.pedido.id);
+                            fetchRows();
+                          }}>
+                            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ENVIADO">Enviado</SelectItem>
+                              <SelectItem value="APROVADO">Aprovado</SelectItem>
+                              <SelectItem value="REPROVADO">Reprovado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Badge className={`text-xs self-center ${
+                            detail.pedido.status_piloto === 'APROVADO' ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]' :
+                            detail.pedido.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive' :
+                            'bg-purple-500/15 text-purple-600'
+                          }`}>
+                            {detail.pedido.status_piloto || 'ENVIADO'}
+                          </Badge>
+                        </div>
+                        <Textarea
+                          placeholder="Observação do piloto..."
+                          defaultValue={detail.pedido.observacao_piloto || ''}
+                          onBlur={async (e) => {
+                            if (e.target.value !== (detail.pedido.observacao_piloto || '')) {
+                              await supabase.from('pedidos').update({ observacao_piloto: e.target.value }).eq('id', detail.pedido.id);
+                            }
+                          }}
+                          className="text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Perdas confirmadas */}
+                {detail.perdas.filter((p: any) => p.status === 'CONFIRMADA').length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 text-destructive" /> Perdas Confirmadas</p>
+                    {detail.perdas.filter((p: any) => p.status === 'CONFIRMADA').map((p: any) => (
+                      <div key={p.id} className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm">
+                        <p className="font-medium">{p.nm_item}</p>
+                        <div className="flex gap-3 text-muted-foreground mt-1">
+                          <span>{p.quantidade_perdida} un perdida{p.quantidade_perdida > 1 ? 's' : ''}</span>
+                          <span>Etapa: {p.etapa}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">Motivo: {p.motivo}</p>
                       </div>
                     ))}
                   </div>
