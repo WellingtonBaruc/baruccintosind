@@ -133,7 +133,6 @@ export default function FilaMestre() {
       ordens: rOrdens.data || [],
       perdas: perdas || [],
     });
-    });
     setDetailLoading(false);
   };
 
