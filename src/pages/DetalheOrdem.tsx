@@ -565,22 +565,30 @@ export default function DetalheOrdem() {
                           {etapa.observacao && <p className="text-xs text-muted-foreground mt-1 bg-muted/50 rounded px-2 py-1">{etapa.observacao}</p>}
                           {etapa.motivo_rejeicao && <p className="text-xs text-destructive mt-1 bg-destructive/5 rounded px-2 py-1">Rejeitado: {etapa.motivo_rejeicao}</p>}
 
-                          {canStart && (
-                            <Button size="sm" className="mt-2" onClick={() => handleIniciar(etapa.id)} disabled={actionLoading}>
-                              <Play className="h-3.5 w-3.5 mr-1" /> Iniciar Etapa
-                            </Button>
-                          )}
-                          {canConclude && !hasSpecializedView && (
-                            <Button size="sm" className="mt-2" onClick={() => { setConcluirEtapaId(etapa.id); setConcluirDialogOpen(true); }} disabled={actionLoading}>
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir Etapa
-                            </Button>
-                          )}
-                          {/* Tecido transfer button */}
-                          {isTecidoConcluido && etapa.id === etapaAtiva?.id && canConclude && (
-                            <Button size="sm" className="mt-2" onClick={() => setTransferDialogOpen(true)} disabled={actionLoading}>
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir e Transferir para Sintético
-                            </Button>
-                          )}
+                          <div className="flex gap-2 flex-wrap mt-2">
+                            {canStart && (
+                              <Button size="sm" onClick={() => handleIniciar(etapa.id)} disabled={actionLoading}>
+                                <Play className="h-3.5 w-3.5 mr-1" /> Iniciar Etapa
+                              </Button>
+                            )}
+                            {canConclude && !hasSpecializedView && (
+                              <Button size="sm" onClick={() => { setConcluirEtapaId(etapa.id); setConcluirDialogOpen(true); }} disabled={actionLoading}>
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir Etapa
+                              </Button>
+                            )}
+                            {/* Assign operator button */}
+                            {isActive && canAssignOperador && (
+                              <Button size="sm" variant="outline" onClick={() => { setSelectedOperadorId(etapa.operador_id || ''); setAtribuirDialogOpen(true); }} disabled={actionLoading}>
+                                <UserPlus className="h-3.5 w-3.5 mr-1" /> Atribuir operador
+                              </Button>
+                            )}
+                            {/* Tecido transfer button */}
+                            {isTecidoConcluido && etapa.id === etapaAtiva?.id && canConclude && (
+                              <Button size="sm" onClick={() => setTransferDialogOpen(true)} disabled={actionLoading}>
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir e Transferir para Sintético
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
