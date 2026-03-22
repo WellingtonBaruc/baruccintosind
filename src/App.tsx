@@ -5,15 +5,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import Login from "./pages/Login";
-import DashboardRouter from "./pages/DashboardRouter";
-import DashboardSupervisor from "./pages/DashboardSupervisor";
-import DashboardOperador from "./pages/DashboardOperador";
-import DashboardLoja from "./pages/DashboardLoja";
-import DashboardComercial from "./pages/DashboardComercial";
-import DashboardFinanceiro from "./pages/DashboardFinanceiro";
+import DashboardGestao from "./pages/DashboardGestao";
+import FilaMestre from "./pages/FilaMestre";
+import KanbanProducao from "./pages/KanbanProducao";
+import PainelDia from "./pages/PainelDia";
 import Usuarios from "./pages/Usuarios";
 import Pipelines from "./pages/Pipelines";
-import FilaProducao from "./pages/FilaProducao";
 import NovoPedido from "./pages/NovoPedido";
 import DetalheOrdem from "./pages/DetalheOrdem";
 import FilaLoja from "./pages/FilaLoja";
@@ -24,9 +21,9 @@ import FilaLogistica from "./pages/FilaLogistica";
 import RegistroEnvio from "./pages/RegistroEnvio";
 import Integracao from "./pages/Integracao";
 import PCP from "./pages/PCP";
-import MinhaFila from "./pages/MinhaFila";
-import PainelTV from "./pages/PainelTV";
-import ProgramacaoDia from "./pages/ProgramacaoDia";
+import DashboardComercial from "./pages/DashboardComercial";
+import DashboardFinanceiro from "./pages/DashboardFinanceiro";
+import DashboardLoja from "./pages/DashboardLoja";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 
@@ -42,28 +39,34 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<DashboardRouter />} />
-              <Route path="/painel-supervisor" element={<DashboardSupervisor />} />
-              <Route path="/painel-operador" element={<DashboardOperador />} />
-              <Route path="/painel-loja" element={<DashboardLoja />} />
-              <Route path="/painel-comercial" element={<DashboardComercial />} />
-              <Route path="/painel-financeiro" element={<DashboardFinanceiro />} />
+              {/* Main 3 screens */}
+              <Route path="/dashboard" element={<DashboardGestao />} />
+              <Route path="/producao" element={<FilaMestre />} />
+              <Route path="/kanban" element={<KanbanProducao />} />
+              <Route path="/painel-dia" element={<PainelDia />} />
+
+              {/* Config / Admin */}
               <Route path="/usuarios" element={<Usuarios />} />
               <Route path="/pipelines" element={<Pipelines />} />
-              <Route path="/producao" element={<FilaProducao />} />
+              <Route path="/integracao" element={<Integracao />} />
+              <Route path="/pcp" element={<PCP />} />
+
+              {/* Production detail */}
               <Route path="/producao/novo" element={<NovoPedido />} />
               <Route path="/producao/ordem/:id" element={<DetalheOrdem />} />
+
+              {/* Role-specific queues */}
               <Route path="/loja" element={<FilaLoja />} />
               <Route path="/loja/verificar/:id" element={<VerificacaoLoja />} />
               <Route path="/financeiro" element={<FilaFinanceira />} />
               <Route path="/financeiro/validar/:id" element={<ValidacaoFinanceira />} />
               <Route path="/logistica" element={<FilaLogistica />} />
               <Route path="/logistica/envio/:id" element={<RegistroEnvio />} />
-              <Route path="/pcp" element={<PCP />} />
-              <Route path="/minha-fila" element={<MinhaFila />} />
-              <Route path="/painel" element={<PainelTV />} />
-              <Route path="/programacao" element={<ProgramacaoDia />} />
-              <Route path="/integracao" element={<Integracao />} />
+
+              {/* Role dashboards for specific profiles */}
+              <Route path="/comercial" element={<DashboardComercial />} />
+              <Route path="/painel-financeiro" element={<DashboardFinanceiro />} />
+              <Route path="/painel-loja" element={<DashboardLoja />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFound />} />
