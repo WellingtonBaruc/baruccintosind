@@ -120,7 +120,8 @@ export default function DetalheOrdem() {
 
   const ordemCfg = STATUS_ORDEM_CONFIG[ordem.status] || { label: ordem.status, color: '' };
   const isOperador = ['operador_producao', 'supervisor_producao', 'admin'].includes(profile.perfil);
-  const isSupervisor = ['supervisor_producao', 'admin'].includes(profile.perfil);
+  const isSupervisor = ['supervisor_producao', 'admin', 'gestor'].includes(profile.perfil);
+  const canAssignOperador = ['supervisor_producao', 'admin', 'gestor'].includes(profile.perfil);
   const aguardandoAprovacao = ordem.status === 'CONCLUIDA' && !ordem.aprovado_em;
 
   const etapaAtiva = etapas.find(e => e.status === 'EM_ANDAMENTO');
@@ -128,6 +129,32 @@ export default function DetalheOrdem() {
   const isPreparacaoActive = etapaAtiva?.nome_etapa === 'Preparação';
   const isMontagemActive = etapaAtiva?.nome_etapa === 'Montagem';
   const isTecidoConcluido = etapaAtiva?.nome_etapa === 'Concluído' && ordem.tipo_produto === 'TECIDO';
+
+  const handleAtribuirOperador = async () => {
+    if (!selectedOperadorId || !etapaAtiva) return;
+    setActionLoading(true);
+    try {
+      await supabase.from('op_etapas').update({
+        operador_id: selectedOperadorId,
+      }).eq('id', etapaAtiva.id);
+
+      const operadorNome = operadores.find(o => o.id === selectedOperadorId)?.nome || '';
+      await supabase.from('pedido_historico').insert({
+        pedido_id: pedido.id,
+        usuario_id: profile.id,
+        tipo_acao: 'TRANSICAO',
+        observacao: `Operador ${operadorNome} atribuído à etapa ${etapaAtiva.nome_etapa}.`,
+      });
+
+      toast.success(`Operador ${operadorNome} atribuído!`);
+      setAtribuirDialogOpen(false);
+      setSelectedOperadorId('');
+      fetchData();
+    } catch {
+      toast.error('Erro ao atribuir operador.');
+    }
+    setActionLoading(false);
+  };
 
   const handleIniciar = async (etapaId: string) => {
     setActionLoading(true);
