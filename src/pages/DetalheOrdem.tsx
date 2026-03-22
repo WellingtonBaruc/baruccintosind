@@ -717,6 +717,37 @@ export default function DetalheOrdem() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Atribuir operador dialog */}
+      <Dialog open={atribuirDialogOpen} onOpenChange={setAtribuirDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Atribuir operador</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Etapa: <span className="font-medium text-foreground">{etapaAtiva?.nome_etapa}</span>
+            </p>
+            <div className="space-y-2">
+              <Label>Selecionar operador</Label>
+              <Select value={selectedOperadorId} onValueChange={setSelectedOperadorId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha um operador..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {operadores.filter(o => o.id !== etapaAtiva?.operador_id).map(op => (
+                    <SelectItem key={op.id} value={op.id}>{op.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAtribuirDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleAtribuirOperador} disabled={actionLoading || !selectedOperadorId}>
+              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Atribuir'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
