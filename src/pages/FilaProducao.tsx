@@ -25,7 +25,7 @@ interface OrdemView {
   status: string;
   tipo_produto: string | null;
   criado_em: string;
-  pedidos: { numero_pedido: string; cliente_nome: string; valor_liquido: number; criado_em: string; status_prazo: string | null; data_previsao_entrega: string | null };
+  pedidos: { numero_pedido: string; cliente_nome: string; valor_liquido: number; criado_em: string; status_prazo: string | null; data_previsao_entrega: string | null; api_venda_id: string | null };
   pipeline_producao: { nome: string };
   etapa_atual?: string;
   operador_atual?: string;
@@ -49,7 +49,7 @@ export default function FilaProducao() {
       .from('ordens_producao')
       .select(`
         *,
-        pedidos!inner(numero_pedido, cliente_nome, valor_liquido, criado_em, status_prazo, data_previsao_entrega),
+        pedidos!inner(numero_pedido, cliente_nome, valor_liquido, criado_em, status_prazo, data_previsao_entrega, api_venda_id),
         pipeline_producao(nome)
       `)
       .order('criado_em', { ascending: false });
@@ -160,6 +160,7 @@ export default function FilaProducao() {
                 <TableRow>
                   <TableHead className="w-8">Prazo</TableHead>
                   <TableHead>Pedido</TableHead>
+                  <TableHead>Venda Simplifica</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Pipeline</TableHead>
@@ -188,6 +189,7 @@ export default function FilaProducao() {
                         )}
                       </TableCell>
                       <TableCell className="font-medium">{o.pedidos.numero_pedido}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{o.pedidos.api_venda_id || '—'}</TableCell>
                       <TableCell className="text-muted-foreground">{o.pedidos.cliente_nome}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs font-normal">{tipoLabel}</Badge>
