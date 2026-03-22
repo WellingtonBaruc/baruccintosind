@@ -2,19 +2,23 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { concluirEtapa } from '@/lib/producao';
-import { TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE, STATUS_PRAZO_CONFIG } from '@/lib/pcp';
+import { TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, User } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Loader2, User, Search, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface KanbanCard {
-  id: string; // op_etapa id
+  id: string;
   ordem_id: string;
   pedido_id: string;
   nome_etapa: string;
+  etapa_status: string;
   ordem_sequencia: number;
   operador_id: string | null;
   operador_nome: string;
@@ -24,25 +28,38 @@ interface KanbanCard {
   quantidade: number;
   status_prazo: string;
   data_previsao_entrega: string | null;
+  ordem_status: string;
 }
 
-const PIPELINE_ETAPAS: Record<string, string[]> = {
-  SINTETICO: ['Corte', 'Preparação', 'Montagem', 'Embalagem', 'Produção Finalizada'],
-  TECIDO: ['Conferência', 'Fusionagem', 'Colagem / Viração', 'Finalização', 'Concluído'],
-  FIVELA_COBERTA: ['Conferência', 'Produção', 'Embalagem'],
+const PIPELINE_COLUMNS: Record<string, string[]> = {
+  SINTETICO: ['Aguardando Início', 'Corte', 'Preparação', 'Montagem', 'Embalagem', 'Concluído'],
+  TECIDO: ['Aguardando Início', 'Conferência', 'Fusionagem', 'Colagem / Viração', 'Finalização', 'Concluído'],
+  FIVELA_COBERTA: ['Aguardando Início', 'Em Andamento', 'Concluído'],
 };
+
+// Map real etapa names to kanban column
+function mapEtapaToColumn(etapaName: string, etapaStatus: string, ordemStatus: string): string {
+  if (ordemStatus === 'AGUARDANDO') return 'Aguardando Início';
+  // Map "Produção" (fivela pipeline stage) to "Em Andamento"
+  if (etapaName === 'Produção') return 'Em Andamento';
+  // Map final stages
+  if (etapaName === 'Produção Finalizada') return 'Concluído';
+  if (etapaName === 'Concluído') return 'Concluído';
+  return etapaName;
+}
 
 export default function KanbanProducao() {
   const { profile } = useAuth();
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tipoFilter, setTipoFilter] = useState('SINTETICO');
-  const [prazoFilter, setPrazoFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('SINTETICO');
+  const [filterMode, setFilterMode] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; type: string; card: KanbanCard | null }>({ open: false, type: '', card: null });
 
   useEffect(() => { fetchCards(); }, []);
 
   const fetchCards = async () => {
-    // Get all active ordens with their active etapa
     const { data: etapas } = await supabase
       .from('op_etapas')
       .select(`
@@ -58,7 +75,6 @@ export default function KanbanProducao() {
 
     if (!etapas) { setLoading(false); return; }
 
-    // Get quantities
     const pedidoIds = [...new Set(etapas.map((e: any) => e.ordens_producao.pedido_id))];
     const { data: itens } = await supabase
       .from('pedido_itens')
@@ -73,160 +89,290 @@ export default function KanbanProducao() {
       qtdMap.set(item.pedido_id, (qtdMap.get(item.pedido_id) || 0) + item.quantidade);
     }
 
-    // Build kanban cards — one per etapa that is EM_ANDAMENTO or CONCLUIDA (for concluded column)
-    const kanbanCards: KanbanCard[] = etapas
-      .filter((e: any) => e.status === 'EM_ANDAMENTO' || e.status === 'CONCLUIDA')
-      .map((e: any) => ({
-        id: e.id,
-        ordem_id: e.ordem_id,
-        pedido_id: e.ordens_producao.pedido_id,
-        nome_etapa: e.nome_etapa,
-        ordem_sequencia: e.ordem_sequencia,
-        operador_id: e.operador_id,
-        operador_nome: (e.usuarios as any)?.nome || 'Sem operador',
-        api_venda_id: e.ordens_producao.pedidos.api_venda_id || '—',
-        cliente_nome: e.ordens_producao.pedidos.cliente_nome,
-        tipo_produto: e.ordens_producao.tipo_produto || 'OUTROS',
-        quantidade: qtdMap.get(e.ordens_producao.pedido_id) || 0,
-        status_prazo: e.ordens_producao.pedidos.status_prazo || 'NO_PRAZO',
-        data_previsao_entrega: e.ordens_producao.pedidos.data_previsao_entrega,
-      }));
+    // For each ordem, pick the active etapa (EM_ANDAMENTO) or last CONCLUIDA
+    const ordemMap = new Map<string, any>();
+    for (const e of etapas as any[]) {
+      const key = e.ordem_id;
+      const existing = ordemMap.get(key);
+      if (!existing) { ordemMap.set(key, e); continue; }
+      // Prefer EM_ANDAMENTO
+      if (e.status === 'EM_ANDAMENTO') ordemMap.set(key, e);
+      else if (existing.status !== 'EM_ANDAMENTO' && e.ordem_sequencia > existing.ordem_sequencia) ordemMap.set(key, e);
+    }
+
+    const kanbanCards: KanbanCard[] = Array.from(ordemMap.values()).map((e: any) => ({
+      id: e.id,
+      ordem_id: e.ordem_id,
+      pedido_id: e.ordens_producao.pedido_id,
+      nome_etapa: e.nome_etapa,
+      etapa_status: e.status,
+      ordem_sequencia: e.ordem_sequencia,
+      operador_id: e.operador_id,
+      operador_nome: (e.usuarios as any)?.nome || '',
+      api_venda_id: e.ordens_producao.pedidos.api_venda_id || '—',
+      cliente_nome: e.ordens_producao.pedidos.cliente_nome,
+      tipo_produto: e.ordens_producao.tipo_produto || 'OUTROS',
+      quantidade: qtdMap.get(e.ordens_producao.pedido_id) || 0,
+      status_prazo: e.ordens_producao.pedidos.status_prazo || 'NO_PRAZO',
+      data_previsao_entrega: e.ordens_producao.pedidos.data_previsao_entrega,
+      ordem_status: e.ordens_producao.status,
+    }));
 
     setCards(kanbanCards);
     setLoading(false);
   };
 
+  const isSupervisor = profile && ['admin', 'gestor', 'supervisor_producao'].includes(profile.perfil);
+
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination || !profile) return;
-    const cardId = result.draggableId;
-    const destEtapa = result.destination.droppableId;
-    const card = cards.find(c => c.id === cardId);
-    if (!card || card.nome_etapa === destEtapa) return;
+    const destCol = result.destination.droppableId;
+    const card = cards.find(c => c.id === result.draggableId);
+    if (!card) return;
 
-    // Check if supervisor or admin
-    if (!['admin', 'gestor', 'supervisor_producao'].includes(profile.perfil)) {
-      toast.error('Apenas supervisores podem arrastar cards.');
+    const columns = PIPELINE_COLUMNS[activeTab] || [];
+    const currentCol = mapEtapaToColumn(card.nome_etapa, card.etapa_status, card.ordem_status);
+    if (currentCol === destCol) return;
+
+    const srcIdx = columns.indexOf(currentCol);
+    const destIdx = columns.indexOf(destCol);
+
+    // No dragging backwards
+    if (destIdx <= srcIdx) {
+      toast.error('Não é possível voltar etapas.');
       return;
     }
-
-    const etapas = PIPELINE_ETAPAS[tipoFilter] || [];
-    const srcIdx = etapas.indexOf(card.nome_etapa);
-    const destIdx = etapas.indexOf(destEtapa);
-
-    // Only allow advancing one step
+    // Only one step at a time
     if (destIdx !== srcIdx + 1) {
       toast.error('Só é possível avançar uma etapa por vez.');
       return;
     }
+    if (!isSupervisor) {
+      toast.error('Apenas supervisores podem arrastar cards.');
+      return;
+    }
 
+    // Check cross-pipeline notifications
+    if (destCol === 'Concluído' && activeTab === 'TECIDO') {
+      setConfirmDialog({ open: true, type: 'TECIDO_CONCLUIDO', card });
+      return;
+    }
+    if (destCol === 'Concluído' && activeTab === 'FIVELA_COBERTA') {
+      setConfirmDialog({ open: true, type: 'FIVELA_CONCLUIDA', card });
+      return;
+    }
+
+    await advanceCard(card);
+  };
+
+  const advanceCard = async (card: KanbanCard, obs?: string) => {
     try {
-      await concluirEtapa(card.id, card.ordem_id, card.pedido_id, profile.id, `Avançado via kanban por ${profile.nome}`);
-      toast.success(`Avançado para ${destEtapa}`);
+      await concluirEtapa(card.id, card.ordem_id, card.pedido_id, profile!.id, obs || `Avançado via kanban por ${profile!.nome}`);
+      toast.success('Etapa avançada com sucesso');
       fetchCards();
-    } catch (err) {
+    } catch {
       toast.error('Erro ao avançar etapa');
     }
   };
 
-  const etapas = PIPELINE_ETAPAS[tipoFilter] || [];
+  const handleCrossPipelineConfirm = async () => {
+    const { card, type } = confirmDialog;
+    if (!card || !profile) return;
 
-  const filteredCards = cards.filter(c => {
-    if (c.tipo_produto !== tipoFilter) return false;
-    if (prazoFilter === 'ATRASADO' && c.status_prazo !== 'ATRASADO') return false;
-    // For operador, show only assigned
-    if (profile?.perfil === 'operador_producao' && c.operador_id !== profile.id) return false;
-    return true;
-  });
+    // First advance the current card to Concluído
+    await advanceCard(card, type === 'TECIDO_CONCLUIDO'
+      ? `Tecido concluído — encaminhado para Preparação do Sintético. Confirmado por ${profile.nome}`
+      : `Fivelas prontas — encaminhadas para Embalagem do Sintético. Confirmado por ${profile.nome}`
+    );
 
-  const getCardsForEtapa = (etapa: string) => filteredCards.filter(c => c.nome_etapa === etapa);
+    toast.success(type === 'TECIDO_CONCLUIDO'
+      ? `Tecido concluído — card enviado para Preparação do Sintético (#${card.api_venda_id})`
+      : `Fivelas prontas — card enviado para Embalagem do Sintético (#${card.api_venda_id})`
+    );
 
-  const prazoColors: Record<string, string> = {
-    ATRASADO: 'border-l-destructive',
-    ATENCAO: 'border-l-[hsl(var(--warning))]',
+    setConfirmDialog({ open: false, type: '', card: null });
+  };
+
+  // Filter logic
+  const getFilteredCards = (tipo: string) => {
+    let filtered = cards.filter(c => c.tipo_produto === tipo);
+    if (profile?.perfil === 'operador_producao') {
+      filtered = filtered.filter(c => c.operador_id === profile.id);
+    }
+    if (filterMode === 'ATRASADO') filtered = filtered.filter(c => c.status_prazo === 'ATRASADO');
+    if (filterMode === 'SEM_OPERADOR') filtered = filtered.filter(c => !c.operador_id);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(c =>
+        c.api_venda_id.toLowerCase().includes(q) || c.cliente_nome.toLowerCase().includes(q)
+      );
+    }
+    return filtered;
+  };
+
+  const getCardsForColumn = (tipoCards: KanbanCard[], column: string) =>
+    tipoCards.filter(c => mapEtapaToColumn(c.nome_etapa, c.etapa_status, c.ordem_status) === column);
+
+  const prazoClasses: Record<string, string> = {
+    ATRASADO: 'border-l-destructive bg-destructive/5',
+    ATENCAO: 'border-l-[hsl(var(--warning))] bg-[hsl(var(--warning))]/5',
     NO_PRAZO: 'border-l-[hsl(var(--success))]',
+  };
+
+  const prazoBadge: Record<string, { label: string; cls: string }> = {
+    ATRASADO: { label: 'Atrasado', cls: 'bg-destructive/15 text-destructive border-destructive/30' },
+    ATENCAO: { label: 'Atenção', cls: 'bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30' },
+    NO_PRAZO: { label: 'No prazo', cls: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30' },
   };
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
+  const tabTypes = ['SINTETICO', 'TECIDO', 'FIVELA_COBERTA'] as const;
+
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Kanban</h1>
-        <div className="flex gap-2">
-          <Select value={tipoFilter} onValueChange={setTipoFilter}>
+        <h1 className="text-2xl font-semibold tracking-tight">Kanban de Produção</h1>
+        <div className="flex gap-2 items-center flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar venda ou cliente..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 w-[220px]"
+            />
+          </div>
+          <Select value={filterMode} onValueChange={setFilterMode}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="SINTETICO">Sintético</SelectItem>
-              <SelectItem value="TECIDO">Tecido</SelectItem>
-              <SelectItem value="FIVELA_COBERTA">Fivela Coberta</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={prazoFilter} onValueChange={setPrazoFilter}>
-            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="ATRASADO">Atrasados</SelectItem>
+              <SelectItem value="SEM_OPERADOR">Sem operador</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: '70vh' }}>
-          {etapas.map(etapa => {
-            const colCards = getCardsForEtapa(etapa);
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          {tabTypes.map(t => {
+            const count = getFilteredCards(t).length;
             return (
-              <Droppable droppableId={etapa} key={etapa}>
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={`flex-shrink-0 w-[260px] rounded-xl border border-border/60 bg-muted/30 p-2 transition-colors ${snapshot.isDraggingOver ? 'bg-accent/40' : ''}`}
-                  >
-                    <div className="flex items-center justify-between px-2 py-2 mb-1">
-                      <h3 className="text-sm font-semibold text-foreground">{etapa}</h3>
-                      <Badge variant="outline" className="text-xs">{colCards.length}</Badge>
-                    </div>
-                    <div className="space-y-2 min-h-[100px]">
-                      {colCards.map((card, index) => (
-                        <Draggable key={card.id} draggableId={card.id} index={index}>
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className={`rounded-lg border bg-card p-3 shadow-sm border-l-4 ${prazoColors[card.status_prazo] || 'border-l-border'} ${snapshot.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''}`}
-                            >
-                              <p className="font-semibold text-sm">{card.api_venda_id}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">{card.cliente_nome}</p>
-                              <div className="flex items-center gap-2 mt-2">
-                                <Badge className={`text-[10px] font-normal ${TIPO_PRODUTO_BADGE[card.tipo_produto] || 'bg-muted text-muted-foreground border-border'}`}>
-                                  {TIPO_PRODUTO_LABELS[card.tipo_produto] || card.tipo_produto}
-                                </Badge>
-                                <span className="text-[10px] text-muted-foreground">{card.quantidade} un</span>
-                              </div>
-                              <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
-                                <User className="h-3 w-3" />
-                                <span>{card.operador_nome}</span>
-                              </div>
-                              {card.data_previsao_entrega && (
-                                <p className="text-[10px] text-muted-foreground mt-1">
-                                  Entrega: {new Date(card.data_previsao_entrega + 'T00:00:00').toLocaleDateString('pt-BR')}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  </div>
-                )}
-              </Droppable>
+              <TabsTrigger key={t} value={t} className="gap-1.5">
+                {TIPO_PRODUTO_LABELS[t] || t}
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">{count}</Badge>
+              </TabsTrigger>
             );
           })}
-        </div>
-      </DragDropContext>
+        </TabsList>
+
+        {tabTypes.map(tipo => {
+          const columns = PIPELINE_COLUMNS[tipo];
+          const tipoCards = getFilteredCards(tipo);
+
+          return (
+            <TabsContent key={tipo} value={tipo}>
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: '65vh' }}>
+                  {columns.map(col => {
+                    const colCards = getCardsForColumn(tipoCards, col);
+                    return (
+                      <Droppable droppableId={col} key={col}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className={`flex-shrink-0 w-[250px] rounded-xl border border-border/60 bg-muted/30 p-2 transition-colors ${snapshot.isDraggingOver ? 'bg-accent/40' : ''}`}
+                          >
+                            <div className="flex items-center justify-between px-2 py-2 mb-1">
+                              <h3 className="text-sm font-semibold text-foreground truncate">{col}</h3>
+                              <Badge variant="outline" className="text-[10px] ml-1">{colCards.length}</Badge>
+                            </div>
+                            <div className="space-y-2 min-h-[80px]">
+                              {colCards.map((card, index) => (
+                                <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={!isSupervisor}>
+                                  {(prov, snap) => (
+                                    <div
+                                      ref={prov.innerRef}
+                                      {...prov.draggableProps}
+                                      {...prov.dragHandleProps}
+                                      className={`rounded-lg border bg-card p-3 shadow-sm border-l-4 ${prazoClasses[card.status_prazo] || 'border-l-border'} ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''}`}
+                                    >
+                                      <p className="font-bold text-base leading-tight">{card.api_venda_id}</p>
+                                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.cliente_nome}</p>
+                                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                                        <Badge className={`text-[10px] font-normal ${TIPO_PRODUTO_BADGE[card.tipo_produto] || 'bg-muted text-muted-foreground border-border'}`}>
+                                          {TIPO_PRODUTO_LABELS[card.tipo_produto] || card.tipo_produto}
+                                        </Badge>
+                                        <span className="text-[10px] text-muted-foreground">{card.quantidade} un</span>
+                                        <Badge variant="outline" className={`text-[10px] ${prazoBadge[card.status_prazo]?.cls || ''}`}>
+                                          {prazoBadge[card.status_prazo]?.label || '—'}
+                                        </Badge>
+                                      </div>
+                                      {card.data_previsao_entrega && (
+                                        <p className="text-[10px] text-muted-foreground mt-1.5">
+                                          Entrega: {new Date(card.data_previsao_entrega + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                        </p>
+                                      )}
+                                      <div className="flex items-center gap-1 mt-1.5 text-[10px] text-muted-foreground">
+                                        <User className="h-3 w-3" />
+                                        {card.operador_nome
+                                          ? <span>{card.operador_nome}</span>
+                                          : <Badge variant="outline" className="text-[9px] px-1 py-0 text-muted-foreground">Sem operador</Badge>
+                                        }
+                                      </div>
+                                      {/* Operator confirm button */}
+                                      {profile?.perfil === 'operador_producao' && card.operador_id === profile.id && col !== 'Aguardando Início' && col !== 'Concluído' && (
+                                        <Button
+                                          size="sm"
+                                          className="w-full mt-2 h-8 text-xs"
+                                          onClick={() => advanceCard(card, `Concluído pelo operador ${profile.nome}`)}
+                                        >
+                                          <CheckCircle2 className="h-3 w-3 mr-1" /> Confirmar conclusão
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))}
+                              {provided.placeholder}
+                            </div>
+                          </div>
+                        )}
+                      </Droppable>
+                    );
+                  })}
+                </div>
+              </DragDropContext>
+            </TabsContent>
+          );
+        })}
+      </Tabs>
+
+      {/* Cross-pipeline confirmation dialog */}
+      <Dialog open={confirmDialog.open} onOpenChange={o => !o && setConfirmDialog({ open: false, type: '', card: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmDialog.type === 'TECIDO_CONCLUIDO'
+                ? 'Tecido concluído — confirmar entrada no Sintético'
+                : 'Fivelas prontas — confirmar entrega para Sintético'
+              }
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {confirmDialog.type === 'TECIDO_CONCLUIDO'
+              ? `Confirmar que o tecido do pedido #${confirmDialog.card?.api_venda_id} está pronto e deve entrar na Preparação do Kanban Sintético?`
+              : `Confirmar que as fivelas do pedido #${confirmDialog.card?.api_venda_id} estão prontas e devem entrar na Embalagem do Kanban Sintético?`
+            }
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDialog({ open: false, type: '', card: null })}>Cancelar</Button>
+            <Button onClick={handleCrossPipelineConfirm}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
