@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
+import DashboardRouter from "./pages/DashboardRouter";
 import Usuarios from "./pages/Usuarios";
 import Pipelines from "./pages/Pipelines";
 import FilaProducao from "./pages/FilaProducao";
@@ -37,7 +37,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard" element={<DashboardRouter />} />
               <Route path="/usuarios" element={<Usuarios />} />
               <Route path="/pipelines" element={<Pipelines />} />
               <Route path="/producao" element={<FilaProducao />} />
