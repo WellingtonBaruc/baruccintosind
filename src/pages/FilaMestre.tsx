@@ -299,6 +299,10 @@ export default function FilaMestre() {
                             )}
                           </div>
                         </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
               </Table>
             </div>
           )}
