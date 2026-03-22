@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2, Play, CheckCircle2, XCircle, Shield, Clock, User, MessageSquare, Scissors, Package } from 'lucide-react';
+import { ArrowLeft, Loader2, Play, CheckCircle2, XCircle, Shield, Clock, User, MessageSquare, Scissors, Package, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
