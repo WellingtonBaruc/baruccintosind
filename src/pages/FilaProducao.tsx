@@ -230,7 +230,9 @@ export default function FilaProducao() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">{o.pedidos.cliente_nome}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs font-normal">{tipoLabel}</Badge>
+                        <Badge className={`text-xs font-normal ${TIPO_PRODUTO_BADGE[o.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border'}`}>
+                          {tipoLabel || 'A classificar'}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">{o.pipeline_producao?.nome}</TableCell>
                       <TableCell className="text-sm">{o.etapa_atual}</TableCell>

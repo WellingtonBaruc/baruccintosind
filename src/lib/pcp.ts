@@ -77,10 +77,17 @@ export function classificarProduto(nomeProduto: string): string {
 }
 
 export const TIPO_PRODUTO_LABELS: Record<string, string> = {
-  SINTETICO: 'Cinto Sintético',
-  TECIDO: 'Cinto Tecido',
+  SINTETICO: 'Sintético',
+  TECIDO: 'Tecido',
   FIVELA_COBERTA: 'Fivela Coberta',
   OUTROS: 'Outros',
+};
+
+export const TIPO_PRODUTO_BADGE: Record<string, string> = {
+  SINTETICO: 'bg-purple-500/15 text-purple-700 border-purple-200',
+  TECIDO: 'bg-orange-500/15 text-orange-700 border-orange-200',
+  FIVELA_COBERTA: 'bg-blue-500/15 text-blue-700 border-blue-200',
+  OUTROS: 'bg-muted text-muted-foreground border-border',
 };
 
 export const STATUS_PRAZO_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
