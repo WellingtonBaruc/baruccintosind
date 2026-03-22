@@ -160,6 +160,7 @@ export default function FilaProducao() {
                 <TableRow>
                   <TableHead className="w-8">Prazo</TableHead>
                   <TableHead>Pedido</TableHead>
+                  <TableHead>Venda Simplifica</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Pipeline</TableHead>
