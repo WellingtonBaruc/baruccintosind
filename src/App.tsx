@@ -48,6 +48,7 @@ const App = () => (
               <Route path="/logistica" element={<FilaLogistica />} />
               <Route path="/logistica/envio/:id" element={<RegistroEnvio />} />
               <Route path="/pcp" element={<PCP />} />
+              <Route path="/minha-fila" element={<MinhaFila />} />
               <Route path="/integracao" element={<Integracao />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

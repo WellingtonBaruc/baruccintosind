@@ -25,6 +25,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, perfis: 'all' },
   { title: 'Fila de Produção', url: '/producao', icon: ClipboardList, perfis: ['admin', 'gestor', 'supervisor_producao', 'operador_producao'] },
+  { title: 'Minha Fila', url: '/minha-fila', icon: ListTodo, perfis: ['operador_producao'] },
   { title: 'Novo Pedido', url: '/producao/novo', icon: PlusCircle, perfis: ['admin', 'gestor'] },
   { title: 'Fila da Loja', url: '/loja', icon: Store, perfis: ['admin', 'gestor', 'loja'] },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign, perfis: ['admin', 'gestor', 'financeiro'] },
