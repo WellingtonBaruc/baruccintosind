@@ -107,6 +107,8 @@ export default function FilaMestre() {
         operador_atual: (etapa?.usuarios as any)?.nome || '—',
         data_inicio_pcp: (ordem as any)?.data_inicio_pcp || null,
         data_fim_pcp: (ordem as any)?.data_fim_pcp || null,
+        is_piloto: (p as any).is_piloto || false,
+        status_piloto: (p as any).status_piloto || null,
       };
     });
 
