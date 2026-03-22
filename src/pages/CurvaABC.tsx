@@ -295,6 +295,10 @@ export default function CurvaABC() {
     'Classe C': { label: 'Classe C', color: 'hsl(0, 70%, 50%)' },
   };
 
+  if (!profile || !perfisPermitidos.includes(profile.perfil)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return (
     <div className="animate-fade-in space-y-6 max-w-7xl">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
