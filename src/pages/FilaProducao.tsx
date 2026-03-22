@@ -25,7 +25,7 @@ interface OrdemView {
   status: string;
   tipo_produto: string | null;
   criado_em: string;
-  pedidos: { numero_pedido: string; cliente_nome: string; valor_liquido: number; criado_em: string; status_prazo: string | null; data_previsao_entrega: string | null; api_venda_id: string | null };
+  pedidos: { numero_pedido: string; cliente_nome: string; valor_liquido: number; criado_em: string; status_prazo: string | null; data_previsao_entrega: string | null; api_venda_id: string | null; status_api: string | null };
   pipeline_producao: { nome: string };
   etapa_atual?: string;
   operador_atual?: string;
