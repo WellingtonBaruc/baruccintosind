@@ -25,7 +25,7 @@ interface OrdemView {
   status: string;
   tipo_produto: string | null;
   criado_em: string;
-  pedidos: { numero_pedido: string; cliente_nome: string; valor_liquido: number; criado_em: string; status_prazo: string | null; data_previsao_entrega: string | null; api_venda_id: string | null };
+  pedidos: { numero_pedido: string; cliente_nome: string; valor_liquido: number; criado_em: string; status_prazo: string | null; data_previsao_entrega: string | null; api_venda_id: string | null; status_api: string | null };
   pipeline_producao: { nome: string };
   etapa_atual?: string;
   operador_atual?: string;
@@ -49,9 +49,10 @@ export default function FilaProducao() {
       .from('ordens_producao')
       .select(`
         *,
-        pedidos!inner(numero_pedido, cliente_nome, valor_liquido, criado_em, status_prazo, data_previsao_entrega, api_venda_id),
+        pedidos!inner(numero_pedido, cliente_nome, valor_liquido, criado_em, status_prazo, data_previsao_entrega, api_venda_id, status_api),
         pipeline_producao(nome)
       `)
+      .neq('pedidos.status_api', 'Finalizado')
       .order('criado_em', { ascending: false });
 
     if (data) {
@@ -160,7 +161,8 @@ export default function FilaProducao() {
                 <TableRow>
                   <TableHead className="w-8">Prazo</TableHead>
                   <TableHead>Pedido</TableHead>
-                  <TableHead>Venda Simplifica</TableHead>
+                    <TableHead>Venda Simplifica</TableHead>
+                    <TableHead>Situação</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Pipeline</TableHead>
@@ -190,6 +192,15 @@ export default function FilaProducao() {
                       </TableCell>
                       <TableCell className="font-medium">{o.pedidos.numero_pedido}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{o.pedidos.api_venda_id || '—'}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const sa = o.pedidos.status_api;
+                          if (sa === 'Em Produção') return <Badge className="bg-blue-500/15 text-blue-700 border-blue-200 font-normal">Em Produção</Badge>;
+                          if (sa === 'Pedido Enviado') return <Badge className="bg-orange-500/15 text-orange-700 border-orange-200 font-normal">Pedido Enviado</Badge>;
+                          if (sa === 'Finalizado') return <Badge className="bg-muted text-muted-foreground font-normal">Finalizado</Badge>;
+                          return <Badge variant="outline" className="font-normal text-muted-foreground">Sem status</Badge>;
+                        })()}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{o.pedidos.cliente_nome}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs font-normal">{tipoLabel}</Badge>
