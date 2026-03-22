@@ -50,6 +50,7 @@ export default function Integracao() {
   const [diagCounts, setDiagCounts] = useState<DiagRow[]>([]);
   const [mismatch, setMismatch] = useState<MismatchInfo>({ total: 0, statuses: [] });
   const [fixing, setFixing] = useState(false);
+  const [reclassifying, setReclassifying] = useState(false);
 
   useEffect(() => {
     fetchData();
