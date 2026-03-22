@@ -29,6 +29,7 @@ const navItems: NavItem[] = [
   { title: 'Fila da Loja', url: '/loja', icon: Store, perfis: ['admin', 'gestor', 'loja'] },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign, perfis: ['admin', 'gestor', 'financeiro'] },
   { title: 'Logística', url: '/logistica', icon: Truck, perfis: ['admin', 'gestor', 'logistica'] },
+  { title: 'PCP', url: '/pcp', icon: Calendar, perfis: ['admin', 'gestor', 'supervisor_producao'] },
   { title: 'Usuários', url: '/usuarios', icon: Users, perfis: ['admin'] },
   { title: 'Pipelines', url: '/pipelines', icon: Settings, perfis: ['admin'] },
   { title: 'Integração', url: '/integracao', icon: RefreshCw, perfis: ['admin'] },
