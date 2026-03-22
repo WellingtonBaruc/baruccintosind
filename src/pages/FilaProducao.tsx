@@ -192,6 +192,15 @@ export default function FilaProducao() {
                       </TableCell>
                       <TableCell className="font-medium">{o.pedidos.numero_pedido}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{o.pedidos.api_venda_id || '—'}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const sa = o.pedidos.status_api;
+                          if (sa === 'Em Produção') return <Badge className="bg-blue-500/15 text-blue-700 border-blue-200 font-normal">Em Produção</Badge>;
+                          if (sa === 'Pedido Enviado') return <Badge className="bg-orange-500/15 text-orange-700 border-orange-200 font-normal">Pedido Enviado</Badge>;
+                          if (sa === 'Finalizado') return <Badge className="bg-muted text-muted-foreground font-normal">Finalizado</Badge>;
+                          return <Badge variant="outline" className="font-normal text-muted-foreground">Sem status</Badge>;
+                        })()}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{o.pedidos.cliente_nome}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs font-normal">{tipoLabel}</Badge>
