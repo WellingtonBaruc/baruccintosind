@@ -49,7 +49,7 @@ export default function FilaProducao() {
       .from('ordens_producao')
       .select(`
         *,
-        pedidos!inner(numero_pedido, cliente_nome, valor_liquido, criado_em, status_prazo, data_previsao_entrega),
+        pedidos!inner(numero_pedido, cliente_nome, valor_liquido, criado_em, status_prazo, data_previsao_entrega, api_venda_id),
         pipeline_producao(nome)
       `)
       .order('criado_em', { ascending: false });
