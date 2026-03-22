@@ -57,9 +57,6 @@ export default function CurvaABC() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const perfisPermitidos = ['admin', 'gestor'];
-  if (!profile || !perfisPermitidos.includes(profile.perfil)) {
-    return <Navigate to="/dashboard" replace />;
-  }
 
   const dateRange = useMemo(() => {
     const now = new Date();
