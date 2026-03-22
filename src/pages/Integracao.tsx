@@ -131,6 +131,152 @@ export default function Integracao() {
     setFixing(false);
   };
 
+  const classifyProduct = (name: string): string => {
+    const upper = (name || '').toUpperCase();
+    if (upper.includes('CINTO SINTETICO') || upper.includes('TIRA SINTETICO')) return 'SINTETICO';
+    if (upper.includes('CINTO TECIDO') || upper.includes('TIRA TECIDO')) return 'TECIDO';
+    if (upper.includes('FIVELA COBERTA')) return 'FIVELA_COBERTA';
+    return 'OUTROS';
+  };
+
+  const handleReclassify = async () => {
+    setReclassifying(true);
+    try {
+      // Get all pipelines
+      const { data: pipelines } = await supabase.from('pipeline_producao').select('id, nome');
+      if (!pipelines) throw new Error('Pipelines não encontrados');
+
+      const pipelineMap: Record<string, string> = {};
+      for (const p of pipelines) {
+        const upper = p.nome.toUpperCase();
+        if (upper.includes('SINTÉTICO') || upper.includes('SINTETICO')) pipelineMap['SINTETICO'] = p.id;
+        else if (upper.includes('TECIDO')) pipelineMap['TECIDO'] = p.id;
+        else if (upper.includes('FIVELA')) pipelineMap['FIVELA_COBERTA'] = p.id;
+      }
+
+      // Get all ordens with their pedido items
+      const { data: ordens } = await supabase
+        .from('ordens_producao')
+        .select('id, pedido_id, pipeline_id, tipo_produto, status')
+        .in('status', ['AGUARDANDO', 'EM_ANDAMENTO']);
+
+      if (!ordens || ordens.length === 0) {
+        toast.info('Nenhuma ordem ativa para reclassificar.');
+        setReclassifying(false);
+        return;
+      }
+
+      let updated = 0;
+      let created = 0;
+
+      // Group ordens by pedido_id
+      const ordensByPedido = new Map<string, typeof ordens>();
+      for (const o of ordens) {
+        const list = ordensByPedido.get(o.pedido_id) || [];
+        list.push(o);
+        ordensByPedido.set(o.pedido_id, list);
+      }
+
+      for (const [pedidoId, pedidoOrdens] of ordensByPedido) {
+        const { data: itens } = await supabase
+          .from('pedido_itens')
+          .select('descricao_produto')
+          .eq('pedido_id', pedidoId);
+
+        if (!itens || itens.length === 0) continue;
+
+        // Detect types present
+        const tiposPresentes = new Set<string>();
+        for (const item of itens) {
+          tiposPresentes.add(classifyProduct(item.descricao_produto));
+        }
+        tiposPresentes.delete('OUTROS');
+
+        if (tiposPresentes.size === 0) continue;
+
+        const tipos = Array.from(tiposPresentes);
+
+        // Update first ordem with first type
+        const firstOrdem = pedidoOrdens[0];
+        const firstTipo = tipos[0];
+        const firstPipelineId = pipelineMap[firstTipo];
+        if (firstPipelineId && firstOrdem.pipeline_id !== firstPipelineId) {
+          await supabase.from('ordens_producao').update({
+            pipeline_id: firstPipelineId,
+            tipo_produto: firstTipo,
+          }).eq('id', firstOrdem.id);
+
+          // Recreate etapas for new pipeline
+          await supabase.from('op_etapas').delete().eq('ordem_id', firstOrdem.id);
+          const { data: etapas } = await supabase
+            .from('pipeline_etapas')
+            .select('*')
+            .eq('pipeline_id', firstPipelineId)
+            .order('ordem');
+          if (etapas && etapas.length > 0) {
+            await supabase.from('op_etapas').insert(
+              etapas.map((e, idx) => ({
+                ordem_id: firstOrdem.id,
+                pipeline_etapa_id: e.id,
+                nome_etapa: e.nome,
+                ordem_sequencia: e.ordem,
+                status: (idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as any,
+                ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
+              }))
+            );
+          }
+          updated++;
+        }
+
+        // Create additional ordens for additional types
+        for (let i = 1; i < tipos.length; i++) {
+          const tipo = tipos[i];
+          const pid = pipelineMap[tipo];
+          if (!pid) continue;
+
+          // Check if already exists
+          const exists = pedidoOrdens.some(o => o.tipo_produto === tipo);
+          if (exists) continue;
+
+          const { data: newOrdem } = await supabase.from('ordens_producao').insert({
+            pedido_id: pedidoId,
+            pipeline_id: pid,
+            sequencia: pedidoOrdens.length + i,
+            status: 'EM_ANDAMENTO' as any,
+            tipo_produto: tipo,
+          }).select().single();
+
+          if (newOrdem) {
+            const { data: etapas } = await supabase
+              .from('pipeline_etapas')
+              .select('*')
+              .eq('pipeline_id', pid)
+              .order('ordem');
+            if (etapas && etapas.length > 0) {
+              await supabase.from('op_etapas').insert(
+                etapas.map((e, idx) => ({
+                  ordem_id: newOrdem.id,
+                  pipeline_etapa_id: e.id,
+                  nome_etapa: e.nome,
+                  ordem_sequencia: e.ordem,
+                  status: (idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as any,
+                  ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
+                }))
+              );
+            }
+            created++;
+          }
+        }
+      }
+
+      toast.success(`Reclassificação concluída: ${updated} atualizadas, ${created} novas ordens criadas.`);
+      fetchDiagnostics();
+    } catch (err: any) {
+      toast.error(`Erro na reclassificação: ${err.message}`);
+    }
+    setReclassifying(false);
+  };
+
   if (!profile || profile.perfil !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
