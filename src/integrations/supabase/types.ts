@@ -278,6 +278,8 @@ export type Database = {
         Row: {
           aprovado_em: string | null
           criado_em: string
+          data_fim_pcp: string | null
+          data_inicio_pcp: string | null
           data_programacao: string | null
           fivelas_recebidas: boolean | null
           id: string
@@ -294,6 +296,8 @@ export type Database = {
         Insert: {
           aprovado_em?: string | null
           criado_em?: string
+          data_fim_pcp?: string | null
+          data_inicio_pcp?: string | null
           data_programacao?: string | null
           fivelas_recebidas?: boolean | null
           id?: string
@@ -310,6 +314,8 @@ export type Database = {
         Update: {
           aprovado_em?: string | null
           criado_em?: string
+          data_fim_pcp?: string | null
+          data_inicio_pcp?: string | null
           data_programacao?: string | null
           fivelas_recebidas?: boolean | null
           id?: string
