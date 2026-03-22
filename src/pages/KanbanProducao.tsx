@@ -40,10 +40,15 @@ const PIPELINE_COLUMNS: Record<string, string[]> = {
   FIVELA_COBERTA: ['Aguardando Início', 'Em Andamento', 'Concluído'],
 };
 
-function mapEtapaToColumn(etapaName: string, etapaStatus: string, ordemStatus: string): string {
+function mapEtapaToColumn(etapaName: string, etapaStatus: string, ordemStatus: string, tipoProduto?: string): string {
   if (ordemStatus === 'AGUARDANDO') return 'Aguardando Início';
-  // If the ordem is fully concluded, card goes to Concluído
   if (ordemStatus === 'CONCLUIDA') return 'Concluído';
+
+  // Fivela Coberta: all active etapas map to "Em Andamento"
+  if (tipoProduto === 'FIVELA_COBERTA') {
+    return 'Em Andamento';
+  }
+
   if (etapaName === 'Produção') return 'Em Andamento';
   if (etapaName === 'Produção Finalizada') return 'Concluído';
   if (etapaName === 'Concluído') return 'Concluído';
@@ -155,7 +160,7 @@ export default function KanbanProducao() {
     if (!card) return;
 
     const columns = PIPELINE_COLUMNS[activeTab] || [];
-    const currentCol = mapEtapaToColumn(card.nome_etapa, card.etapa_status, card.ordem_status);
+    const currentCol = mapEtapaToColumn(card.nome_etapa, card.etapa_status, card.ordem_status, card.tipo_produto);
     if (currentCol === destCol) return;
 
     const srcIdx = columns.indexOf(currentCol);
@@ -289,7 +294,7 @@ export default function KanbanProducao() {
   };
 
   const getCardsForColumn = (tipoCards: KanbanCard[], column: string) =>
-    tipoCards.filter(c => mapEtapaToColumn(c.nome_etapa, c.etapa_status, c.ordem_status) === column);
+    tipoCards.filter(c => mapEtapaToColumn(c.nome_etapa, c.etapa_status, c.ordem_status, c.tipo_produto) === column);
 
   const prazoClasses: Record<string, string> = {
     ATRASADO: 'border-l-destructive bg-destructive/5',
