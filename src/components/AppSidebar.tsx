@@ -1,4 +1,4 @@
-import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, Columns3, ShoppingBag } from 'lucide-react';
+import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, Columns3, ShoppingBag, BarChart3 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {
@@ -47,6 +47,7 @@ const navItems: NavItem[] = [
   { title: 'Logística', url: '/logistica', icon: Truck, perfis: ['admin', 'gestor'], group: 'setores' },
 
   // Config
+  { title: 'Relatórios', url: '/relatorios/abc', icon: BarChart3, perfis: ['admin', 'gestor'], group: 'config' },
   { title: 'PCP', url: '/pcp', icon: Calendar, perfis: ['admin', 'gestor', 'supervisor_producao'], group: 'config' },
   { title: 'Usuários', url: '/usuarios', icon: Users, perfis: ['admin'], group: 'config' },
   { title: 'Pipelines', url: '/pipelines', icon: Settings, perfis: ['admin'], group: 'config' },

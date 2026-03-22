@@ -24,6 +24,7 @@ import PCP from "./pages/PCP";
 import DashboardComercial from "./pages/DashboardComercial";
 import DashboardFinanceiro from "./pages/DashboardFinanceiro";
 import DashboardLoja from "./pages/DashboardLoja";
+import CurvaABC from "./pages/CurvaABC";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 
@@ -67,6 +68,9 @@ const App = () => (
               <Route path="/comercial" element={<DashboardComercial />} />
               <Route path="/painel-financeiro" element={<DashboardFinanceiro />} />
               <Route path="/painel-loja" element={<DashboardLoja />} />
+
+              {/* Reports */}
+              <Route path="/relatorios/abc" element={<CurvaABC />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFound />} />

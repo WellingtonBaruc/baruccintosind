@@ -51,6 +51,10 @@ export default function Integracao() {
   const [mismatch, setMismatch] = useState<MismatchInfo>({ total: 0, statuses: [] });
   const [fixing, setFixing] = useState(false);
   const [reclassifying, setReclassifying] = useState(false);
+  const [historicLoading, setHistoricLoading] = useState(false);
+  const [historicProgress, setHistoricProgress] = useState<string | null>(null);
+  const [historicDone, setHistoricDone] = useState<{ date: string; count: number } | null>(null);
+  const [lastDailyLog, setLastDailyLog] = useState<LogEntry | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -63,6 +67,17 @@ export default function Integracao() {
     ]);
     setConfig(cfg as any);
     setLogs((logData || []) as any);
+
+    // Check if historic load was already done
+    const historicLog = (logData || []).find((l: any) => l.tipo === 'HISTORICO_90D' && l.status !== 'ERRO');
+    if (historicLog) {
+      setHistoricDone({ date: (historicLog as any).executado_em, count: (historicLog as any).total_inseridos });
+    }
+
+    // Find latest daily log
+    const dailyLog = (logData || []).find((l: any) => l.tipo === 'HISTORICO_DIARIO');
+    if (dailyLog) setLastDailyLog(dailyLog as any);
+
     setLoading(false);
     fetchDiagnostics();
   };
@@ -277,9 +292,45 @@ export default function Integracao() {
     setReclassifying(false);
   };
 
-  if (!profile || profile.perfil !== 'admin') {
+  if (!profile || (profile.perfil !== 'admin' && profile.perfil !== 'gestor')) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  const handleHistoricLoad = async () => {
+    setHistoricLoading(true);
+    setHistoricProgress('Conectando à API Simplifica...');
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/sync-historico`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || anonKey}`,
+            'apikey': anonKey,
+          },
+          body: JSON.stringify({ tipo: 'HISTORICO_90D', dias: 90 }),
+        }
+      );
+
+      const result = await res.json();
+      if (result.success) {
+        toast.success(`Carga histórica concluída: ${result.total_inseridos} vendas importadas.`);
+        setHistoricDone({ date: new Date().toISOString(), count: result.total_inseridos });
+      } else {
+        toast.error(`Erro na carga histórica: ${result.error || 'Erro desconhecido'}`);
+      }
+    } catch (err: any) {
+      toast.error(`Falha na carga histórica: ${err.message}`);
+    }
+    setHistoricLoading(false);
+    setHistoricProgress(null);
+    fetchData();
+  };
 
   const handleSync = async () => {
     setSyncing(true);
@@ -416,6 +467,59 @@ export default function Integracao() {
                   "dd/MM 'às' HH:mm", { locale: ptBR }
                 )}
               </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Historical load + Daily sync */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Layers className="h-4 w-4" /> Carga Histórica (90 dias)
+            </CardTitle>
+            <CardDescription>Importa vendas Finalizadas dos últimos 90 dias para análise. Não afeta a fila de produção.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {historicDone ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-600">
+                <CheckCircle2 className="h-4 w-4" />
+                Histórico carregado em {format(new Date(historicDone.date), "dd/MM/yyyy", { locale: ptBR })} — {historicDone.count} vendas
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">Pode demorar alguns minutos. Só pode ser executada uma vez.</p>
+                <Button onClick={handleHistoricLoad} disabled={historicLoading} className="w-full" variant="outline">
+                  {historicLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Layers className="h-4 w-4 mr-2" />}
+                  {historicLoading ? 'Importando...' : 'Carregar histórico 90 dias'}
+                </Button>
+                {historicProgress && (
+                  <p className="text-sm text-muted-foreground animate-pulse">{historicProgress}</p>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4" /> Atualização Diária do Histórico
+            </CardTitle>
+            <CardDescription>Importa vendas finalizadas do dia anterior automaticamente às 02:00.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2 text-sm">
+              <Badge className={historicDone ? 'bg-emerald-500/15 text-emerald-600 border-0' : 'bg-muted text-muted-foreground border-0'}>
+                {historicDone ? 'Ativa' : 'Aguardando carga inicial'}
+              </Badge>
+            </div>
+            {lastDailyLog && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                Última execução: {format(new Date(lastDailyLog.executado_em), "dd/MM 'às' HH:mm", { locale: ptBR })} — {lastDailyLog.total_inseridos} vendas adicionadas
+              </div>
             )}
           </CardContent>
         </Card>
