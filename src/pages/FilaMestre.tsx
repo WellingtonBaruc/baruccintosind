@@ -21,7 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface VendaRow {
-  id: string; // pedido id
+  id: string;
   api_venda_id: string | null;
   numero_pedido: string;
   cliente_nome: string;
@@ -32,13 +32,14 @@ interface VendaRow {
   status_prazo: string | null;
   status_api: string | null;
   criado_em: string;
-  // from ordens
   ordem_id: string | null;
   tipo_produto: string | null;
   etapa_atual: string;
   operador_atual: string;
   data_inicio_pcp: string | null;
   data_fim_pcp: string | null;
+  is_piloto: boolean;
+  status_piloto: string | null;
 }
 
 interface PedidoDetail {
@@ -46,6 +47,7 @@ interface PedidoDetail {
   itens: any[];
   historico: any[];
   ordens: any[];
+  perdas: any[];
 }
 
 export default function FilaMestre() {
