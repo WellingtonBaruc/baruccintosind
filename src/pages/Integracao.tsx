@@ -489,6 +489,18 @@ export default function Integracao() {
                 </Button>
               </div>
             )}
+
+            {/* Reclassify button */}
+            <div className="pt-4 border-t border-border/60">
+              <h4 className="text-sm font-medium mb-2">Reclassificação de Pipelines</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Analisa os itens de cada pedido e migra as ordens ativas para o pipeline correto (Sintético, Tecido ou Fivela Coberta).
+              </p>
+              <Button onClick={handleReclassify} disabled={reclassifying} variant="outline" size="sm">
+                {reclassifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Layers className="h-4 w-4 mr-2" />}
+                {reclassifying ? 'Reclassificando...' : 'Reclassificar ordens por tipo de produto'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
