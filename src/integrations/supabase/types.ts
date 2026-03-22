@@ -274,6 +274,80 @@ export type Database = {
           },
         ]
       }
+      ordem_perdas: {
+        Row: {
+          confirmado_em: string | null
+          confirmado_por: string | null
+          criado_em: string
+          etapa: string
+          id: string
+          motivo: string
+          nm_item: string
+          ordem_id: string
+          pedido_item_id: string | null
+          quantidade_perdida: number
+          registrado_por: string | null
+          status: string
+        }
+        Insert: {
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          criado_em?: string
+          etapa: string
+          id?: string
+          motivo: string
+          nm_item: string
+          ordem_id: string
+          pedido_item_id?: string | null
+          quantidade_perdida?: number
+          registrado_por?: string | null
+          status?: string
+        }
+        Update: {
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          criado_em?: string
+          etapa?: string
+          id?: string
+          motivo?: string
+          nm_item?: string
+          ordem_id?: string
+          pedido_item_id?: string | null
+          quantidade_perdida?: number
+          registrado_por?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordem_perdas_confirmado_por_fkey"
+            columns: ["confirmado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordem_perdas_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_producao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordem_perdas_pedido_item_id_fkey"
+            columns: ["pedido_item_id"]
+            isOneToOne: false
+            referencedRelation: "pedido_itens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordem_perdas_registrado_por_fkey"
+            columns: ["registrado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ordens_producao: {
         Row: {
           aprovado_em: string | null
@@ -623,6 +697,7 @@ export type Database = {
           forma_envio: string | null
           forma_pagamento: string | null
           id: string
+          is_piloto: boolean | null
           lead_time_preparacao_dias: number | null
           numero_pedido: string
           observacao_api: string | null
@@ -630,10 +705,12 @@ export type Database = {
           observacao_financeiro: string | null
           observacao_interna_api: string | null
           observacao_logistica: string | null
+          observacao_piloto: string | null
           pagamento_confirmado: boolean
           sincronizacao_bloqueada: boolean
           status_api: string | null
           status_atual: Database["public"]["Enums"]["status_pedido"]
+          status_piloto: string | null
           status_prazo: string | null
           subtipo_pronta_entrega: string | null
           tipo_fluxo: string | null
@@ -669,6 +746,7 @@ export type Database = {
           forma_envio?: string | null
           forma_pagamento?: string | null
           id?: string
+          is_piloto?: boolean | null
           lead_time_preparacao_dias?: number | null
           numero_pedido: string
           observacao_api?: string | null
@@ -676,10 +754,12 @@ export type Database = {
           observacao_financeiro?: string | null
           observacao_interna_api?: string | null
           observacao_logistica?: string | null
+          observacao_piloto?: string | null
           pagamento_confirmado?: boolean
           sincronizacao_bloqueada?: boolean
           status_api?: string | null
           status_atual?: Database["public"]["Enums"]["status_pedido"]
+          status_piloto?: string | null
           status_prazo?: string | null
           subtipo_pronta_entrega?: string | null
           tipo_fluxo?: string | null
@@ -715,6 +795,7 @@ export type Database = {
           forma_envio?: string | null
           forma_pagamento?: string | null
           id?: string
+          is_piloto?: boolean | null
           lead_time_preparacao_dias?: number | null
           numero_pedido?: string
           observacao_api?: string | null
@@ -722,10 +803,12 @@ export type Database = {
           observacao_financeiro?: string | null
           observacao_interna_api?: string | null
           observacao_logistica?: string | null
+          observacao_piloto?: string | null
           pagamento_confirmado?: boolean
           sincronizacao_bloqueada?: boolean
           status_api?: string | null
           status_atual?: Database["public"]["Enums"]["status_pedido"]
+          status_piloto?: string | null
           status_prazo?: string | null
           subtipo_pronta_entrega?: string | null
           tipo_fluxo?: string | null
