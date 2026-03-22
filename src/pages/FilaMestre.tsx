@@ -290,12 +290,15 @@ export default function FilaMestre() {
                         </TableCell>
                         <TableCell className="text-sm">{r.etapa_atual}</TableCell>
                         <TableCell>
-                          <Badge className={`font-normal text-xs ${statusCfg.color}`}>{statusCfg.label}</Badge>
+                          <div className="flex items-center gap-1">
+                            <Badge className={`font-normal text-xs ${statusCfg.color}`}>{statusCfg.label}</Badge>
+                            {r.is_piloto && (
+                              <Badge className={`text-[10px] ${r.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
+                                {r.status_piloto === 'REPROVADO' ? 'PILOTO ✗' : 'PILOTO'}
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
               </Table>
             </div>
           )}
