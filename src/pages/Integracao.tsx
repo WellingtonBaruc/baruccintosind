@@ -292,9 +292,45 @@ export default function Integracao() {
     setReclassifying(false);
   };
 
-  if (!profile || profile.perfil !== 'admin') {
+  if (!profile || (profile.perfil !== 'admin' && profile.perfil !== 'gestor')) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  const handleHistoricLoad = async () => {
+    setHistoricLoading(true);
+    setHistoricProgress('Conectando à API Simplifica...');
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/sync-historico`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || anonKey}`,
+            'apikey': anonKey,
+          },
+          body: JSON.stringify({ tipo: 'HISTORICO_90D', dias: 90 }),
+        }
+      );
+
+      const result = await res.json();
+      if (result.success) {
+        toast.success(`Carga histórica concluída: ${result.total_inseridos} vendas importadas.`);
+        setHistoricDone({ date: new Date().toISOString(), count: result.total_inseridos });
+      } else {
+        toast.error(`Erro na carga histórica: ${result.error || 'Erro desconhecido'}`);
+      }
+    } catch (err: any) {
+      toast.error(`Falha na carga histórica: ${err.message}`);
+    }
+    setHistoricLoading(false);
+    setHistoricProgress(null);
+    fetchData();
+  };
 
   const handleSync = async () => {
     setSyncing(true);
