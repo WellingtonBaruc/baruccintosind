@@ -75,7 +75,7 @@ export default function FilaMestre() {
     // Fetch pedidos that are not finalized
     const { data: pedidos } = await supabase
       .from('pedidos')
-      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em')
+      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em, is_piloto, status_piloto')
       .not('status_api', 'eq', 'Finalizado')
       .order('criado_em', { ascending: false });
 
