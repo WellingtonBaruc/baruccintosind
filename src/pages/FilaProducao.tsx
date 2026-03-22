@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Loader2, Search, AlertTriangle, Clock } from 'lucide-react';
+import { Plus, Loader2, Search, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -89,7 +89,6 @@ export default function FilaProducao() {
     return matchSearch && matchStatus;
   });
 
-  // Sort by urgency
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === 'urgencia') {
       const prazoOrder: Record<string, number> = { ATRASADO: 0, ATENCAO: 1, NO_PRAZO: 2 };
@@ -105,6 +104,13 @@ export default function FilaProducao() {
     return diff > 4 * 60 * 60 * 1000;
   };
 
+  // Counters based on filtered data
+  const emProducaoCount = filtered.filter(o => o.pedidos.status_api === 'Em Produção').length;
+  const pedidoEnviadoCount = filtered.filter(o => o.pedidos.status_api === 'Pedido Enviado').length;
+  const atrasadoCount = filtered.filter(o => (o.pedidos.status_prazo || 'NO_PRAZO') === 'ATRASADO').length;
+  const atencaoCount = filtered.filter(o => (o.pedidos.status_prazo || 'NO_PRAZO') === 'ATENCAO').length;
+  const noPrazoCount = filtered.filter(o => (o.pedidos.status_prazo || 'NO_PRAZO') === 'NO_PRAZO').length;
+
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -118,6 +124,28 @@ export default function FilaProducao() {
           </Button>
         )}
       </div>
+
+      {/* Summary counters */}
+      {!loading && (
+        <div className="flex flex-wrap gap-3">
+          <div className="rounded-lg border border-border/60 bg-card px-4 py-2.5 text-sm">
+            <span className="text-2xl font-bold text-foreground">{filtered.length}</span>
+            <span className="ml-1.5 text-muted-foreground">pedidos em produção</span>
+          </div>
+          <div className="rounded-lg border border-border/60 bg-card px-4 py-2.5 text-sm flex items-center gap-3">
+            <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-blue-500" />{emProducaoCount} Em Produção</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-orange-500" />{pedidoEnviadoCount} Pedido Enviado</span>
+          </div>
+          <div className="rounded-lg border border-border/60 bg-card px-4 py-2.5 text-sm flex items-center gap-3">
+            <span className="flex items-center gap-1">🔴 {atrasadoCount} Atrasados</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="flex items-center gap-1">🟡 {atencaoCount} Atenção</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="flex items-center gap-1">🟢 {noPrazoCount} No Prazo</span>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-3 flex-wrap">
@@ -161,8 +189,8 @@ export default function FilaProducao() {
                 <TableRow>
                   <TableHead className="w-8">Prazo</TableHead>
                   <TableHead>Pedido</TableHead>
-                    <TableHead>Venda Simplifica</TableHead>
-                    <TableHead>Situação</TableHead>
+                  <TableHead>Venda Simplifica</TableHead>
+                  <TableHead>Situação</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Pipeline</TableHead>
@@ -175,7 +203,6 @@ export default function FilaProducao() {
               <TableBody>
                 {sorted.map(o => {
                   const cfg = STATUS_ORDEM_CONFIG[o.status] || { label: o.status, color: 'bg-muted text-muted-foreground' };
-                  const delayed = isDelayed(o.criado_em) && ['EM_ANDAMENTO', 'AGUARDANDO'].includes(o.status);
                   const prazoCfg = STATUS_PRAZO_CONFIG[o.pedidos.status_prazo || 'NO_PRAZO'];
                   const tipoLabel = TIPO_PRODUTO_LABELS[o.tipo_produto || ''] || o.tipo_produto || '—';
 
