@@ -90,7 +90,7 @@ export default function MinhaFila() {
     setLoading(false);
   };
 
-  if (!profile || profile.perfil !== 'operador_producao') {
+  if (!profile || !['admin', 'gestor', 'supervisor_producao', 'operador_producao'].includes(profile.perfil)) {
     return <Navigate to="/dashboard" replace />;
   }
 
