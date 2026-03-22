@@ -160,7 +160,7 @@ export default function KanbanProducao() {
     if (!card) return;
 
     const columns = PIPELINE_COLUMNS[activeTab] || [];
-    const currentCol = mapEtapaToColumn(card.nome_etapa, card.etapa_status, card.ordem_status);
+    const currentCol = mapEtapaToColumn(card.nome_etapa, card.etapa_status, card.ordem_status, card.tipo_produto);
     if (currentCol === destCol) return;
 
     const srcIdx = columns.indexOf(currentCol);
