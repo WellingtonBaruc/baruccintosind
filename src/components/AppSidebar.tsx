@@ -1,4 +1,4 @@
-import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, PlusCircle, Store, DollarSign, Truck, RefreshCw, Calendar, ListTodo } from 'lucide-react';
+import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, PlusCircle, Store, DollarSign, Truck, RefreshCw, Calendar, ListTodo, Monitor, CalendarDays } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {
@@ -26,6 +26,8 @@ const navItems: NavItem[] = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, perfis: 'all' },
   { title: 'Fila de Produção', url: '/producao', icon: ClipboardList, perfis: ['admin', 'gestor', 'supervisor_producao', 'operador_producao'] },
   { title: 'Minha Fila', url: '/minha-fila', icon: ListTodo, perfis: ['admin', 'gestor', 'supervisor_producao', 'operador_producao'] },
+  { title: 'Programação do Dia', url: '/programacao', icon: CalendarDays, perfis: ['admin', 'gestor', 'supervisor_producao'] },
+  { title: 'Painel TV', url: '/painel', icon: Monitor, perfis: ['admin', 'gestor', 'supervisor_producao'] },
   { title: 'Novo Pedido', url: '/producao/novo', icon: PlusCircle, perfis: ['admin', 'gestor'] },
   { title: 'Fila da Loja', url: '/loja', icon: Store, perfis: ['admin', 'gestor', 'loja'] },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign, perfis: ['admin', 'gestor', 'financeiro'] },

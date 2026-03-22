@@ -278,11 +278,13 @@ export type Database = {
         Row: {
           aprovado_em: string | null
           criado_em: string
+          data_programacao: string | null
           fivelas_recebidas: boolean | null
           id: string
           observacao: string | null
           pedido_id: string
           pipeline_id: string
+          programado_para_hoje: boolean | null
           sequencia: number
           status: Database["public"]["Enums"]["status_ordem"]
           sugestao_tipo_confirmada: boolean | null
@@ -292,11 +294,13 @@ export type Database = {
         Insert: {
           aprovado_em?: string | null
           criado_em?: string
+          data_programacao?: string | null
           fivelas_recebidas?: boolean | null
           id?: string
           observacao?: string | null
           pedido_id: string
           pipeline_id: string
+          programado_para_hoje?: boolean | null
           sequencia?: number
           status?: Database["public"]["Enums"]["status_ordem"]
           sugestao_tipo_confirmada?: boolean | null
@@ -306,11 +310,13 @@ export type Database = {
         Update: {
           aprovado_em?: string | null
           criado_em?: string
+          data_programacao?: string | null
           fivelas_recebidas?: boolean | null
           id?: string
           observacao?: string | null
           pedido_id?: string
           pipeline_id?: string
+          programado_para_hoje?: boolean | null
           sequencia?: number
           status?: Database["public"]["Enums"]["status_ordem"]
           sugestao_tipo_confirmada?: boolean | null

@@ -20,7 +20,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2, CheckCircle2, Package, AlertTriangle, Send, Warehouse } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle2, Package, AlertTriangle, Send, Warehouse, HelpCircle } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 
 const PERFIS_LOJA = ['loja', 'admin', 'gestor'];
@@ -304,6 +305,58 @@ export default function VerificacaoLoja() {
             {pedido.cliente_nome} • {pedido.valor_liquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
           </p>
         </div>
+
+        {/* Help button */}
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
+              <HelpCircle className="h-4 w-4" /> Como proceder
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="w-[380px] sm:w-[440px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Guia de Verificação</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4 space-y-5 text-sm">
+              <div className="rounded-lg border border-green-200 bg-green-500/5 p-4 space-y-2">
+                <p className="font-semibold text-green-700">Caminho A — Todos disponíveis</p>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                  <li>Confira todos os itens marcando o checkbox</li>
+                  <li>Marque cada item como "Disponível"</li>
+                  <li>Clique em <strong>"Confirmar OK"</strong></li>
+                  <li>Pedido é encaminhado ao comercial</li>
+                </ol>
+              </div>
+              <div className="rounded-lg border border-yellow-200 bg-yellow-500/5 p-4 space-y-2">
+                <p className="font-semibold text-yellow-700">Caminho B — Itens faltantes (produzir)</p>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                  <li>Confira os itens disponíveis</li>
+                  <li>Marque os faltantes como "Faltante"</li>
+                  <li>Clique em <strong>"Gerar OP Complementar"</strong></li>
+                  <li>Aguarde a produção concluir</li>
+                  <li>Quando concluída → confira novamente → confirme OK</li>
+                </ol>
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-500/5 p-4 space-y-2">
+                <p className="font-semibold text-blue-700">Caminho C — Só fivelas</p>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                  <li>Clique em <strong>"Solicitar ao Almoxarifado"</strong></li>
+                  <li>Aguarde a chegada das fivelas</li>
+                  <li>Ao receber → confira → confirme OK</li>
+                </ol>
+              </div>
+              <div className="rounded-lg border border-purple-200 bg-purple-500/5 p-4 space-y-2">
+                <p className="font-semibold text-purple-700">Caminho D — Misto (cintos + fivelas)</p>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                  <li>Siga o Caminho B para itens de produção</li>
+                  <li>Siga o Caminho C para fivelas em paralelo</li>
+                  <li>Classifique cada faltante como "Produção" ou "Almoxarifado"</li>
+                  <li>Confirme OK apenas quando <strong>tudo</strong> estiver resolvido</li>
+                </ol>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       {/* Itens */}
