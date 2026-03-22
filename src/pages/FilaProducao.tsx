@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { STATUS_ORDEM_CONFIG } from '@/lib/producao';
-import { STATUS_PRAZO_CONFIG, TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
+import { STATUS_PRAZO_CONFIG, TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE, classificarProduto } from '@/lib/pcp';
 import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,13 @@ interface OrdemView {
   operador_atual?: string;
 }
 
+interface UnitCounters {
+  SINTETICO: number;
+  TECIDO: number;
+  FIVELA_COBERTA: number;
+  OUTROS: number;
+}
+
 export default function FilaProducao() {
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -39,9 +46,11 @@ export default function FilaProducao() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('urgencia');
+  const [unitCounters, setUnitCounters] = useState<UnitCounters>({ SINTETICO: 0, TECIDO: 0, FIVELA_COBERTA: 0, OUTROS: 0 });
 
   useEffect(() => {
     fetchOrdens();
+    fetchUnitCounters();
   }, []);
 
   const fetchOrdens = async () => {
@@ -77,6 +86,40 @@ export default function FilaProducao() {
     setLoading(false);
   };
 
+  const fetchUnitCounters = async () => {
+    // Get all pedidos that are active (Em Produção or Pedido Enviado)
+    const { data: pedidos } = await supabase
+      .from('pedidos')
+      .select('id')
+      .in('status_api', ['Em Produção', 'Pedido Enviado']);
+
+    if (!pedidos || pedidos.length === 0) return;
+
+    const pedidoIds = pedidos.map(p => p.id);
+    // Fetch items in batches if needed
+    const { data: itens } = await supabase
+      .from('pedido_itens')
+      .select('descricao_produto, quantidade, categoria_produto')
+      .in('pedido_id', pedidoIds);
+
+    if (!itens) return;
+
+    const counters: UnitCounters = { SINTETICO: 0, TECIDO: 0, FIVELA_COBERTA: 0, OUTROS: 0 };
+    for (const item of itens) {
+      const cat = (item.categoria_produto || '').toUpperCase();
+      const desc = (item.descricao_produto || '').toUpperCase();
+      // Exclude ADICIONAIS
+      if (cat === 'ADICIONAIS' || desc.includes('ADICIONAL')) continue;
+      const tipo = classificarProduto(item.descricao_produto);
+      if (tipo in counters) {
+        counters[tipo as keyof UnitCounters] += item.quantidade;
+      } else {
+        counters.OUTROS += item.quantidade;
+      }
+    }
+    setUnitCounters(counters);
+  };
+
   if (!profile || !PERFIS_PRODUCAO.includes(profile.perfil)) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -99,17 +142,14 @@ export default function FilaProducao() {
     return new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime();
   });
 
-  const isDelayed = (createdAt: string) => {
-    const diff = Date.now() - new Date(createdAt).getTime();
-    return diff > 4 * 60 * 60 * 1000;
-  };
-
-  // Counters based on filtered data
+  // Counters
   const emProducaoCount = filtered.filter(o => o.pedidos.status_api === 'Em Produção').length;
   const pedidoEnviadoCount = filtered.filter(o => o.pedidos.status_api === 'Pedido Enviado').length;
   const atrasadoCount = filtered.filter(o => (o.pedidos.status_prazo || 'NO_PRAZO') === 'ATRASADO').length;
   const atencaoCount = filtered.filter(o => (o.pedidos.status_prazo || 'NO_PRAZO') === 'ATENCAO').length;
   const noPrazoCount = filtered.filter(o => (o.pedidos.status_prazo || 'NO_PRAZO') === 'NO_PRAZO').length;
+
+  const formatNum = (n: number) => n.toLocaleString('pt-BR');
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -144,6 +184,37 @@ export default function FilaProducao() {
             <span className="text-muted-foreground">·</span>
             <span className="flex items-center gap-1">🟢 {noPrazoCount} No Prazo</span>
           </div>
+        </div>
+      )}
+
+      {/* Unit counters by type */}
+      {!loading && (unitCounters.SINTETICO > 0 || unitCounters.TECIDO > 0 || unitCounters.FIVELA_COBERTA > 0) && (
+        <div className="rounded-lg border border-border/60 bg-card px-4 py-2.5 text-sm flex items-center gap-4 flex-wrap">
+          <span className="text-muted-foreground font-medium">Unidades:</span>
+          {unitCounters.SINTETICO > 0 && (
+            <span className="flex items-center gap-1.5">
+              <Badge className="bg-purple-500/15 text-purple-700 border-purple-200 font-normal text-xs">Sintético</Badge>
+              <span className="font-semibold">{formatNum(unitCounters.SINTETICO)} un</span>
+            </span>
+          )}
+          {unitCounters.TECIDO > 0 && (
+            <span className="flex items-center gap-1.5">
+              <Badge className="bg-orange-500/15 text-orange-700 border-orange-200 font-normal text-xs">Tecido</Badge>
+              <span className="font-semibold">{formatNum(unitCounters.TECIDO)} un</span>
+            </span>
+          )}
+          {unitCounters.FIVELA_COBERTA > 0 && (
+            <span className="flex items-center gap-1.5">
+              <Badge className="bg-blue-500/15 text-blue-700 border-blue-200 font-normal text-xs">Fivela Coberta</Badge>
+              <span className="font-semibold">{formatNum(unitCounters.FIVELA_COBERTA)} un</span>
+            </span>
+          )}
+          {unitCounters.OUTROS > 0 && (
+            <span className="flex items-center gap-1.5">
+              <Badge className="bg-muted text-muted-foreground border-border font-normal text-xs">Outros</Badge>
+              <span className="font-semibold">{formatNum(unitCounters.OUTROS)} un</span>
+            </span>
+          )}
         </div>
       )}
 

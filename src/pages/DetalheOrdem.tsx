@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2, Play, CheckCircle2, XCircle, Shield, Clock, User, MessageSquare, Scissors, Package } from 'lucide-react';
+import { ArrowLeft, Loader2, Play, CheckCircle2, XCircle, Shield, Clock, User, MessageSquare, Scissors, Package, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -48,6 +48,10 @@ export default function DetalheOrdem() {
 
   // Tecido→Sintetico transfer dialog
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+
+  // Atribuir operador dialog
+  const [atribuirDialogOpen, setAtribuirDialogOpen] = useState(false);
+  const [selectedOperadorId, setSelectedOperadorId] = useState('');
 
   // Preparação sub-etapas state
   const [subEtapas, setSubEtapas] = useState<{ nome: string; checked: boolean; operadorId: string; quantidade: number }[]>([
@@ -116,7 +120,8 @@ export default function DetalheOrdem() {
 
   const ordemCfg = STATUS_ORDEM_CONFIG[ordem.status] || { label: ordem.status, color: '' };
   const isOperador = ['operador_producao', 'supervisor_producao', 'admin'].includes(profile.perfil);
-  const isSupervisor = ['supervisor_producao', 'admin'].includes(profile.perfil);
+  const isSupervisor = ['supervisor_producao', 'admin', 'gestor'].includes(profile.perfil);
+  const canAssignOperador = ['supervisor_producao', 'admin', 'gestor'].includes(profile.perfil);
   const aguardandoAprovacao = ordem.status === 'CONCLUIDA' && !ordem.aprovado_em;
 
   const etapaAtiva = etapas.find(e => e.status === 'EM_ANDAMENTO');
@@ -124,6 +129,32 @@ export default function DetalheOrdem() {
   const isPreparacaoActive = etapaAtiva?.nome_etapa === 'Preparação';
   const isMontagemActive = etapaAtiva?.nome_etapa === 'Montagem';
   const isTecidoConcluido = etapaAtiva?.nome_etapa === 'Concluído' && ordem.tipo_produto === 'TECIDO';
+
+  const handleAtribuirOperador = async () => {
+    if (!selectedOperadorId || !etapaAtiva) return;
+    setActionLoading(true);
+    try {
+      await supabase.from('op_etapas').update({
+        operador_id: selectedOperadorId,
+      }).eq('id', etapaAtiva.id);
+
+      const operadorNome = operadores.find(o => o.id === selectedOperadorId)?.nome || '';
+      await supabase.from('pedido_historico').insert({
+        pedido_id: pedido.id,
+        usuario_id: profile.id,
+        tipo_acao: 'TRANSICAO',
+        observacao: `Operador ${operadorNome} atribuído à etapa ${etapaAtiva.nome_etapa}.`,
+      });
+
+      toast.success(`Operador ${operadorNome} atribuído!`);
+      setAtribuirDialogOpen(false);
+      setSelectedOperadorId('');
+      fetchData();
+    } catch {
+      toast.error('Erro ao atribuir operador.');
+    }
+    setActionLoading(false);
+  };
 
   const handleIniciar = async (etapaId: string) => {
     setActionLoading(true);
@@ -534,22 +565,30 @@ export default function DetalheOrdem() {
                           {etapa.observacao && <p className="text-xs text-muted-foreground mt-1 bg-muted/50 rounded px-2 py-1">{etapa.observacao}</p>}
                           {etapa.motivo_rejeicao && <p className="text-xs text-destructive mt-1 bg-destructive/5 rounded px-2 py-1">Rejeitado: {etapa.motivo_rejeicao}</p>}
 
-                          {canStart && (
-                            <Button size="sm" className="mt-2" onClick={() => handleIniciar(etapa.id)} disabled={actionLoading}>
-                              <Play className="h-3.5 w-3.5 mr-1" /> Iniciar Etapa
-                            </Button>
-                          )}
-                          {canConclude && !hasSpecializedView && (
-                            <Button size="sm" className="mt-2" onClick={() => { setConcluirEtapaId(etapa.id); setConcluirDialogOpen(true); }} disabled={actionLoading}>
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir Etapa
-                            </Button>
-                          )}
-                          {/* Tecido transfer button */}
-                          {isTecidoConcluido && etapa.id === etapaAtiva?.id && canConclude && (
-                            <Button size="sm" className="mt-2" onClick={() => setTransferDialogOpen(true)} disabled={actionLoading}>
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir e Transferir para Sintético
-                            </Button>
-                          )}
+                          <div className="flex gap-2 flex-wrap mt-2">
+                            {canStart && (
+                              <Button size="sm" onClick={() => handleIniciar(etapa.id)} disabled={actionLoading}>
+                                <Play className="h-3.5 w-3.5 mr-1" /> Iniciar Etapa
+                              </Button>
+                            )}
+                            {canConclude && !hasSpecializedView && (
+                              <Button size="sm" onClick={() => { setConcluirEtapaId(etapa.id); setConcluirDialogOpen(true); }} disabled={actionLoading}>
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir Etapa
+                              </Button>
+                            )}
+                            {/* Assign operator button */}
+                            {isActive && canAssignOperador && (
+                              <Button size="sm" variant="outline" onClick={() => { setSelectedOperadorId(etapa.operador_id || ''); setAtribuirDialogOpen(true); }} disabled={actionLoading}>
+                                <UserPlus className="h-3.5 w-3.5 mr-1" /> Atribuir operador
+                              </Button>
+                            )}
+                            {/* Tecido transfer button */}
+                            {isTecidoConcluido && etapa.id === etapaAtiva?.id && canConclude && (
+                              <Button size="sm" onClick={() => setTransferDialogOpen(true)} disabled={actionLoading}>
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir e Transferir para Sintético
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -674,6 +713,37 @@ export default function DetalheOrdem() {
             <Button variant="outline" onClick={() => setTransferDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleTecidoTransfer} disabled={actionLoading}>
               {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmar Transferência'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Atribuir operador dialog */}
+      <Dialog open={atribuirDialogOpen} onOpenChange={setAtribuirDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Atribuir operador</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Etapa: <span className="font-medium text-foreground">{etapaAtiva?.nome_etapa}</span>
+            </p>
+            <div className="space-y-2">
+              <Label>Selecionar operador</Label>
+              <Select value={selectedOperadorId} onValueChange={setSelectedOperadorId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha um operador..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {operadores.filter(o => o.id !== etapaAtiva?.operador_id).map(op => (
+                    <SelectItem key={op.id} value={op.id}>{op.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAtribuirDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleAtribuirOperador} disabled={actionLoading || !selectedOperadorId}>
+              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Atribuir'}
             </Button>
           </DialogFooter>
         </DialogContent>
