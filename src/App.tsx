@@ -19,6 +19,7 @@ import FilaLogistica from "./pages/FilaLogistica";
 import RegistroEnvio from "./pages/RegistroEnvio";
 import Integracao from "./pages/Integracao";
 import PCP from "./pages/PCP";
+import MinhaFila from "./pages/MinhaFila";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 
