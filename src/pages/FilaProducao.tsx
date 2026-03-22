@@ -49,9 +49,10 @@ export default function FilaProducao() {
       .from('ordens_producao')
       .select(`
         *,
-        pedidos!inner(numero_pedido, cliente_nome, valor_liquido, criado_em, status_prazo, data_previsao_entrega, api_venda_id),
+        pedidos!inner(numero_pedido, cliente_nome, valor_liquido, criado_em, status_prazo, data_previsao_entrega, api_venda_id, status_api),
         pipeline_producao(nome)
       `)
+      .neq('pedidos.status_api', 'Finalizado')
       .order('criado_em', { ascending: false });
 
     if (data) {
