@@ -20,7 +20,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2, CheckCircle2, Package, AlertTriangle, Send, Warehouse } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle2, Package, AlertTriangle, Send, Warehouse, HelpCircle } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 
 const PERFIS_LOJA = ['loja', 'admin', 'gestor'];
