@@ -20,6 +20,8 @@ import RegistroEnvio from "./pages/RegistroEnvio";
 import Integracao from "./pages/Integracao";
 import PCP from "./pages/PCP";
 import MinhaFila from "./pages/MinhaFila";
+import PainelTV from "./pages/PainelTV";
+import ProgramacaoDia from "./pages/ProgramacaoDia";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 
@@ -49,6 +51,8 @@ const App = () => (
               <Route path="/logistica/envio/:id" element={<RegistroEnvio />} />
               <Route path="/pcp" element={<PCP />} />
               <Route path="/minha-fila" element={<MinhaFila />} />
+              <Route path="/painel" element={<PainelTV />} />
+              <Route path="/programacao" element={<ProgramacaoDia />} />
               <Route path="/integracao" element={<Integracao />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
