@@ -1043,6 +1043,7 @@ export type Database = {
         | "LOJA_OK"
         | "VALIDADO_FINANCEIRO"
         | "FINALIZADO_SIMPLIFICA"
+        | "HISTORICO"
       tipo_acao_historico:
         | "TRANSICAO"
         | "EDICAO"
@@ -1215,6 +1216,7 @@ export const Constants = {
         "LOJA_OK",
         "VALIDADO_FINANCEIRO",
         "FINALIZADO_SIMPLIFICA",
+        "HISTORICO",
       ],
       tipo_acao_historico: [
         "TRANSICAO",
