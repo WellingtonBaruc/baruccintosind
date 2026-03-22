@@ -18,6 +18,7 @@ import ValidacaoFinanceira from "./pages/ValidacaoFinanceira";
 import FilaLogistica from "./pages/FilaLogistica";
 import RegistroEnvio from "./pages/RegistroEnvio";
 import Integracao from "./pages/Integracao";
+import PCP from "./pages/PCP";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/financeiro/validar/:id" element={<ValidacaoFinanceira />} />
               <Route path="/logistica" element={<FilaLogistica />} />
               <Route path="/logistica/envio/:id" element={<RegistroEnvio />} />
+              <Route path="/pcp" element={<PCP />} />
               <Route path="/integracao" element={<Integracao />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

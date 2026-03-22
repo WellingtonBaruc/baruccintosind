@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { STATUS_ORDEM_CONFIG } from '@/lib/producao';
+import { STATUS_PRAZO_CONFIG, TIPO_PRODUTO_LABELS } from '@/lib/pcp';
 import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,8 +23,9 @@ interface OrdemView {
   pipeline_id: string;
   sequencia: number;
   status: string;
+  tipo_produto: string | null;
   criado_em: string;
-  pedidos: { numero_pedido: string; cliente_nome: string; valor_liquido: number; criado_em: string };
+  pedidos: { numero_pedido: string; cliente_nome: string; valor_liquido: number; criado_em: string; status_prazo: string | null; data_previsao_entrega: string | null };
   pipeline_producao: { nome: string };
   etapa_atual?: string;
   operador_atual?: string;
@@ -36,6 +38,7 @@ export default function FilaProducao() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('urgencia');
 
   useEffect(() => {
     fetchOrdens();
@@ -46,13 +49,12 @@ export default function FilaProducao() {
       .from('ordens_producao')
       .select(`
         *,
-        pedidos!inner(numero_pedido, cliente_nome, valor_liquido, criado_em),
+        pedidos!inner(numero_pedido, cliente_nome, valor_liquido, criado_em, status_prazo, data_previsao_entrega),
         pipeline_producao(nome)
       `)
       .order('criado_em', { ascending: false });
 
     if (data) {
-      // Fetch current step for each order
       const ordensWithEtapa = await Promise.all(
         data.map(async (o: any) => {
           const { data: etapa } = await supabase
@@ -86,9 +88,20 @@ export default function FilaProducao() {
     return matchSearch && matchStatus;
   });
 
+  // Sort by urgency
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'urgencia') {
+      const prazoOrder: Record<string, number> = { ATRASADO: 0, ATENCAO: 1, NO_PRAZO: 2 };
+      const pa = prazoOrder[a.pedidos.status_prazo || 'NO_PRAZO'] ?? 3;
+      const pb = prazoOrder[b.pedidos.status_prazo || 'NO_PRAZO'] ?? 3;
+      if (pa !== pb) return pa - pb;
+    }
+    return new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime();
+  });
+
   const isDelayed = (createdAt: string) => {
     const diff = Date.now() - new Date(createdAt).getTime();
-    return diff > 4 * 60 * 60 * 1000; // 4 hours
+    return diff > 4 * 60 * 60 * 1000;
   };
 
   return (
@@ -122,6 +135,15 @@ export default function FilaProducao() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Ordenar" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="urgencia">Mais urgentes</SelectItem>
+            <SelectItem value="recente">Mais recentes</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <Card className="border-border/60 shadow-sm">
@@ -130,15 +152,16 @@ export default function FilaProducao() {
             <div className="flex justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : filtered.length === 0 ? (
+          ) : sorted.length === 0 ? (
             <p className="text-center py-12 text-muted-foreground text-sm">Nenhuma ordem encontrada.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-8"></TableHead>
+                  <TableHead className="w-8">Prazo</TableHead>
                   <TableHead>Pedido</TableHead>
                   <TableHead>Cliente</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Pipeline</TableHead>
                   <TableHead>Etapa Atual</TableHead>
                   <TableHead>Operador</TableHead>
@@ -147,9 +170,12 @@ export default function FilaProducao() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map(o => {
+                {sorted.map(o => {
                   const cfg = STATUS_ORDEM_CONFIG[o.status] || { label: o.status, color: 'bg-muted text-muted-foreground' };
                   const delayed = isDelayed(o.criado_em) && ['EM_ANDAMENTO', 'AGUARDANDO'].includes(o.status);
+                  const prazoCfg = STATUS_PRAZO_CONFIG[o.pedidos.status_prazo || 'NO_PRAZO'];
+                  const tipoLabel = TIPO_PRODUTO_LABELS[o.tipo_produto || ''] || o.tipo_produto || '—';
+
                   return (
                     <TableRow
                       key={o.id}
@@ -157,10 +183,15 @@ export default function FilaProducao() {
                       onClick={() => navigate(`/producao/ordem/${o.id}`)}
                     >
                       <TableCell className="w-8">
-                        {delayed && <AlertTriangle className="h-4 w-4 text-warning" />}
+                        {prazoCfg && (
+                          <span title={prazoCfg.label} className="text-sm">{prazoCfg.icon}</span>
+                        )}
                       </TableCell>
                       <TableCell className="font-medium">{o.pedidos.numero_pedido}</TableCell>
                       <TableCell className="text-muted-foreground">{o.pedidos.cliente_nome}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs font-normal">{tipoLabel}</Badge>
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-sm">{o.pipeline_producao?.nome}</TableCell>
                       <TableCell className="text-sm">{o.etapa_atual}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{o.operador_atual}</TableCell>

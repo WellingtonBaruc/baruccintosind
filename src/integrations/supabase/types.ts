@@ -86,6 +86,130 @@ export type Database = {
         }
         Relationships: []
       }
+      op_etapa_corte_grupos: {
+        Row: {
+          concluido: boolean | null
+          cor: string | null
+          criado_em: string
+          id: string
+          iniciado: boolean | null
+          itens: Json | null
+          largura: string | null
+          material: string | null
+          op_etapa_id: string
+          quantidade_total: number | null
+          tamanho: string | null
+        }
+        Insert: {
+          concluido?: boolean | null
+          cor?: string | null
+          criado_em?: string
+          id?: string
+          iniciado?: boolean | null
+          itens?: Json | null
+          largura?: string | null
+          material?: string | null
+          op_etapa_id: string
+          quantidade_total?: number | null
+          tamanho?: string | null
+        }
+        Update: {
+          concluido?: boolean | null
+          cor?: string | null
+          criado_em?: string
+          id?: string
+          iniciado?: boolean | null
+          itens?: Json | null
+          largura?: string | null
+          material?: string | null
+          op_etapa_id?: string
+          quantidade_total?: number | null
+          tamanho?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "op_etapa_corte_grupos_op_etapa_id_fkey"
+            columns: ["op_etapa_id"]
+            isOneToOne: false
+            referencedRelation: "op_etapas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      op_etapa_montagem_operadores: {
+        Row: {
+          criado_em: string
+          id: string
+          op_etapa_id: string
+          operador_id: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          op_etapa_id: string
+          operador_id: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          op_etapa_id?: string
+          operador_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "op_etapa_montagem_operadores_op_etapa_id_fkey"
+            columns: ["op_etapa_id"]
+            isOneToOne: false
+            referencedRelation: "op_etapas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "op_etapa_montagem_operadores_operador_id_fkey"
+            columns: ["operador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      op_etapa_subetapas: {
+        Row: {
+          concluida: boolean | null
+          criado_em: string
+          id: string
+          nome: string
+          op_etapa_id: string
+          operadores_ids: string[] | null
+          quantidade_produzida: number | null
+        }
+        Insert: {
+          concluida?: boolean | null
+          criado_em?: string
+          id?: string
+          nome: string
+          op_etapa_id: string
+          operadores_ids?: string[] | null
+          quantidade_produzida?: number | null
+        }
+        Update: {
+          concluida?: boolean | null
+          criado_em?: string
+          id?: string
+          nome?: string
+          op_etapa_id?: string
+          operadores_ids?: string[] | null
+          quantidade_produzida?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "op_etapa_subetapas_op_etapa_id_fkey"
+            columns: ["op_etapa_id"]
+            isOneToOne: false
+            referencedRelation: "op_etapas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       op_etapas: {
         Row: {
           concluido_em: string | null
@@ -154,36 +278,42 @@ export type Database = {
         Row: {
           aprovado_em: string | null
           criado_em: string
+          fivelas_recebidas: boolean | null
           id: string
           observacao: string | null
           pedido_id: string
           pipeline_id: string
           sequencia: number
           status: Database["public"]["Enums"]["status_ordem"]
+          sugestao_tipo_confirmada: boolean | null
           supervisor_id: string | null
           tipo_produto: string | null
         }
         Insert: {
           aprovado_em?: string | null
           criado_em?: string
+          fivelas_recebidas?: boolean | null
           id?: string
           observacao?: string | null
           pedido_id: string
           pipeline_id: string
           sequencia?: number
           status?: Database["public"]["Enums"]["status_ordem"]
+          sugestao_tipo_confirmada?: boolean | null
           supervisor_id?: string | null
           tipo_produto?: string | null
         }
         Update: {
           aprovado_em?: string | null
           criado_em?: string
+          fivelas_recebidas?: boolean | null
           id?: string
           observacao?: string | null
           pedido_id?: string
           pipeline_id?: string
           sequencia?: number
           status?: Database["public"]["Enums"]["status_ordem"]
+          sugestao_tipo_confirmada?: boolean | null
           supervisor_id?: string | null
           tipo_produto?: string | null
         }
@@ -207,6 +337,38 @@ export type Database = {
             columns: ["supervisor_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pcp_configuracao: {
+        Row: {
+          criado_em: string
+          id: string
+          lead_time_dias: number
+          pipeline_id: string | null
+          tipo_produto: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          lead_time_dias?: number
+          pipeline_id?: string | null
+          tipo_produto: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          lead_time_dias?: number
+          pipeline_id?: string | null
+          tipo_produto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pcp_configuracao_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_producao"
             referencedColumns: ["id"]
           },
         ]
@@ -442,12 +604,14 @@ export type Database = {
           data_entrega: string | null
           data_entrega_api: string | null
           data_envio: string | null
+          data_inicio_producao_necessaria: string | null
           data_pagamento_confirmado: string | null
           data_previsao_entrega: string | null
           data_venda_api: string | null
           forma_envio: string | null
           forma_pagamento: string | null
           id: string
+          lead_time_preparacao_dias: number | null
           numero_pedido: string
           observacao_api: string | null
           observacao_comercial: string | null
@@ -458,6 +622,7 @@ export type Database = {
           sincronizacao_bloqueada: boolean
           status_api: string | null
           status_atual: Database["public"]["Enums"]["status_pedido"]
+          status_prazo: string | null
           subtipo_pronta_entrega: string | null
           tipo_fluxo: string | null
           usuario_responsavel_id: string | null
@@ -485,12 +650,14 @@ export type Database = {
           data_entrega?: string | null
           data_entrega_api?: string | null
           data_envio?: string | null
+          data_inicio_producao_necessaria?: string | null
           data_pagamento_confirmado?: string | null
           data_previsao_entrega?: string | null
           data_venda_api?: string | null
           forma_envio?: string | null
           forma_pagamento?: string | null
           id?: string
+          lead_time_preparacao_dias?: number | null
           numero_pedido: string
           observacao_api?: string | null
           observacao_comercial?: string | null
@@ -501,6 +668,7 @@ export type Database = {
           sincronizacao_bloqueada?: boolean
           status_api?: string | null
           status_atual?: Database["public"]["Enums"]["status_pedido"]
+          status_prazo?: string | null
           subtipo_pronta_entrega?: string | null
           tipo_fluxo?: string | null
           usuario_responsavel_id?: string | null
@@ -528,12 +696,14 @@ export type Database = {
           data_entrega?: string | null
           data_entrega_api?: string | null
           data_envio?: string | null
+          data_inicio_producao_necessaria?: string | null
           data_pagamento_confirmado?: string | null
           data_previsao_entrega?: string | null
           data_venda_api?: string | null
           forma_envio?: string | null
           forma_pagamento?: string | null
           id?: string
+          lead_time_preparacao_dias?: number | null
           numero_pedido?: string
           observacao_api?: string | null
           observacao_comercial?: string | null
@@ -544,6 +714,7 @@ export type Database = {
           sincronizacao_bloqueada?: boolean
           status_api?: string | null
           status_atual?: Database["public"]["Enums"]["status_pedido"]
+          status_prazo?: string | null
           subtipo_pronta_entrega?: string | null
           tipo_fluxo?: string | null
           usuario_responsavel_id?: string | null
