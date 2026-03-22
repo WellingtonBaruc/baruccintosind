@@ -524,7 +524,23 @@ export default function KanbanProducao() {
                                           </Button>
                                         )}
 
-                                        {/* Operator confirm button */}
+                                        {/* Piloto toggle */}
+                                        {isSupervisor && col !== 'Aguardando Início' && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className={`w-full mt-1 h-7 text-[10px] ${card.is_piloto ? 'text-purple-600' : 'text-muted-foreground'}`}
+                                            onClick={async () => {
+                                              const newVal = !card.is_piloto;
+                                              await supabase.from('pedidos').update({ is_piloto: newVal, status_piloto: newVal ? 'ENVIADO' : null }).eq('id', card.pedido_id);
+                                              toast.success(newVal ? 'Marcado como piloto' : 'Piloto removido');
+                                              fetchCards();
+                                            }}
+                                          >
+                                            {card.is_piloto ? '✦ Piloto ativo' : '+ Marcar Piloto'}
+                                          </Button>
+                                        )}
+
                                         {profile?.perfil === 'operador_producao' && card.operador_id === profile.id && !inConcluido && col !== 'Aguardando Início' && (
                                           <Button size="sm" className="w-full mt-2 h-8 text-xs" onClick={() => advanceCard(card, `Concluído pelo operador ${profile.nome}`)}>
                                             <CheckCircle2 className="h-3 w-3 mr-1" /> Confirmar conclusão
