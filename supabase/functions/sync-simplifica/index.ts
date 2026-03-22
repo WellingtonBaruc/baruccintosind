@@ -7,6 +7,12 @@ const corsHeaders = {
 
 const API_URL = 'https://app.simplificagestao.com.br/simplifica/api/bi/v2/venda_com_item/1MORY0PAW7';
 
+const PIPELINE_IDS: Record<string, string> = {
+  SINTETICO: '00000000-0000-0000-0000-000000000001',
+  TECIDO: '00000000-0000-0000-0000-000000000002',
+  FIVELA_COBERTA: '00000000-0000-0000-0000-000000000003',
+};
+
 interface SyncResult {
   total_recebidos: number;
   total_inseridos: number;
@@ -27,6 +33,15 @@ function parseDateBR(dateStr: string | null | undefined): string | null {
 
 function fmtBRL(v: number): string {
   return `R$ ${v.toFixed(2).replace('.', ',')}`;
+}
+
+// Classify product type from name
+function classificarProduto(nomeProduto: string): string {
+  const upper = (nomeProduto || '').toUpperCase();
+  if (upper.includes('FIVELA COBERTA')) return 'FIVELA_COBERTA';
+  if (upper.includes('CINTO SINTETICO') || upper.includes('TIRA SINTETICO') || upper.includes('CINTO SINTÉTICO') || upper.includes('TIRA SINTÉTICO')) return 'SINTETICO';
+  if (upper.includes('CINTO TECIDO') || upper.includes('TIRA TECIDO')) return 'TECIDO';
+  return 'OUTROS';
 }
 
 Deno.serve(async (req) => {
@@ -70,23 +85,22 @@ Deno.serve(async (req) => {
     dataInicio.setDate(dataInicio.getDate() - diasImportacao);
     const dataInicioStr = `${String(dataInicio.getDate()).padStart(2, '0')}/${String(dataInicio.getMonth() + 1).padStart(2, '0')}/${dataInicio.getFullYear()}`;
 
-    const { data: pipeline } = await supabase
-      .from('pipeline_producao')
-      .select('id')
-      .eq('padrao', true)
-      .eq('ativo', true)
-      .limit(1)
-      .single();
-
-    const pipelineId = pipeline?.id;
-    let pipelineEtapas: any[] = [];
-    if (pipelineId) {
+    // Load all pipeline steps
+    const pipelineEtapasMap: Record<string, any[]> = {};
+    for (const [tipo, pId] of Object.entries(PIPELINE_IDS)) {
       const { data: etapas } = await supabase
         .from('pipeline_etapas')
         .select('*')
-        .eq('pipeline_id', pipelineId)
+        .eq('pipeline_id', pId)
         .order('ordem');
-      pipelineEtapas = etapas || [];
+      pipelineEtapasMap[tipo] = etapas || [];
+    }
+
+    // Also load pcp_configuracao for lead time
+    const { data: pcpConfigs } = await supabase.from('pcp_configuracao').select('*');
+    const leadTimeMap: Record<string, number> = {};
+    for (const cfg of (pcpConfigs || [])) {
+      leadTimeMap[cfg.tipo_produto] = cfg.lead_time_dias;
     }
 
     let offset = 0;
@@ -123,9 +137,8 @@ Deno.serve(async (req) => {
           if (existente) {
             await processarExistente(supabase, venda, existente, statusApi, result);
           } else if (statusApi === 'Em Produção' || statusApi === 'Pedido Enviado') {
-            await inserirNovoPedido(supabase, venda, statusApi, pipelineId, pipelineEtapas, result);
+            await inserirNovoPedido(supabase, venda, statusApi, pipelineEtapasMap, leadTimeMap, result);
           }
-          // Any other status for new records → skip entirely
         } catch (err: any) {
           result.total_erros++;
           result.erros.push(`Venda ${venda.id_venda}: ${err.message}`);
@@ -200,7 +213,6 @@ async function processarExistente(
 ) {
   let hadChanges = false;
 
-  // 1. Check status_api change
   if (existente.status_api !== statusApi) {
     await supabase.from('pedidos').update({ status_api: statusApi }).eq('id', existente.id);
     hadChanges = true;
@@ -214,7 +226,6 @@ async function processarExistente(
     }
   }
 
-  // 2. Detect item-level changes (only if bloqueada — means we manage it)
   if (existente.sincronizacao_bloqueada) {
     const apiItens = (venda.itens2 || venda.itens || []) as any[];
     const { data: dbItens } = await supabase
@@ -227,56 +238,30 @@ async function processarExistente(
     if (itemChanges.hasChanges) {
       hadChanges = true;
 
-      // Build human-readable diff
       const diffLines: string[] = [];
-      const beforeItems: any[] = [];
-      const afterItems: any[] = [];
-
       for (const changed of itemChanges.changed) {
         const lines = [`Item alterado: ${changed.descricao}`];
-        if (changed.qtdBefore !== changed.qtdAfter) {
-          lines.push(`  Quantidade: ${changed.qtdBefore} → ${changed.qtdAfter}`);
-        }
-        if (changed.vlBefore !== changed.vlAfter) {
-          lines.push(`  Valor unitário: ${fmtBRL(changed.vlBefore)} → ${fmtBRL(changed.vlAfter)}`);
-        }
-        if (changed.obsBefore !== changed.obsAfter) {
-          lines.push(`  Observação produção alterada`);
-        }
+        if (changed.qtdBefore !== changed.qtdAfter) lines.push(`  Quantidade: ${changed.qtdBefore} → ${changed.qtdAfter}`);
+        if (changed.vlBefore !== changed.vlAfter) lines.push(`  Valor unitário: ${fmtBRL(changed.vlBefore)} → ${fmtBRL(changed.vlAfter)}`);
+        if (changed.obsBefore !== changed.obsAfter) lines.push(`  Observação produção alterada`);
         diffLines.push(lines.join('\n'));
-        beforeItems.push(changed.before);
-        afterItems.push(changed.after);
       }
-
       for (const added of itemChanges.added) {
-        diffLines.push(
-          `Item adicionado: ${added.descricao}\n  Quantidade: ${added.qtd} — Valor: ${fmtBRL(added.vl)}`
-        );
-        afterItems.push(added.raw);
+        diffLines.push(`Item adicionado: ${added.descricao}\n  Quantidade: ${added.qtd} — Valor: ${fmtBRL(added.vl)}`);
       }
-
       for (const removed of itemChanges.removed) {
-        diffLines.push(
-          `Item removido: ${removed.descricao}\n  Quantidade era: ${removed.qtd}`
-        );
-        beforeItems.push(removed.raw);
+        diffLines.push(`Item removido: ${removed.descricao}\n  Quantidade era: ${removed.qtd}`);
       }
 
-      // Register in history
       await supabase.from('pedido_historico').insert({
         pedido_id: existente.id,
         tipo_acao: 'ALTERACAO_ITENS',
         observacao: diffLines.join('\n\n'),
       });
 
-      // Apply item changes to DB
       await applyItemChanges(supabase, existente.id, dbItens || [], apiItens);
 
-      // Alert if order is in production or beyond
-      const activeStatuses = [
-        'EM_PRODUCAO', 'PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL',
-        'AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR',
-      ];
+      const activeStatuses = ['EM_PRODUCAO', 'PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL', 'AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR'];
       if (activeStatuses.includes(existente.status_atual)) {
         await supabase.from('pedido_historico').insert({
           pedido_id: existente.id,
@@ -295,7 +280,7 @@ async function processarExistente(
   }
 }
 
-// ── Detect item changes by comparing DB items with API items ──
+// ── Detect item changes ──
 
 interface ItemChange {
   hasChanges: boolean;
@@ -307,27 +292,23 @@ interface ItemChange {
 function detectItemChanges(dbItens: any[], apiItens: any[]): ItemChange {
   const result: ItemChange = { hasChanges: false, changed: [], added: [], removed: [] };
 
-  // Map DB items by api_item_id
   const dbMap = new Map<string, any>();
   for (const item of dbItens) {
     if (item.api_item_id) dbMap.set(item.api_item_id, item);
   }
 
-  // Map API items by id_item
   const apiMap = new Map<string, any>();
   for (const item of apiItens) {
     const key = item.id_item ? String(item.id_item) : null;
     if (key) apiMap.set(key, item);
   }
 
-  // Check for changed and added items
   for (const [apiId, apiItem] of apiMap) {
     const dbItem = dbMap.get(apiId);
     if (dbItem) {
       const qtdApi = parseInt(apiItem.qt_item) || 1;
       const vlApi = parseFloat(apiItem.vl_unitario) || 0;
       const obsApi = apiItem.ds_observacao || null;
-
       const qtdDb = dbItem.quantidade;
       const vlDb = parseFloat(dbItem.valor_unitario) || 0;
       const obsDb = dbItem.observacao_producao || null;
@@ -354,22 +335,17 @@ function detectItemChanges(dbItens: any[], apiItens: any[]): ItemChange {
     }
   }
 
-  // Check for removed items
   for (const [apiId, dbItem] of dbMap) {
     if (!apiMap.has(apiId)) {
       result.hasChanges = true;
-      result.removed.push({
-        descricao: dbItem.descricao_produto,
-        qtd: dbItem.quantidade,
-        raw: dbItem,
-      });
+      result.removed.push({ descricao: dbItem.descricao_produto, qtd: dbItem.quantidade, raw: dbItem });
     }
   }
 
   return result;
 }
 
-// ── Apply detected item changes to DB ──
+// ── Apply item changes ──
 
 async function applyItemChanges(supabase: any, pedidoId: string, dbItens: any[], apiItens: any[]) {
   const dbMap = new Map<string, any>();
@@ -383,7 +359,6 @@ async function applyItemChanges(supabase: any, pedidoId: string, dbItens: any[],
 
     const dbItem = dbMap.get(apiId);
     if (dbItem) {
-      // Update existing item
       await supabase.from('pedido_itens').update({
         quantidade: parseInt(apiItem.qt_item) || 1,
         valor_unitario: parseFloat(apiItem.vl_unitario) || 0,
@@ -396,7 +371,6 @@ async function applyItemChanges(supabase: any, pedidoId: string, dbItens: any[],
       }).eq('id', dbItem.id);
       dbMap.delete(apiId);
     } else {
-      // Insert new item
       await supabase.from('pedido_itens').insert({
         pedido_id: pedidoId,
         api_item_id: apiId,
@@ -414,20 +388,19 @@ async function applyItemChanges(supabase: any, pedidoId: string, dbItens: any[],
     }
   }
 
-  // Remove items no longer in API
   for (const [, dbItem] of dbMap) {
     await supabase.from('pedido_itens').delete().eq('id', dbItem.id);
   }
 }
 
-// ── Insert new order ──
+// ── Insert new order with auto-classification ──
 
 async function inserirNovoPedido(
   supabase: any,
   venda: any,
   statusApi: string,
-  pipelineId: string | null,
-  pipelineEtapas: any[],
+  pipelineEtapasMap: Record<string, any[]>,
+  leadTimeMap: Record<string, number>,
   result: SyncResult
 ) {
   const apiVendaId = String(venda.id_venda);
@@ -436,6 +409,42 @@ async function inserirNovoPedido(
 
   const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true });
   const numeroPedido = `PED-${String((count || 0) + 1).padStart(5, '0')}`;
+
+  // Calculate lead time from previsao_entrega
+  const dataPrevisao = parseDateBR(venda.dt_previsao_entrega);
+  let leadTimeDias: number | null = null;
+  let dataInicioNecessaria: string | null = null;
+  let statusPrazo = 'NO_PRAZO';
+
+  const itens = venda.itens2 || venda.itens || [];
+
+  // Classify items by type
+  const tiposProduto = new Set<string>();
+  for (const item of (Array.isArray(itens) ? itens : [])) {
+    tiposProduto.add(classificarProduto(item.nm_produto || ''));
+  }
+
+  // Calculate max lead time across all types
+  if (dataPrevisao && tipoFluxo === 'PRODUCAO') {
+    let maxLeadTime = 0;
+    for (const tp of tiposProduto) {
+      const lt = leadTimeMap[tp] || 2;
+      if (lt > maxLeadTime) maxLeadTime = lt;
+    }
+    leadTimeDias = maxLeadTime;
+
+    const previsaoDate = new Date(dataPrevisao);
+    const inicioDate = new Date(previsaoDate);
+    inicioDate.setDate(inicioDate.getDate() - maxLeadTime);
+    dataInicioNecessaria = inicioDate.toISOString().split('T')[0];
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const inicioCheck = new Date(dataInicioNecessaria);
+    if (hoje > inicioCheck) statusPrazo = 'ATRASADO';
+    else if (hoje.getTime() === inicioCheck.getTime()) statusPrazo = 'ATENCAO';
+    else statusPrazo = 'NO_PRAZO';
+  }
 
   const { data: pedido, error: pedidoErr } = await supabase
     .from('pedidos')
@@ -461,15 +470,18 @@ async function inserirNovoPedido(
       observacao_api: venda.ds_observacao || null,
       observacao_interna_api: venda.ds_observacao_interna || null,
       data_venda_api: venda.dte_venda ? venda.dte_venda.split('T')[0] : null,
-      data_previsao_entrega: parseDateBR(venda.dt_previsao_entrega),
+      data_previsao_entrega: dataPrevisao,
       data_entrega_api: parseDateBR(venda.dt_entrega),
+      lead_time_preparacao_dias: leadTimeDias,
+      data_inicio_producao_necessaria: dataInicioNecessaria,
+      status_prazo: statusPrazo,
     })
     .select('id')
     .single();
 
   if (pedidoErr) throw pedidoErr;
 
-  const itens = venda.itens2 || venda.itens || [];
+  // Insert items
   if (Array.isArray(itens) && itens.length > 0) {
     const itensData = itens.map((item: any) => ({
       pedido_id: pedido.id,
@@ -488,23 +500,46 @@ async function inserirNovoPedido(
     await supabase.from('pedido_itens').insert(itensData);
   }
 
-  if (tipoFluxo === 'PRODUCAO' && pipelineId) {
-    const { data: ordem } = await supabase
-      .from('ordens_producao')
-      .insert({ pedido_id: pedido.id, pipeline_id: pipelineId, sequencia: 1, status: 'EM_ANDAMENTO' })
-      .select('id')
-      .single();
+  // Create production orders only for PRODUCAO flow
+  if (tipoFluxo === 'PRODUCAO') {
+    // Group items by type and create one order per type
+    const itensByTipo: Record<string, any[]> = {};
+    for (const item of (Array.isArray(itens) ? itens : [])) {
+      const tipo = classificarProduto(item.nm_produto || '');
+      if (!itensByTipo[tipo]) itensByTipo[tipo] = [];
+      itensByTipo[tipo].push(item);
+    }
 
-    if (ordem && pipelineEtapas.length > 0) {
-      const opEtapas = pipelineEtapas.map((e: any, idx: number) => ({
-        ordem_id: ordem.id,
-        pipeline_etapa_id: e.id,
-        nome_etapa: e.nome,
-        ordem_sequencia: e.ordem,
-        status: idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE',
-        ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
-      }));
-      await supabase.from('op_etapas').insert(opEtapas);
+    let sequencia = 1;
+    for (const [tipoProduto, _tipoItens] of Object.entries(itensByTipo)) {
+      const pipelineId = PIPELINE_IDS[tipoProduto] || PIPELINE_IDS['SINTETICO'];
+      const etapas = pipelineEtapasMap[tipoProduto] || pipelineEtapasMap['SINTETICO'] || [];
+
+      const { data: ordem } = await supabase
+        .from('ordens_producao')
+        .insert({
+          pedido_id: pedido.id,
+          pipeline_id: pipelineId,
+          sequencia,
+          status: 'EM_ANDAMENTO',
+          tipo_produto: tipoProduto,
+        })
+        .select('id')
+        .single();
+
+      if (ordem && etapas.length > 0) {
+        const opEtapas = etapas.map((e: any, idx: number) => ({
+          ordem_id: ordem.id,
+          pipeline_etapa_id: e.id,
+          nome_etapa: e.nome,
+          ordem_sequencia: e.ordem,
+          status: idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE',
+          ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
+        }));
+        await supabase.from('op_etapas').insert(opEtapas);
+      }
+
+      sequencia++;
     }
 
     await supabase.from('pedidos').update({ status_atual: 'EM_PRODUCAO' }).eq('id', pedido.id);
@@ -515,7 +550,7 @@ async function inserirNovoPedido(
     tipo_acao: 'TRANSICAO',
     status_anterior: null,
     status_novo: tipoFluxo === 'PRODUCAO' ? 'EM_PRODUCAO' : statusAtual,
-    observacao: `Pedido importado da API Simplifica (${statusApi}). Fluxo: ${tipoFluxo}.`,
+    observacao: `Pedido importado da API Simplifica (${statusApi}). Fluxo: ${tipoFluxo}.${tiposProduto.size > 1 ? ` Tipos: ${[...tiposProduto].join(', ')}.` : ''}`,
   });
 
   result.total_inseridos++;
