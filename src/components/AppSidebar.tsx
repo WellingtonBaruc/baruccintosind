@@ -40,6 +40,9 @@ const navItems: NavItem[] = [
   // Loja
   { title: 'Verificar Pedidos', url: '/loja', icon: Store, perfis: ['loja'] },
 
+  // Almoxarifado
+  { title: 'Separação Fivelas', url: '/almoxarifado', icon: Package, perfis: ['almoxarifado'] },
+
   // Admin extras — under Configurações group
   { title: 'Loja', url: '/loja', icon: Store, perfis: ['admin', 'gestor'], group: 'setores' },
   { title: 'Comercial', url: '/comercial', icon: ShoppingBag, perfis: ['admin', 'gestor'], group: 'setores' },
