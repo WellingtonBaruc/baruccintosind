@@ -37,6 +37,7 @@ interface ABCRow {
   pedidos: number;
   meses: Record<string, number>;
   produtos?: ABCRow[];
+  subgrupos?: ABCRow[];
 }
 
 const FIVELA_BASES_KEYWORDS = ['TICI', 'ERICA', 'JADE', 'LIZ', 'ROSY', 'SEM FIVELA'];
