@@ -1,25 +1,35 @@
 
 
-# Corrigir botão "Enviar para o Comercial" não aparecendo
+## Diagnóstico: Cards Duplicados no Kanban Produção
 
-## Problema
+### Causa Raiz
 
-A função `canSendToComercial` verifica se `pedido_status` é exatamente `'EM_PRODUCAO'` ou `'PRODUCAO_CONCLUIDA'`. Pedidos que estão com outros status (como `'AGUARDANDO_LOJA'`, `'LOJA_OK'`, etc.) não mostram o botão, mesmo estando com a ordem concluída no Kanban.
+O sistema exibe **um card por Ordem de Produção (OP)**, não por venda. Quando uma venda tem múltiplas OPs (ex: TECIDO seq1 + SINTÉTICO seq2), ambas aparecem no Kanban como cards separados com o mesmo número de venda.
 
-## Correção
+**Vendas afetadas atualmente:**
+- 3085410, 3090872, 3093749, 3094415 → TECIDO (Concluído) + SINTÉTICO (Em Andamento)
+- 3095255, 3095425, 3097292 → Duas OPs SINTÉTICO
+- 3099077 → TECIDO + OUTROS
 
-**Arquivo: `src/pages/KanbanProducao.tsx`**
+### Solução Proposta
 
-Inverter a lógica de `canSendToComercial`: em vez de listar os status permitidos, excluir os status que já passaram do comercial:
+**1. Ocultar ordens CONCLUÍDA quando existe OP ativa no mesmo pedido**
 
-```typescript
-const canSendToComercial = (card: KanbanCard) => {
-  const alreadySent = ['AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL', 
-    'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA',
-    'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO'].includes(card.pedido_status);
-  return card.ordem_status === 'CONCLUIDA' && !alreadySent && isSupervisor;
-};
-```
+Se um pedido tem uma OP seq1 CONCLUÍDA e uma OP seq2 ainda ativa, esconder a OP concluída do Kanban. O card da OP ativa já mostra o badge "OP 2", então o contexto se mantém.
 
-Isso garante que qualquer pedido com ordem concluída, que ainda não tenha sido enviado ao comercial, mostre o botão — independente do status intermediário do pedido.
+**2. Melhorar a diferenciação visual das OPs complementares**
+
+Para OPs que legitimamente aparecem juntas (ambas ativas), tornar o badge "OP" mais proeminente:
+- Badge maior e colorido (azul) com o texto "OP Complementar"
+- Mostrar o tipo de produto da OP principal como referência
+
+### Arquivo alterado
+- `src/pages/KanbanProducao.tsx` — Ajuste na lógica de filtragem (`visibleEtapas` / `ordemMap`) para ocultar ordens concluídas quando há OP ativa, e melhoria visual nos badges de OP.
+
+### Detalhes Técnicos
+
+Na função `fetchCards`, após construir o `kanbanCards`, adicionar filtro:
+- Agrupar cards por `pedido_id`
+- Se um pedido tem cards em "Concluído" E cards em colunas ativas, remover os de "Concluído"
+- Manter badge "OP X" mais visível nos cards restantes
 
