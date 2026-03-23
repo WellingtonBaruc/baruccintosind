@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { concluirEtapa } from '@/lib/producao';
+import { concluirEtapa, iniciarEtapa } from '@/lib/producao';
 import { TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Badge } from '@/components/ui/badge';
@@ -158,10 +158,16 @@ export default function KanbanProducao() {
     const ordemMap = new Map<string, any>();
     for (const e of visibleEtapas as any[]) {
       const key = e.ordem_id;
+      const ordemStatus = e.ordens_producao?.status;
       const existing = ordemMap.get(key);
       if (!existing) { ordemMap.set(key, e); continue; }
-      if (e.status === 'EM_ANDAMENTO') ordemMap.set(key, e);
-      else if (existing.status !== 'EM_ANDAMENTO' && e.ordem_sequencia > existing.ordem_sequencia) ordemMap.set(key, e);
+      // For AGUARDANDO orders (all etapas PENDENTE), pick the FIRST etapa (lowest sequence)
+      if (ordemStatus === 'AGUARDANDO') {
+        if (e.ordem_sequencia < existing.ordem_sequencia) ordemMap.set(key, e);
+      } else {
+        if (e.status === 'EM_ANDAMENTO') ordemMap.set(key, e);
+        else if (existing.status !== 'EM_ANDAMENTO' && e.ordem_sequencia > existing.ordem_sequencia) ordemMap.set(key, e);
+      }
     }
 
     const kanbanCards: KanbanCard[] = Array.from(ordemMap.values()).map((e: any) => {
@@ -231,8 +237,15 @@ export default function KanbanProducao() {
 
   const advanceCard = async (card: KanbanCard, obs?: string) => {
     try {
-      await concluirEtapa(card.id, card.ordem_id, card.pedido_id, profile!.id, obs || `Avançado via kanban por ${profile!.nome}`);
-      toast.success('Etapa avançada com sucesso');
+      if (card.ordem_status === 'AGUARDANDO') {
+        // Transition: AGUARDANDO → EM_ANDAMENTO (start first etapa, don't conclude)
+        await supabase.from('ordens_producao').update({ status: 'EM_ANDAMENTO' }).eq('id', card.ordem_id);
+        await iniciarEtapa(card.id, profile!.id, card.pedido_id);
+        toast.success('Ordem iniciada com sucesso');
+      } else {
+        await concluirEtapa(card.id, card.ordem_id, card.pedido_id, profile!.id, obs || `Avançado via kanban por ${profile!.nome}`);
+        toast.success('Etapa avançada com sucesso');
+      }
       fetchCards();
     } catch {
       toast.error('Erro ao avançar etapa');
