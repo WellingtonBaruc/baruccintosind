@@ -311,12 +311,6 @@ export default function AlmoxarifadoPage() {
                     )}
                   </CardContent>
                 </Card>
-                );
-              })}
-            </div>
-                );
-              })}
-            </div>
           )}
         </>
       )}
