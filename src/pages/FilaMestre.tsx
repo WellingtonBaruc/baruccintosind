@@ -86,7 +86,7 @@ export default function FilaMestre() {
     const pedidoIds = pedidos.map(p => p.id);
     const { data: ordens } = await supabase
       .from('ordens_producao')
-      .select('id, pedido_id, tipo_produto, data_inicio_pcp, data_fim_pcp')
+      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp')
       .in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']);
 
     // Fetch active etapas (EM_ANDAMENTO first, fallback to first PENDENTE)
