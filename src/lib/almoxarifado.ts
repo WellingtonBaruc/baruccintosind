@@ -73,7 +73,7 @@ export function parseItemAttributes(descricao: string, categoria?: string | null
     tipo_produto = 'FIVELA_COBERTA';
   } else if (desc.includes('CINTO SINTETICO') || desc.includes('CINTO SINTÉTICO')) {
     tipo_produto = 'SINTETICO';
-  } else if (desc.includes('CINTO TECIDO') || desc.includes('TIRA TECIDO')) {
+  } else if (desc.includes('CINTO TECIDO')) {
     tipo_produto = 'TECIDO';
   } else if (desc.includes('FIVELA') || desc.includes('PASSANTE') || cat.includes('AVIAMENTO')) {
     tipo_produto = 'AVIAMENTO';
