@@ -29,6 +29,7 @@ const calcStatusPrazo = (dataPrevisao: string | null): string => {
 };
 
 export default function PainelDia() {
+  const [atrasados, setAtrasados] = useState<PainelRow[]>([]);
   const [entregarHoje, setEntregarHoje] = useState<PainelRow[]>([]);
   const [iniciarHoje, setIniciarHoje] = useState<PainelRow[]>([]);
   const [totalMeta, setTotalMeta] = useState(0);
@@ -37,6 +38,17 @@ export default function PainelDia() {
 
   const fetchData = async () => {
     const today = new Date().toISOString().slice(0, 10);
+
+    const statusFinais = ['ENVIADO', 'ENTREGUE', 'FINALIZADO_SIMPLIFICA', 'CANCELADO', 'HISTORICO'];
+
+    // Atrasados: data_previsao_entrega < hoje e não finalizados
+    const { data: atrasadosData } = await supabase
+      .from('pedidos')
+      .select('numero_pedido, api_venda_id, cliente_nome, status_prazo, status_atual, data_previsao_entrega')
+      .lt('data_previsao_entrega', today)
+      .not('status_api', 'eq', 'Finalizado')
+      .not('status_atual', 'in', `(${statusFinais.join(',')})`)
+      .order('data_previsao_entrega', { ascending: true });
 
     // Entregar hoje
     const { data: entrega } = await supabase
@@ -65,6 +77,11 @@ export default function PainelDia() {
       .select('*', { count: 'exact', head: true })
       .eq('programado_para_hoje', true).eq('data_programacao', today).eq('status', 'CONCLUIDA');
 
+    setAtrasados((atrasadosData || []).map(p => ({
+      ...p,
+      tipo_produto: null,
+      status_prazo: 'ATRASADO',
+    })));
     setEntregarHoje((entrega || []).map(p => ({
       ...p,
       tipo_produto: null,
@@ -107,16 +124,40 @@ export default function PainelDia() {
             <p className="text-sm text-muted-foreground">Concluídos</p>
           </CardContent>
         </Card>
-        <Card className="border-border/60">
-          <CardContent className="p-5">
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-muted-foreground">Progresso</span>
-              <span className="font-semibold">{pct}%</span>
-            </div>
-            <Progress value={pct} className="h-3" />
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="p-5 text-center">
+            <p className="text-3xl font-bold text-destructive">{atrasados.length}</p>
+            <p className="text-sm text-muted-foreground">Atrasados</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Atrasados */}
+      {atrasados.length > 0 && (
+        <Card className="border-destructive/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base text-destructive">⚠️ Atrasados ({atrasados.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {atrasados.map((p, i) => (
+                <div key={i} className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                  <div>
+                    <span className="font-medium text-sm">{p.api_venda_id || p.numero_pedido}</span>
+                    <span className="text-sm text-muted-foreground ml-2">{p.cliente_nome}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="destructive" className="text-xs font-normal">
+                      Prev: {p.data_previsao_entrega ? format(new Date(p.data_previsao_entrega + 'T00:00:00'), 'dd/MM') : '—'}
+                    </Badge>
+                    <span className="text-sm">{STATUS_PRAZO_CONFIG['ATRASADO']?.icon}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Entregar hoje */}
       <Card className="border-border/60">
