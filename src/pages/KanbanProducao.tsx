@@ -332,7 +332,36 @@ export default function KanbanProducao() {
       return;
     }
 
+    // Moving to Conferência — ask about fivela coberta
+    if (destCol === 'Conferência' && !card.tem_fivela_coberta) {
+      setFivelaModal({ open: true, card });
+      // Continue advancing regardless
+    }
+
     await advanceCard(card);
+  };
+
+  const handleFivelaModalResponse = async (hasFivela: boolean) => {
+    const card = fivelaModal.card;
+    if (!card) return;
+    setFivelaModal({ open: false, card: null });
+    if (hasFivela) {
+      await supabase.from('ordens_producao').update({
+        tem_fivela_coberta: true,
+        fivela_coberta_status: 'AGUARDANDO',
+      } as any).eq('id', card.ordem_id);
+      toast.success('Fivela coberta marcada na venda');
+      fetchCards();
+    }
+  };
+
+  const updateFivelaCobertaStatus = async (card: KanbanCard, newStatus: string) => {
+    await supabase.from('ordens_producao').update({
+      fivela_coberta_status: newStatus,
+    } as any).eq('id', card.ordem_id);
+    toast.success(`Fivela coberta: ${newStatus === 'AGUARDANDO' ? 'Aguardando' : newStatus === 'EM_ANDAMENTO' ? 'Em Andamento' : 'Concluído'}`);
+    setFivelaStatusModal({ open: false, card: null });
+    fetchCards();
   };
 
   const advanceCard = async (card: KanbanCard, obs?: string) => {
