@@ -393,14 +393,14 @@ export default function KanbanProducao() {
     tipoCards
       .filter(c => mapEtapaToColumn(c.nome_etapa, c.etapa_status, c.ordem_status, c.tipo_produto) === column)
       .sort((a, b) => {
-        // 1. Priority by prazo status (ATRASADO first, then ATENCAO, then NO_PRAZO)
-        const pA = prazoOrder[a.status_prazo] ?? 2;
-        const pB = prazoOrder[b.status_prazo] ?? 2;
-        if (pA !== pB) return pA - pB;
-        // 2. Within same prazo, sort by delivery date ascending (earliest first)
+        // 1. Sort by delivery date ascending (earliest first) — same as Fila Mestre
         const dA = a.data_previsao_entrega || '9999-12-31';
         const dB = b.data_previsao_entrega || '9999-12-31';
-        return dA.localeCompare(dB);
+        if (dA !== dB) return dA.localeCompare(dB);
+        // 2. Tiebreaker: prazo status (ATRASADO first)
+        const pA = prazoOrder[a.status_prazo] ?? 2;
+        const pB = prazoOrder[b.status_prazo] ?? 2;
+        return pA - pB;
       });
 
   const prazoClasses: Record<string, string> = {
