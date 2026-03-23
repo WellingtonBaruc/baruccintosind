@@ -44,7 +44,7 @@ export default function FilaLoja() {
   const fetchPedidos = async () => {
     const { data } = await supabase
       .from('pedidos')
-      .select('*')
+      .select('*, fivelas_separadas')
       .in('status_atual', STATUS_LOJA)
       .order('criado_em', { ascending: true });
 
