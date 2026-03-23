@@ -27,7 +27,7 @@ const navItems: NavItem[] = [
   // Main 3 — gestor/admin/supervisor
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, perfis: ['admin', 'gestor', 'supervisor_producao'] },
   { title: 'Fila Mestre', url: '/producao', icon: ClipboardList, perfis: ['admin', 'gestor', 'supervisor_producao'] },
-  { title: 'Kanban', url: '/kanban', icon: Columns3, perfis: ['admin', 'gestor', 'supervisor_producao', 'operador_producao'] },
+  { title: 'Kanban Produção', url: '/kanban', icon: Columns3, perfis: ['admin', 'gestor', 'supervisor_producao', 'operador_producao'] },
 
   // Operador — only kanban (above)
 
