@@ -192,7 +192,10 @@ export default function CurvaABC() {
     }
 
     // Group by nivel
-    const groups = new Map<string, { total: number; unidades: number; pedidoIds: Set<string>; meses: Record<string, number>; produtos: Map<string, { total: number; unidades: number; pedidoIds: Set<string>; meses: Record<string, number> }> }>();
+    type SubGrupo = { total: number; unidades: number; pedidoIds: Set<string>; meses: Record<string, number> };
+    type AberturaBucket = SubGrupo & { banhos: Map<string, SubGrupo>; produtos: Map<string, SubGrupo> };
+    type FivelaGroup = SubGrupo & { aberturas: Map<string, AberturaBucket>; produtos: Map<string, SubGrupo> };
+    const groups = new Map<string, FivelaGroup>();
 
     for (const item of filtered) {
       const key = nivel === 'categoria'
@@ -210,7 +213,7 @@ export default function CurvaABC() {
       }
 
       if (!groups.has(key)) {
-        groups.set(key, { total: 0, unidades: 0, pedidoIds: new Set(), meses: {}, produtos: new Map() });
+        groups.set(key, { total: 0, unidades: 0, pedidoIds: new Set(), meses: {}, aberturas: new Map(), produtos: new Map() });
       }
       const g = groups.get(key)!;
       g.total += val;
@@ -218,8 +221,32 @@ export default function CurvaABC() {
       g.pedidoIds.add(item.pedido_id);
       g.meses[mesKey] = (g.meses[mesKey] || 0) + val;
 
-      // If grouping by category, track products inside
-      if (nivel === 'categoria' || nivel === 'fivela') {
+      // For fivela level, build abertura → banho hierarchy
+      if (nivel === 'fivela') {
+        const abertura = extrairAbertura(item.descricao_produto);
+        const banho = extrairBanho(item.descricao_produto);
+
+        if (!g.aberturas.has(abertura)) {
+          g.aberturas.set(abertura, { total: 0, unidades: 0, pedidoIds: new Set(), meses: {}, banhos: new Map(), produtos: new Map() });
+        }
+        const ab = g.aberturas.get(abertura)!;
+        ab.total += val;
+        ab.unidades += item.quantidade;
+        ab.pedidoIds.add(item.pedido_id);
+        ab.meses[mesKey] = (ab.meses[mesKey] || 0) + val;
+
+        if (!ab.banhos.has(banho)) {
+          ab.banhos.set(banho, { total: 0, unidades: 0, pedidoIds: new Set(), meses: {} });
+        }
+        const bn = ab.banhos.get(banho)!;
+        bn.total += val;
+        bn.unidades += item.quantidade;
+        bn.pedidoIds.add(item.pedido_id);
+        bn.meses[mesKey] = (bn.meses[mesKey] || 0) + val;
+      }
+
+      // Track products inside for categoria
+      if (nivel === 'categoria') {
         const prodKey = item.descricao_produto;
         if (!g.produtos.has(prodKey)) {
           g.produtos.set(prodKey, { total: 0, unidades: 0, pedidoIds: new Set(), meses: {} });
@@ -239,6 +266,12 @@ export default function CurvaABC() {
 
     const grandTotal = sorted.reduce((sum, g) => sum + g.total, 0);
 
+    const toSubRow = (nome: string, s: SubGrupo, classe: 'A' | 'B' | 'C'): ABCRow => ({
+      nome, total: s.total,
+      percentual: grandTotal > 0 ? (s.total / grandTotal) * 100 : 0,
+      acumulado: 0, classe, unidades: s.unidades, pedidos: s.pedidoIds.size, meses: s.meses,
+    });
+
     // Classify ABC
     let acumulado = 0;
     const rows: ABCRow[] = sorted.map(g => {
@@ -246,31 +279,29 @@ export default function CurvaABC() {
       acumulado += pct;
       const classe: 'A' | 'B' | 'C' = acumulado <= 80 ? 'A' : acumulado <= 95 ? 'B' : 'C';
 
-      const produtos = (nivel === 'categoria' || nivel === 'fivela')
-        ? Array.from(g.produtos.entries())
-            .map(([pNome, p]) => ({
-              nome: pNome,
-              total: p.total,
-              percentual: grandTotal > 0 ? (p.total / grandTotal) * 100 : 0,
-              acumulado: 0,
-              classe: classe,
-              unidades: p.unidades,
-              pedidos: p.pedidoIds.size,
-              meses: p.meses,
-            }))
-            .sort((a, b) => b.total - a.total)
-        : undefined;
+      let subgrupos: ABCRow[] | undefined;
+      let produtos: ABCRow[] | undefined;
+
+      if (nivel === 'fivela') {
+        subgrupos = Array.from(g.aberturas.entries())
+          .map(([abNome, ab]) => {
+            const row = toSubRow(abNome, ab, classe);
+            row.subgrupos = Array.from(ab.banhos.entries())
+              .map(([bNome, bn]) => toSubRow(bNome, bn, classe))
+              .sort((a, b) => b.total - a.total);
+            return row;
+          })
+          .sort((a, b) => b.total - a.total);
+      } else if (nivel === 'categoria') {
+        produtos = Array.from(g.produtos.entries())
+          .map(([pNome, p]) => toSubRow(pNome, p, classe))
+          .sort((a, b) => b.total - a.total);
+      }
 
       return {
-        nome: g.nome,
-        total: g.total,
-        percentual: pct,
-        acumulado,
-        classe,
-        unidades: g.unidades,
-        pedidos: g.pedidos,
-        meses: g.meses,
-        produtos,
+        nome: g.nome, total: g.total, percentual: pct, acumulado, classe,
+        unidades: g.unidades, pedidos: g.pedidos, meses: g.meses,
+        produtos, subgrupos,
       };
     });
 
