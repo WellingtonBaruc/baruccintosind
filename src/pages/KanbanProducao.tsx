@@ -475,7 +475,20 @@ export default function KanbanProducao() {
                                           </Badge>
                                         )}
 
-                                        {/* Pending losses badge */}
+                                        {/* Fivela pronta badge — on Sintético cards when fivelas_recebidas */}
+                                        {card.tipo_produto === 'SINTETICO' && card.fivelas_recebidas && (
+                                          <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                                            Fivela pronta ✓
+                                          </Badge>
+                                        )}
+
+                                        {/* Fivelas separadas badge — on Sintético cards when almoxarifado confirmed */}
+                                        {card.tipo_produto === 'SINTETICO' && card.fivelas_separadas && (
+                                          <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                                            Fivelas separadas ✓
+                                          </Badge>
+                                        )}
+
                                         {card.perdas_pendentes > 0 && (
                                           <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30">
                                             <AlertTriangle className="h-3 w-3 mr-0.5" />

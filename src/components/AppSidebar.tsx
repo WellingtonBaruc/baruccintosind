@@ -48,7 +48,7 @@ const navItems: NavItem[] = [
   { title: 'Comercial', url: '/comercial', icon: ShoppingBag, perfis: ['admin', 'gestor'], group: 'setores' },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign, perfis: ['admin', 'gestor'], group: 'setores' },
   { title: 'Logística', url: '/logistica', icon: Truck, perfis: ['admin', 'gestor'], group: 'setores' },
-
+  { title: 'Almoxarifado', url: '/almoxarifado', icon: Package, perfis: ['admin', 'gestor'], group: 'setores' },
   // Config
   { title: 'Relatórios', url: '/relatorios/abc', icon: BarChart3, perfis: ['admin', 'gestor'], group: 'config' },
   { title: 'PCP', url: '/pcp', icon: Calendar, perfis: ['admin', 'gestor', 'supervisor_producao'], group: 'config' },

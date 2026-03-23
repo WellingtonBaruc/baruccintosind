@@ -72,6 +72,7 @@ const App = () => (
 
               {/* Reports */}
               <Route path="/relatorios/abc" element={<CurvaABC />} />
+              <Route path="/almoxarifado" element={<AlmoxarifadoPage />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFound />} />
