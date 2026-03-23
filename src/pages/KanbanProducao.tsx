@@ -324,7 +324,14 @@ export default function KanbanProducao() {
     const destIdx = UNIFIED_COLUMNS.indexOf(destCol);
 
     if (destIdx <= srcIdx) { toast.error('Não é possível voltar etapas.'); return; }
-    if (destIdx !== srcIdx + 1) { toast.error('Só é possível avançar uma etapa por vez.'); return; }
+
+    // Sintético skips Conferência and Fusionagem
+    const skipColumns = card.tipo_produto === 'SINTETICO' ? ['Conferência', 'Fusionagem'] : [];
+    const allowedColumns = UNIFIED_COLUMNS.filter(c => !skipColumns.includes(c));
+    const allowedSrcIdx = allowedColumns.indexOf(currentCol);
+    const allowedDestIdx = allowedColumns.indexOf(destCol);
+
+    if (allowedDestIdx !== allowedSrcIdx + 1) { toast.error('Só é possível avançar uma etapa por vez.'); return; }
     if (!isSupervisor) { toast.error('Apenas supervisores podem arrastar cards.'); return; }
 
     // Tecido going to Concluído — confirm cross-pipeline transfer
