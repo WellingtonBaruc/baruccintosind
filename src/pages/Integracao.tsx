@@ -299,11 +299,11 @@ export default function Integracao() {
     setResetting(true);
     setResetConfirmOpen(false);
     try {
-      // Get all active ordens (all types: SINTETICO, TECIDO, FIVELA_COBERTA)
+      // Get ALL ordens that are NOT concluded/cancelled — no filters on type or pipeline
       const { data: ordens } = await supabase
         .from('ordens_producao')
-        .select('id, pedido_id, tipo_produto')
-        .in('status', ['AGUARDANDO', 'EM_ANDAMENTO']);
+        .select('id, pedido_id, tipo_produto, status')
+        .not('status', 'in', '("CONCLUIDA","CANCELADA")');
 
       if (!ordens || ordens.length === 0) {
         toast.info('Nenhuma ordem ativa para resetar.');
@@ -312,11 +312,13 @@ export default function Integracao() {
       }
 
       let resetCount = 0;
+      const countByType: Record<string, number> = {};
+
       for (const ordem of ordens) {
         // Reset ordem status to AGUARDANDO
         await supabase.from('ordens_producao').update({ status: 'AGUARDANDO' as any }).eq('id', ordem.id);
 
-        // Reset all etapas: first to EM_ANDAMENTO, rest to PENDENTE
+        // Reset all etapas
         const { data: etapas } = await supabase
           .from('op_etapas')
           .select('id, ordem_sequencia')
@@ -329,7 +331,7 @@ export default function Integracao() {
               status: (i === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as any,
               operador_id: null,
               concluido_em: null,
-              ...(i === 0 ? { iniciado_em: new Date().toISOString() } : { iniciado_em: null }),
+              iniciado_em: i === 0 ? new Date().toISOString() : null,
             }).eq('id', etapas[i].id);
           }
         }
@@ -341,10 +343,13 @@ export default function Integracao() {
           observacao: 'Ordem resetada para Aguardando Início — ação administrativa',
         });
 
+        const tp = ordem.tipo_produto || 'OUTROS';
+        countByType[tp] = (countByType[tp] || 0) + 1;
         resetCount++;
       }
 
-      toast.success(`${resetCount} ordens resetadas para Aguardando Início.`);
+      const breakdown = Object.entries(countByType).map(([t, c]) => `${t}: ${c}`).join(' / ');
+      toast.success(`${resetCount} ordens resetadas — ${breakdown}`);
       fetchData();
     } catch (err: any) {
       toast.error(`Erro ao resetar: ${err.message}`);
