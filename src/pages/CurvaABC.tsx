@@ -39,21 +39,33 @@ interface ABCRow {
   produtos?: ABCRow[];
 }
 
-const FIVELA_BASES = [
-  { keyword: 'MATRIZ', label: 'MATRIZ' },
-  { keyword: 'TICI', label: 'TICI' },
-  { keyword: 'ERICA', label: 'ERICA' },
-  { keyword: 'JADE', label: 'JADE' },
-  { keyword: 'LIZ', label: 'LIZ' },
-  { keyword: 'ROSY', label: 'ROSY' },
-  { keyword: 'SEM FIVELA', label: 'SEM FIVELA' },
-];
+const FIVELA_BASES_KEYWORDS = ['TICI', 'ERICA', 'JADE', 'LIZ', 'ROSY', 'SEM FIVELA'];
 
 function extrairFivelaBase(descricao: string): string {
   const upper = (descricao || '').toUpperCase();
-  for (const { keyword, label } of FIVELA_BASES) {
-    if (upper.includes(keyword)) return label;
+
+  // Check named bases first
+  for (const kw of FIVELA_BASES_KEYWORDS) {
+    if (upper.includes(kw)) return kw;
   }
+
+  // MATRIZ group — extract sub-type (RETANGULAR, OVAL, REDONDA, etc.)
+  if (upper.includes('MATRIZ')) {
+    const match = upper.match(/MATRIZ\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ]+)/);
+    return match ? `MATRIZ ${match[1]}` : 'MATRIZ';
+  }
+
+  // For products with "FIVELA(S) <NOME>" pattern — extract the buckle name
+  // e.g. "FIVELA ANNY LATONADA 15MM" → ANNY
+  // e.g. "CINTO SINTETICO 2 FIVELAS PALOMA LAT 20MM..." → PALOMA
+  const fivelaMatch = upper.match(/FIVELAS?\s+(?:COBERTA\s+)?([A-ZÁÉÍÓÚÂÊÔÃÕÇ]+)/);
+  if (fivelaMatch) {
+    const nome = fivelaMatch[1];
+    // Ignore suffixes that are not names (LATONADA, NIQUELADA, 3FUROS, etc.)
+    const ignorar = ['LATONADA', 'NIQUELADA', 'LAT', 'NIQ', 'MET', '3FUROS', 'COBERTA'];
+    if (!ignorar.includes(nome)) return nome;
+  }
+
   return 'OUTROS';
 }
 
