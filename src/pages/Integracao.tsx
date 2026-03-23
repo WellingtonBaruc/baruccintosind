@@ -151,9 +151,9 @@ export default function Integracao() {
 
   const classifyProduct = (name: string): string => {
     const upper = (name || '').toUpperCase();
+    if (upper.includes('FIVELA COBERTA') || upper.includes('FIVELA MATRIZ')) return 'FIVELA_COBERTA';
     if (upper.includes('CINTO SINTETICO') || upper.includes('TIRA SINTETICO')) return 'SINTETICO';
     if (upper.includes('CINTO TECIDO') || upper.includes('TIRA TECIDO')) return 'TECIDO';
-    if (upper.includes('FIVELA COBERTA')) return 'FIVELA_COBERTA';
     return 'OUTROS';
   };
 
