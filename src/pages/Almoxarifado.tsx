@@ -166,7 +166,7 @@ export default function AlmoxarifadoPage() {
       const solIds = venda.itens.filter(i => i.solicitacao_id).map(i => i.solicitacao_id!);
       if (solIds.length > 0) {
         await supabase.from('solicitacoes_almoxarifado').update({
-          status: 'ATENDIDO',
+          status: 'ATENDIDA',
           atendido_por: profile.id,
           atendido_em: new Date().toISOString(),
         }).in('id', solIds);
