@@ -36,10 +36,11 @@ function fmtBRL(v: number): string {
 }
 
 // Classify product type from name and category
-function classificarProduto(nomeProduto: string, categoriaProduto?: string): string {
+function classificarProduto(nomeProduto: string, categoriaProduto?: string, referenciaProduto?: string): string {
   const upper = (nomeProduto || '').toUpperCase();
   const catUpper = (categoriaProduto || '').toUpperCase();
-  if (upper.includes('FIVELA COBERTA') || upper.includes('FIVELA MATRIZ') || catUpper === 'FIVELA COBERTA') return 'FIVELA_COBERTA';
+  const refUpper = (referenciaProduto || '').toUpperCase();
+  if (upper.includes('FIVELA COBERTA') || upper.includes('FIVELA MATRIZ') || catUpper === 'FIVELA COBERTA' || catUpper === 'FIVELA_COBERTA' || refUpper.startsWith('FVC')) return 'FIVELA_COBERTA';
   if (upper.includes('CINTO SINTETICO') || upper.includes('TIRA SINTETICO') || upper.includes('CINTO SINTÉTICO') || upper.includes('TIRA SINTÉTICO')) return 'SINTETICO';
   if (upper.includes('CINTO TECIDO') || upper.includes('TIRA TECIDO')) return 'TECIDO';
   return 'OUTROS';
