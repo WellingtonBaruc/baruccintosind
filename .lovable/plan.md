@@ -1,45 +1,78 @@
 
 
-## Diagnóstico
+# Kanban Central Unificado
 
-Quando o almoxarifado confirma separação (`handleConfirmarSeparacao`):
-1. Marca `fivelas_separadas = true` no pedido
-2. Marca solicitações como `ATENDIDO`
-3. Registra histórico
+## Resumo
 
-**Problemas identificados:**
-- A **Loja** não é notificada — a página `VerificacaoLoja.tsx` verifica `solicitacoes.every(s => s.status === 'ATENDIDA')` mas o Almoxarifado está gravando `'ATENDIDO'` (masculino) em vez de `'ATENDIDA'` (feminino). Isso impede que a loja reconheça as solicitações como atendidas.
-- No Almoxarifado, o card fica com cor `bg-muted` quando separado, mas não tem destaque visual claro de "SEPARADO".
-- A Loja tem realtime subscription para atualizar quando solicitações mudam, mas o status inconsistente (`ATENDIDO` vs `ATENDIDA`) quebra a lógica.
+Substituir os 3 Kanbans separados (Sintético, Tecido, Fivela Coberta) por um Kanban único com filtros por tipo de produto. As colunas serão unificadas e a etapa "Preparação" terá sub-etapas (checklist) diferentes conforme o tipo do produto.
 
-## Plano de Correção
+## Mudanças
 
-### 1. Corrigir status da solicitação no Almoxarifado (arquivo `src/pages/Almoxarifado.tsx`)
+### 1. Colunas unificadas
 
-Na função `handleConfirmarSeparacao`, alterar:
-- `status: 'ATENDIDO'` → `status: 'ATENDIDA'`
+Remover `PIPELINE_COLUMNS` com 3 tipos separados e usar uma única lista:
 
-Isso alinha com o que a Loja espera em `VerificacaoLoja.tsx` linha 108: `solicitacoes.every(s => s.status === 'ATENDIDA')`.
+```text
+Aguardando Início → Conferência → Fusionagem → Preparação → Montagem → Embalagem → Concluído
+```
 
-### 2. Adicionar indicador visual "SEPARADO" no card do Almoxarifado
+### 2. Filtros em vez de Tabs
 
-Quando `fivelas_separadas = true`:
-- Card com fundo verde claro e badge "Separado ✓" no cabeçalho
-- Botão de confirmação desaparece (já funciona assim)
+Substituir o `<Tabs>` de 3 abas por filtros horizontais (botões/toggles):
+- **Todos** (padrão)
+- **Sintético**
+- **Tecido**
+- **Fivela Coberta**
 
-### 3. Adicionar badge "Fivelas Separadas ✓" na Fila da Loja e Verificação Loja
+Os cards aparecem todos no mesmo board, filtrados conforme seleção.
 
-**Arquivo `src/pages/VerificacaoLoja.tsx`:**
-- Quando `pedido.fivelas_separadas === true`, exibir badge verde "Fivelas Separadas ✓" no cabeçalho do pedido
-- Quando todas as solicitações forem `ATENDIDA`, habilitar botão de finalização
+### 3. Mapeamento de etapas (mapEtapaToColumn)
 
-**Arquivo `src/pages/FilaLoja.tsx`:**
-- Na listagem, mostrar ícone/badge indicando que as fivelas já foram separadas para pedidos com `fivelas_separadas = true`
+Atualizar a função para mapear as etapas de cada pipeline nas colunas unificadas:
+- Tecido: Conferência → Conferência, Fusionagem → Fusionagem, Colagem/Viração → Preparação, Finalização → Montagem
+- Sintético: Corte → Conferência (ou pular), Preparação → Preparação, Montagem → Montagem, Embalagem → Embalagem
+- Fivela Coberta: Em Andamento → Preparação
+- Produção Finalizada / Concluído → Concluído
+
+### 4. Sub-etapas na Preparação (checklist no card)
+
+Quando um card está na coluna **Preparação**, exibir um checklist expandido dentro do card ou via dialog:
+
+**Sintético:**
+1. Costura
+2. Ilhós
+3. Máq. Fechar
+4. Outros (campo de adição)
+
+**Tecido:**
+1. Colagem/Viração
+2. Forração
+3. Costura
+4. Ilhós
+5. Outros (campo de adição)
+
+Usa a tabela `op_etapa_subetapas` existente para persistir o estado dos checkboxes. Ao clicar para avançar da Preparação, exige que pelo menos as sub-etapas obrigatórias estejam marcadas.
+
+### 5. Lógica de drag-and-drop
+
+- Manter a mesma lógica: só avança uma coluna por vez, apenas supervisores arrastam.
+- O `handleDragEnd` usa a lista unificada de colunas.
+- A transferência Tecido→Sintético continua funcionando (quando Tecido chega em Concluído).
+
+### 6. Transferências cross-pipeline
+
+- Mantidas como estão (Tecido→Sintético, Fivela→Embalagem).
+- Badges de transferência continuam visíveis na coluna Concluído.
+
+### Arquivos modificados
+
+- **`src/pages/KanbanProducao.tsx`** — reescrita significativa: remover Tabs, unificar colunas, adicionar filtro por tipo, adicionar checklist de sub-etapas na Preparação.
 
 ### Detalhes técnicos
 
-- **Mudança crítica**: `'ATENDIDO'` → `'ATENDIDA'` em `src/pages/Almoxarifado.tsx` linha 169
-- Adicionar `fivelas_separadas` ao select da `FilaLoja.tsx`
-- Badge na VerificacaoLoja usando o campo `pedido.fivelas_separadas`
-- Nenhuma alteração de banco de dados necessária
+- `PIPELINE_COLUMNS` passa a ser um array único: `['Aguardando Início', 'Conferência', 'Fusionagem', 'Preparação', 'Montagem', 'Embalagem', 'Concluído']`
+- `mapEtapaToColumn` recebe `tipoProduto` e faz o mapping correto para cada tipo nas colunas unificadas
+- O filtro por tipo é um state `filterTipo: 'all' | 'SINTETICO' | 'TECIDO' | 'FIVELA_COBERTA'`
+- Sub-etapas da Preparação: ao abrir dialog ou expandir card, busca/cria registros em `op_etapa_subetapas` com os nomes padrão conforme tipo; permite adicionar "Outros"
+- O checklist salva em `op_etapa_subetapas` (tabela já existe no schema)
 
