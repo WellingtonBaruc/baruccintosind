@@ -46,10 +46,9 @@ export function requerSeparacaoAlmoxarifado(descricao: string, categoria?: strin
   if (
     desc.includes('CINTO SINTETICO') || desc.includes('CINTO SINTÉTICO') ||
     desc.includes('CINTO TECIDO') ||
-    desc.includes('TIRA SINTETICO') || desc.includes('TIRA SINTÉTICO') ||
-    desc.includes('TIRA TECIDO') ||
     desc.includes('FIVELA COBERTA')
   ) {
+    // TIRA SINTETICO e TIRA TECIDO NÃO requerem separação no almoxarifado
     return true;
   }
 
