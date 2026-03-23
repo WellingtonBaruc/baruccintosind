@@ -242,21 +242,20 @@ export default function VerificacaoLoja() {
             pedido_id: pedido.id,
             pipeline_id: pipelineId,
             sequencia: 2,
-            status: 'EM_ANDAMENTO',
-            tipo_produto: 'OP_COMPLEMENTAR',
-            observacao: `Itens faltantes (produção): ${faltantesProd.map(i => `${i.descricao_produto} (${i.quantidade_faltante ?? i.quantidade} un)`).join(', ')}`,
+            status: 'AGUARDANDO',
+            tipo_produto: 'SINTETICO',
+            observacao: `OP Complementar — Itens faltantes (produção): ${faltantesProd.map(i => `${i.descricao_produto} (${i.quantidade_faltante ?? i.quantidade} un)`).join(', ')}`,
           }).select().single();
 
           if (ordem) {
             const { data: etapas } = await supabase.from('pipeline_etapas').select('*').eq('pipeline_id', pipelineId).order('ordem');
             if (etapas && etapas.length > 0) {
-              const opEtapas = etapas.map((e: any, idx: number) => ({
+              const opEtapas = etapas.map((e: any) => ({
                 ordem_id: ordem.id,
                 pipeline_etapa_id: e.id,
                 nome_etapa: e.nome,
                 ordem_sequencia: e.ordem,
-                status: (idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as 'EM_ANDAMENTO' | 'PENDENTE',
-                ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
+                status: 'PENDENTE' as const,
               }));
               await supabase.from('op_etapas').insert(opEtapas as any);
             }
