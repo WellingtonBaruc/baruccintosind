@@ -186,8 +186,13 @@ export default function KanbanProducao() {
     ]);
 
     const sinteticoMap = new Map<string, string>();
+    // Track which Tecido orders have a Sintético sibling (for transfer detection)
+    const sinteticoExistsForPedido = new Set<string>();
     for (const o of (allOrdensRes.data || [])) {
-      if (o.tipo_produto === 'SINTETICO') sinteticoMap.set(o.pedido_id, o.id);
+      if (o.tipo_produto === 'SINTETICO') {
+        sinteticoMap.set(o.pedido_id, o.id);
+        sinteticoExistsForPedido.add(o.pedido_id);
+      }
     }
 
     const qtdMap = new Map<string, number>();
