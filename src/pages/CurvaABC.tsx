@@ -341,10 +341,11 @@ export default function CurvaABC() {
         </div>
 
         <Select value={nivel} onValueChange={(v) => setNivel(v as Nivel)}>
-          <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="categoria">Categoria</SelectItem>
             <SelectItem value="produto">Produto</SelectItem>
+            <SelectItem value="fivela">Fivela</SelectItem>
           </SelectContent>
         </Select>
 
