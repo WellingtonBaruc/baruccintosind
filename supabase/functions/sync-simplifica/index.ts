@@ -523,7 +523,7 @@ async function inserirNovoPedido(
           pedido_id: pedido.id,
           pipeline_id: pipelineId,
           sequencia,
-          status: 'EM_ANDAMENTO',
+          status: 'AGUARDANDO',
           tipo_produto: tipoProduto,
         })
         .select('id')
