@@ -904,22 +904,10 @@ export default function KanbanProducao() {
                                   </Button>
                                 )}
 
-                                {fivelaSolo && isSupervisor && card.pedido_status !== 'AGUARDANDO_COMERCIAL' && (
-                                  <Button size="sm" variant="outline" className="w-full mt-2 h-8 text-xs" onClick={() => handleEnviarParaComercial(card)}>
-                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Enviar para o Comercial
-                                  </Button>
-                                )}
-
-                                {/* General "Enviar para o Comercial" button for non-fivela cards */}
-                                {inConcluido && !fivelaWithSintetico && !fivelaSolo && canSendToComercial(card) && (
+                                {/* Unified "Enviar para o Comercial" button for ALL concluded cards */}
+                                {inConcluido && !fivelaWithSintetico && canSendToComercial(card) && (
                                   <Button size="sm" className="w-full mt-2 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => handleEnviarParaComercial(card)}>
                                     <ArrowRight className="h-3 w-3 mr-1" /> Enviar para o Comercial
-                                  </Button>
-                                )}
-
-                                {tecidoNeedsTransfer && isSupervisor && (
-                                  <Button size="sm" className="w-full mt-2 h-8 text-xs" onClick={() => handleManualTecidoTransfer(card)}>
-                                    <ArrowRight className="h-3 w-3 mr-1" /> Transferir para Preparação Sintético
                                   </Button>
                                 )}
 
