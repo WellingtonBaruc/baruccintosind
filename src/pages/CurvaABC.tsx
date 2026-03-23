@@ -504,37 +504,82 @@ export default function CurvaABC() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {abcData.rows.map(row => (
-                      <>
-                        <TableRow key={row.nome} className={row.produtos ? 'cursor-pointer hover:bg-accent/50' : ''} onClick={() => row.produtos && toggleExpand(row.nome)}>
-                          <TableCell>{classeBadge(row.classe)}</TableCell>
-                          <TableCell className="font-medium flex items-center gap-1">
-                            {row.produtos && (expandedRows.has(row.nome) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}
-                            {row.nome}
-                          </TableCell>
-                          {mesesColunas.map(m => (
-                            <TableCell key={m} className="text-right tabular-nums text-sm">{fmtVal(row.meses[m] || 0)}</TableCell>
-                          ))}
-                          <TableCell className="text-right tabular-nums font-semibold">{fmtVal(row.total)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{row.percentual.toFixed(1)}%</TableCell>
-                          <TableCell className="text-right tabular-nums">{row.unidades.toLocaleString('pt-BR')}</TableCell>
-                          <TableCell className="text-right tabular-nums">{row.pedidos}</TableCell>
-                        </TableRow>
-                        {row.produtos && expandedRows.has(row.nome) && row.produtos.map(p => (
-                          <TableRow key={`${row.nome}-${p.nome}`} className="bg-muted/30">
-                            <TableCell></TableCell>
-                            <TableCell className="text-sm pl-10">{p.nome}</TableCell>
+                    {abcData.rows.map(row => {
+                      const hasChildren = !!(row.produtos || row.subgrupos);
+                      const isExpanded = expandedRows.has(row.nome);
+                      return (
+                        <React.Fragment key={row.nome}>
+                          <TableRow className={hasChildren ? 'cursor-pointer hover:bg-accent/50' : ''} onClick={() => hasChildren && toggleExpand(row.nome)}>
+                            <TableCell>{classeBadge(row.classe)}</TableCell>
+                            <TableCell className="font-medium flex items-center gap-1">
+                              {hasChildren && (isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}
+                              {row.nome}
+                            </TableCell>
                             {mesesColunas.map(m => (
-                              <TableCell key={m} className="text-right tabular-nums text-xs text-muted-foreground">{fmtVal(p.meses[m] || 0)}</TableCell>
+                              <TableCell key={m} className="text-right tabular-nums text-sm">{fmtVal(row.meses[m] || 0)}</TableCell>
                             ))}
-                            <TableCell className="text-right tabular-nums text-sm">{fmtVal(p.total)}</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm">{p.percentual.toFixed(1)}%</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm">{p.unidades.toLocaleString('pt-BR')}</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm">{p.pedidos}</TableCell>
+                            <TableCell className="text-right tabular-nums font-semibold">{fmtVal(row.total)}</TableCell>
+                            <TableCell className="text-right tabular-nums">{row.percentual.toFixed(1)}%</TableCell>
+                            <TableCell className="text-right tabular-nums">{row.unidades.toLocaleString('pt-BR')}</TableCell>
+                            <TableCell className="text-right tabular-nums">{row.pedidos}</TableCell>
                           </TableRow>
-                        ))}
-                      </>
-                    ))}
+
+                          {/* Fivela: Abertura sub-rows */}
+                          {row.subgrupos && isExpanded && row.subgrupos.map(ab => {
+                            const abKey = `${row.nome}__${ab.nome}`;
+                            const abExpanded = expandedRows.has(abKey);
+                            return (
+                              <React.Fragment key={abKey}>
+                                <TableRow className="bg-muted/20 cursor-pointer hover:bg-muted/40" onClick={(e) => { e.stopPropagation(); toggleExpand(abKey); }}>
+                                  <TableCell></TableCell>
+                                  <TableCell className="text-sm pl-8 font-medium flex items-center gap-1">
+                                    {ab.subgrupos && ab.subgrupos.length > 0 ? (abExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />) : <span className="w-3" />}
+                                    📏 {ab.nome}
+                                  </TableCell>
+                                  {mesesColunas.map(m => (
+                                    <TableCell key={m} className="text-right tabular-nums text-xs text-muted-foreground">{fmtVal(ab.meses[m] || 0)}</TableCell>
+                                  ))}
+                                  <TableCell className="text-right tabular-nums text-sm font-medium">{fmtVal(ab.total)}</TableCell>
+                                  <TableCell className="text-right tabular-nums text-sm">{ab.percentual.toFixed(1)}%</TableCell>
+                                  <TableCell className="text-right tabular-nums text-sm">{ab.unidades.toLocaleString('pt-BR')}</TableCell>
+                                  <TableCell className="text-right tabular-nums text-sm">{ab.pedidos}</TableCell>
+                                </TableRow>
+
+                                {/* Banho sub-sub-rows */}
+                                {ab.subgrupos && abExpanded && ab.subgrupos.map(bn => (
+                                  <TableRow key={`${abKey}__${bn.nome}`} className="bg-muted/40">
+                                    <TableCell></TableCell>
+                                    <TableCell className="text-xs pl-14 text-muted-foreground">🎨 {bn.nome}</TableCell>
+                                    {mesesColunas.map(m => (
+                                      <TableCell key={m} className="text-right tabular-nums text-xs text-muted-foreground">{fmtVal(bn.meses[m] || 0)}</TableCell>
+                                    ))}
+                                    <TableCell className="text-right tabular-nums text-xs">{fmtVal(bn.total)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-xs">{bn.percentual.toFixed(1)}%</TableCell>
+                                    <TableCell className="text-right tabular-nums text-xs">{bn.unidades.toLocaleString('pt-BR')}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-xs">{bn.pedidos}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </React.Fragment>
+                            );
+                          })}
+
+                          {/* Categoria: product sub-rows */}
+                          {row.produtos && isExpanded && row.produtos.map(p => (
+                            <TableRow key={`${row.nome}-${p.nome}`} className="bg-muted/30">
+                              <TableCell></TableCell>
+                              <TableCell className="text-sm pl-10">{p.nome}</TableCell>
+                              {mesesColunas.map(m => (
+                                <TableCell key={m} className="text-right tabular-nums text-xs text-muted-foreground">{fmtVal(p.meses[m] || 0)}</TableCell>
+                              ))}
+                              <TableCell className="text-right tabular-nums text-sm">{fmtVal(p.total)}</TableCell>
+                              <TableCell className="text-right tabular-nums text-sm">{p.percentual.toFixed(1)}%</TableCell>
+                              <TableCell className="text-right tabular-nums text-sm">{p.unidades.toLocaleString('pt-BR')}</TableCell>
+                              <TableCell className="text-right tabular-nums text-sm">{p.pedidos}</TableCell>
+                            </TableRow>
+                          ))}
+                        </React.Fragment>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
