@@ -574,9 +574,6 @@ export default function FilaMestre() {
                       </React.Fragment>
                     );
                   })}
-                      </TableRow>
-                    );
-                  })}
                 </TableBody>
               </Table>
             </div>
