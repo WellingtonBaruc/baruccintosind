@@ -613,10 +613,10 @@ export default function KanbanProducao() {
         return pA - pB;
       });
 
-  const prazoClasses: Record<string, string> = {
-    ATRASADO: 'border-l-destructive bg-destructive/10',
-    ATENCAO: 'border-l-[hsl(var(--warning))] bg-[hsl(var(--warning))]/10',
-    NO_PRAZO: 'border-l-[hsl(var(--success))] bg-[hsl(var(--success))]/10',
+  const prazoHeaderClasses: Record<string, string> = {
+    ATRASADO: 'bg-red-100 border-b border-red-200',
+    ATENCAO: 'bg-yellow-100 border-b border-yellow-200',
+    NO_PRAZO: 'bg-green-100 border-b border-green-200',
   };
 
   const prazoBadge: Record<string, { label: string; cls: string }> = {
@@ -768,15 +768,18 @@ export default function KanbanProducao() {
                                 ref={prov.innerRef}
                                 {...prov.draggableProps}
                                 {...prov.dragHandleProps}
-                                className={`rounded-lg border bg-card p-3 shadow-sm border-l-4 ${prazoClasses[card.status_prazo] || 'border-l-border'} ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''}`}
+                                className={`rounded-lg border bg-white shadow-sm overflow-hidden ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''}`}
                               >
-                                <p className="font-bold text-base leading-tight">
-                                  {card.api_venda_id}
-                                  {card.ordem_sequencia_op > 1 && (
-                                    <span className="text-xs font-medium text-primary ml-1.5">• OP {card.ordem_sequencia_op}</span>
-                                  )}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.cliente_nome}</p>
+                                <div className={`px-3 py-2 ${prazoHeaderClasses[card.status_prazo] || 'bg-muted/30 border-b border-border/40'}`}>
+                                  <p className="font-bold text-base leading-tight">
+                                    {card.api_venda_id}
+                                    {card.ordem_sequencia_op > 1 && (
+                                      <span className="text-xs font-medium text-primary ml-1.5">• OP {card.ordem_sequencia_op}</span>
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.cliente_nome}</p>
+                                </div>
+                                <div className="px-3 py-2">
                                 <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                                   <Badge className={`text-[10px] font-normal ${TIPO_PRODUTO_BADGE[card.tipo_produto] || 'bg-muted text-muted-foreground border-border'}`}>
                                     {TIPO_PRODUTO_LABELS[card.tipo_produto] || card.tipo_produto}
@@ -901,22 +904,10 @@ export default function KanbanProducao() {
                                   </Button>
                                 )}
 
-                                {fivelaSolo && isSupervisor && card.pedido_status !== 'AGUARDANDO_COMERCIAL' && (
-                                  <Button size="sm" variant="outline" className="w-full mt-2 h-8 text-xs" onClick={() => handleEnviarParaComercial(card)}>
-                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Enviar para o Comercial
-                                  </Button>
-                                )}
-
-                                {/* General "Enviar para o Comercial" button for non-fivela cards */}
-                                {inConcluido && !fivelaWithSintetico && !fivelaSolo && canSendToComercial(card) && (
+                                {/* Unified "Enviar para o Comercial" button for ALL concluded cards */}
+                                {inConcluido && !fivelaWithSintetico && canSendToComercial(card) && (
                                   <Button size="sm" className="w-full mt-2 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => handleEnviarParaComercial(card)}>
                                     <ArrowRight className="h-3 w-3 mr-1" /> Enviar para o Comercial
-                                  </Button>
-                                )}
-
-                                {tecidoNeedsTransfer && isSupervisor && (
-                                  <Button size="sm" className="w-full mt-2 h-8 text-xs" onClick={() => handleManualTecidoTransfer(card)}>
-                                    <ArrowRight className="h-3 w-3 mr-1" /> Transferir para Preparação Sintético
                                   </Button>
                                 )}
 
@@ -947,6 +938,7 @@ export default function KanbanProducao() {
                                     <CheckCircle2 className="h-3 w-3 mr-1" /> Confirmar conclusão
                                   </Button>
                                 )}
+                                </div>
                               </div>
                             )}
                           </Draggable>
