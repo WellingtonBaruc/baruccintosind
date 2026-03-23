@@ -180,8 +180,8 @@ export default function FilaMestre() {
 
     const vendas: VendaRow[] = pedidos.map(p => {
       const ordem = (ordens || []).find(o => o.pedido_id === p.id);
-      const ordemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
-      const etapaAtiva = ordemEtapas.find(e => e.status === 'EM_ANDAMENTO') || ordemEtapas[0] || null;
+      const allOrdemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
+      const etapaAtiva = allOrdemEtapas.find(e => e.status === 'EM_ANDAMENTO') || allOrdemEtapas.find(e => e.status === 'PENDENTE') || null;
 
       let etapaDisplay = '—';
       if (ordem) {
@@ -210,6 +210,7 @@ export default function FilaMestre() {
       return {
         ...p,
         ordem_id: ordem?.id || null,
+        ordem_status: ordem?.status || null,
         tipo_produto: tipoProduto,
         etapa_atual: etapaDisplay,
         operador_atual: (etapaAtiva?.usuarios as any)?.nome || '—',
@@ -223,6 +224,7 @@ export default function FilaMestre() {
         dataInicioIdeal: pcp.dataInicioIdeal,
         atrasoDias: pcp.atrasoDias,
         prioridade: pcp.prioridade,
+        etapas: allOrdemEtapas.map((e: any) => ({ id: e.id, nome_etapa: e.nome_etapa, ordem_sequencia: e.ordem_sequencia, status: e.status })),
       };
     });
 
