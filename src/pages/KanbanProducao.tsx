@@ -503,34 +503,6 @@ export default function KanbanProducao() {
     }
   };
 
-  const handleFivelaTransfer = async () => {
-    const card = transferDialog.card;
-    if (!card || !profile || !card.sintetico_ordem_id) return;
-    try {
-      await supabase.from('ordens_producao').update({ fivelas_recebidas: true }).eq('id', card.sintetico_ordem_id);
-      await supabase.from('pedido_historico').insert({
-        pedido_id: card.pedido_id, usuario_id: profile.id, tipo_acao: 'TRANSICAO',
-        observacao: `Fivelas transferidas para Embalagem Sintético — confirmado pelo supervisor ${profile.nome}`,
-      });
-      toast.success(`Fivelas transferidas para Embalagem do Sintético (#${card.api_venda_id})`);
-      setTransferDialog({ open: false, card: null });
-      fetchCards();
-    } catch { toast.error('Erro ao transferir fivelas'); }
-  };
-
-  const handleFivelaSoloComplete = async (card: KanbanCard) => {
-    if (!profile) return;
-    try {
-      await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', card.pedido_id);
-      await supabase.from('pedido_historico').insert({
-        pedido_id: card.pedido_id, usuario_id: profile.id, tipo_acao: 'TRANSICAO',
-        status_anterior: 'EM_PRODUCAO', status_novo: 'AGUARDANDO_COMERCIAL',
-        observacao: `Produção de fivelas concluída (sem sintético). Encaminhado para comercial por ${profile.nome}`,
-      });
-      toast.success('Pedido encaminhado para comercial');
-      fetchCards();
-    } catch { toast.error('Erro ao avançar pedido'); }
-  };
 
   // --- Preparação Sub-etapas (inline expandable) ---
   const togglePrepExpand = async (card: KanbanCard) => {
