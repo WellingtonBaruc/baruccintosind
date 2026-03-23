@@ -175,13 +175,17 @@ export default function FilaMestre() {
     return true;
   });
 
-  // Sort by urgency
+  // Sort by earliest delivery date first, then by prazo urgency
   const sorted = [...filtered].sort((a, b) => {
+    // 1. Earliest delivery date first
+    const dA = a.data_previsao_entrega || '9999-12-31';
+    const dB = b.data_previsao_entrega || '9999-12-31';
+    if (dA !== dB) return dA.localeCompare(dB);
+    // 2. Within same date, by prazo urgency
     const prazoOrder: Record<string, number> = { ATRASADO: 0, ATENCAO: 1, NO_PRAZO: 2 };
     const pa = prazoOrder[a.status_prazo || 'NO_PRAZO'] ?? 3;
     const pb = prazoOrder[b.status_prazo || 'NO_PRAZO'] ?? 3;
-    if (pa !== pb) return pa - pb;
-    return new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime();
+    return pa - pb;
   });
 
   const fmt = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
