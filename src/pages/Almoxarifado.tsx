@@ -7,25 +7,30 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Search, CheckCircle2, Package } from 'lucide-react';
+import { Loader2, Search, CheckCircle2, Package, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface FivelaVenda {
+interface AlmoxItem {
+  id: string;
+  descricao_produto: string;
+  referencia_produto: string | null;
+  quantidade: number;
+  observacao_producao: string | null;
+  origem: 'fivela' | 'solicitacao';
+  solicitacao_id?: string;
+}
+
+interface AlmoxVenda {
   pedido_id: string;
   api_venda_id: string;
   cliente_nome: string;
   data_previsao_entrega: string | null;
   status_prazo: string | null;
   fivelas_separadas: boolean;
-  itens: {
-    id: string;
-    descricao_produto: string;
-    referencia_produto: string | null;
-    quantidade: number;
-    observacao_producao: string | null;
-  }[];
+  origem: 'fivela' | 'solicitacao' | 'ambos';
+  itens: AlmoxItem[];
 }
 
 function isFivelaItem(item: any): boolean {
@@ -36,7 +41,7 @@ function isFivelaItem(item: any): boolean {
 
 export default function AlmoxarifadoPage() {
   const { profile } = useAuth();
-  const [vendas, setVendas] = useState<FivelaVenda[]>([]);
+  const [vendas, setVendas] = useState<AlmoxVenda[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('PENDENTE');
   const [search, setSearch] = useState('');
@@ -44,55 +49,121 @@ export default function AlmoxarifadoPage() {
   useEffect(() => { fetchVendas(); }, []);
 
   const fetchVendas = async () => {
-    // Fetch ALL active pedidos (exclude only HISTORICO, CANCELADO, FINALIZADO_SIMPLIFICA)
-    const { data: pedidos } = await supabase
+    setLoading(true);
+
+    // ── Fonte A: Pedidos "Em Produção" com itens de fivela ──
+    const { data: pedidosA } = await supabase
       .from('pedidos')
       .select('id, api_venda_id, cliente_nome, data_previsao_entrega, status_prazo, status_atual, status_api, fivelas_separadas')
+      .eq('status_api', 'Em Produção')
       .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
       .order('data_previsao_entrega', { ascending: true });
 
-    if (!pedidos || pedidos.length === 0) { setVendas([]); setLoading(false); return; }
+    const pedidoIdsA = (pedidosA || []).map(p => p.id);
+    let allItensA: any[] = [];
+    if (pedidoIdsA.length > 0) {
+      const { data } = await supabase
+        .from('pedido_itens')
+        .select('id, pedido_id, descricao_produto, referencia_produto, quantidade, observacao_producao, categoria_produto')
+        .in('pedido_id', pedidoIdsA);
+      allItensA = data || [];
+    }
 
-    const pedidoIds = pedidos.map(p => p.id);
-    const { data: allItens } = await supabase
-      .from('pedido_itens')
-      .select('id, pedido_id, descricao_produto, referencia_produto, quantidade, observacao_producao, categoria_produto')
-      .in('pedido_id', pedidoIds);
-
-    const result: FivelaVenda[] = [];
-    for (const p of pedidos) {
-      const pedidoItens = (allItens || []).filter(i => i.pedido_id === p.id);
+    const mapA = new Map<string, AlmoxVenda>();
+    for (const p of (pedidosA || [])) {
+      const pedidoItens = allItensA.filter(i => i.pedido_id === p.id);
       const fivelaItens = pedidoItens.filter(isFivelaItem);
       if (fivelaItens.length === 0) continue;
 
-      result.push({
+      mapA.set(p.id, {
         pedido_id: p.id,
         api_venda_id: p.api_venda_id || '—',
         cliente_nome: p.cliente_nome,
         data_previsao_entrega: p.data_previsao_entrega,
         status_prazo: p.status_prazo,
         fivelas_separadas: (p as any).fivelas_separadas || false,
+        origem: 'fivela',
         itens: fivelaItens.map(i => ({
           id: i.id,
           descricao_produto: i.descricao_produto,
           referencia_produto: i.referencia_produto,
           quantidade: i.quantidade,
           observacao_producao: i.observacao_producao,
+          origem: 'fivela' as const,
         })),
       });
     }
 
-    setVendas(result);
+    // ── Fonte B: Solicitações da loja (PENDENTE) ──
+    const { data: solicitacoes } = await supabase
+      .from('solicitacoes_almoxarifado')
+      .select('id, pedido_id, descricao, quantidade, status')
+      .eq('status', 'PENDENTE');
+
+    const solPedidoIds = [...new Set((solicitacoes || []).map(s => s.pedido_id))];
+    let pedidosB: any[] = [];
+    if (solPedidoIds.length > 0) {
+      const { data } = await supabase
+        .from('pedidos')
+        .select('id, api_venda_id, cliente_nome, data_previsao_entrega, status_prazo, fivelas_separadas')
+        .in('id', solPedidoIds);
+      pedidosB = data || [];
+    }
+
+    const pedidoBMap = new Map(pedidosB.map(p => [p.id, p]));
+
+    for (const sol of (solicitacoes || [])) {
+      const existing = mapA.get(sol.pedido_id);
+      const solItem: AlmoxItem = {
+        id: sol.id,
+        descricao_produto: sol.descricao,
+        referencia_produto: null,
+        quantidade: sol.quantidade,
+        observacao_producao: null,
+        origem: 'solicitacao',
+        solicitacao_id: sol.id,
+      };
+
+      if (existing) {
+        existing.origem = 'ambos';
+        existing.itens.push(solItem);
+      } else {
+        const ped = pedidoBMap.get(sol.pedido_id);
+        if (!ped) continue;
+        mapA.set(sol.pedido_id, {
+          pedido_id: sol.pedido_id,
+          api_venda_id: ped.api_venda_id || '—',
+          cliente_nome: ped.cliente_nome,
+          data_previsao_entrega: ped.data_previsao_entrega,
+          status_prazo: ped.status_prazo,
+          fivelas_separadas: ped.fivelas_separadas || false,
+          origem: 'solicitacao',
+          itens: [solItem],
+        });
+      }
+    }
+
+    setVendas(Array.from(mapA.values()));
     setLoading(false);
   };
 
-  const handleConfirmarSeparacao = async (venda: FivelaVenda) => {
+  const handleConfirmarSeparacao = async (venda: AlmoxVenda) => {
     if (!profile) return;
     try {
       await supabase.from('pedidos').update({
         fivelas_separadas: true,
         fivelas_separadas_em: new Date().toISOString(),
       } as any).eq('id', venda.pedido_id);
+
+      // Atender solicitações pendentes desse pedido
+      const solIds = venda.itens.filter(i => i.solicitacao_id).map(i => i.solicitacao_id!);
+      if (solIds.length > 0) {
+        await supabase.from('solicitacoes_almoxarifado').update({
+          status: 'ATENDIDO',
+          atendido_por: profile.id,
+          atendido_em: new Date().toISOString(),
+        }).in('id', solIds);
+      }
 
       await supabase.from('pedido_historico').insert({
         pedido_id: venda.pedido_id,
@@ -126,6 +197,12 @@ export default function AlmoxarifadoPage() {
     ATRASADO: { label: 'Atrasado', cls: 'bg-destructive/15 text-destructive border-destructive/30' },
     ATENCAO: { label: 'Atenção', cls: 'bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30' },
     NO_PRAZO: { label: 'No prazo', cls: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30' },
+  };
+
+  const origemBadge = (origem: string) => {
+    if (origem === 'solicitacao') return <Badge variant="outline" className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30"><Store className="h-3 w-3 mr-1" />Solicitação Loja</Badge>;
+    if (origem === 'ambos') return <Badge variant="outline" className="text-[10px] bg-blue-500/15 text-blue-600 border-blue-500/30">Fivelas + Loja</Badge>;
+    return null;
   };
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
@@ -170,7 +247,7 @@ export default function AlmoxarifadoPage() {
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground">{v.cliente_nome}</p>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   {v.data_previsao_entrega && (
                     <span className="text-xs text-muted-foreground">
                       Entrega: {format(new Date(v.data_previsao_entrega + 'T00:00:00'), 'dd/MM/yy')}
@@ -181,13 +258,19 @@ export default function AlmoxarifadoPage() {
                       {prazoBadge[v.status_prazo].label}
                     </Badge>
                   )}
+                  {origemBadge(v.origem)}
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-2">
                   {v.itens.map(item => (
                     <div key={item.id} className="rounded-md border border-border/60 p-2 text-sm">
-                      <p className="font-medium">{item.descricao_produto}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium flex-1">{item.descricao_produto}</p>
+                        {item.origem === 'solicitacao' && (
+                          <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-600 border-purple-500/20 shrink-0">Loja</Badge>
+                        )}
+                      </div>
                       {item.referencia_produto && <p className="text-xs text-muted-foreground">Ref: {item.referencia_produto}</p>}
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-xs font-medium">{item.quantidade} un</span>
