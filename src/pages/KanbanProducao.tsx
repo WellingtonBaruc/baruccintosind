@@ -42,6 +42,9 @@ interface KanbanCard {
   fivelas_separadas: boolean;
   // Track when card moved to financeiro for 5min green badge
   sent_to_financeiro_at: number | null;
+  // OP complementar identification
+  ordem_sequencia_op: number;
+  ordem_observacao: string | null;
 }
 
 const PIPELINE_COLUMNS: Record<string, string[]> = {
@@ -105,7 +108,7 @@ export default function KanbanProducao() {
         id, ordem_id, nome_etapa, ordem_sequencia, operador_id, status,
         usuarios(nome),
         ordens_producao!inner(
-          id, pedido_id, tipo_produto, status, fivelas_recebidas,
+          id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao,
           pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas)
         )
       `)
@@ -115,8 +118,23 @@ export default function KanbanProducao() {
 
     // Filter: keep cards where pedido is NOT yet at AGUARDANDO_FINANCEIRO or beyond
     const HIDDEN_STATUSES = ['AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO'];
+    // Statuses where the pedido is in the Loja flow — hide all orders from Kanban
+    const LOJA_HIDE_ALL = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO'];
+    // Statuses where only the OP complementar (sequencia > 1) should be visible
+    const LOJA_SHOW_ONLY_OP = ['AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO'];
+
     const visibleEtapas = (etapas as any[]).filter(e => {
       const pedidoStatus = e.ordens_producao.pedidos.status_atual;
+      const ordemSequencia = e.ordens_producao.sequencia || 1;
+
+      // Hide all orders when pedido is waiting for loja
+      if (LOJA_HIDE_ALL.includes(pedidoStatus)) return false;
+
+      // When waiting for OP complementar, only show OP complementar (sequencia > 1)
+      if (LOJA_SHOW_ONLY_OP.includes(pedidoStatus)) {
+        return ordemSequencia > 1;
+      }
+
       // Show for 5 min after going to financeiro
       if (pedidoStatus === 'AGUARDANDO_FINANCEIRO') {
         const cardKey = e.ordem_id;
@@ -201,6 +219,8 @@ export default function KanbanProducao() {
         fivelas_recebidas: e.ordens_producao.fivelas_recebidas || false,
         fivelas_separadas: e.ordens_producao.pedidos.fivelas_separadas || false,
         sent_to_financeiro_at: recentFinanceiro.get(e.ordem_id) || null,
+        ordem_sequencia_op: e.ordens_producao.sequencia || 1,
+        ordem_observacao: e.ordens_producao.observacao || null,
       };
     });
 
@@ -469,7 +489,12 @@ export default function KanbanProducao() {
                                         {...prov.dragHandleProps}
                                         className={`rounded-lg border bg-card p-3 shadow-sm border-l-4 ${prazoClasses[card.status_prazo] || 'border-l-border'} ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''}`}
                                       >
-                                        <p className="font-bold text-base leading-tight">{card.api_venda_id}</p>
+                                        <p className="font-bold text-base leading-tight">
+                                          {card.api_venda_id}
+                                          {card.ordem_sequencia_op > 1 && (
+                                            <span className="text-xs font-medium text-primary ml-1.5">• OP {card.ordem_sequencia_op}</span>
+                                          )}
+                                        </p>
                                         <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.cliente_nome}</p>
                                         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                                           <Badge className={`text-[10px] font-normal ${TIPO_PRODUTO_BADGE[card.tipo_produto] || 'bg-muted text-muted-foreground border-border'}`}>

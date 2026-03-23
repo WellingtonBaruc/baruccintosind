@@ -79,9 +79,10 @@ export default function VerificacaoLoja() {
 
   useEffect(() => {
     if (!pedidoId) return;
-    supabase.from('ordens_producao').select('id, status, aprovado_em')
+    // Detect OP complementar by sequencia > 1 (not by tipo_produto)
+    supabase.from('ordens_producao').select('id, status, aprovado_em, sequencia')
       .eq('pedido_id', pedidoId)
-      .eq('tipo_produto', 'OP_COMPLEMENTAR')
+      .gt('sequencia', 1)
       .then(({ data }) => {
         if (data && data.length > 0) {
           setOpComplementarDone(data.every(o => o.aprovado_em !== null));
