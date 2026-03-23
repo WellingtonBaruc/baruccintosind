@@ -162,7 +162,6 @@ export default function Integracao() {
   const handleReclassify = async () => {
     setReclassifying(true);
     try {
-      // Get all pipelines
       const { data: pipelines } = await supabase.from('pipeline_producao').select('id, nome');
       if (!pipelines) throw new Error('Pipelines não encontrados');
 
@@ -174,30 +173,34 @@ export default function Integracao() {
         else if (upper.includes('FIVELA')) pipelineMap['FIVELA_COBERTA'] = p.id;
       }
 
-      // Get all ordens with their pedido items
+      // Get ALL active ordens
       const { data: ordens } = await supabase
         .from('ordens_producao')
         .select('id, pedido_id, pipeline_id, tipo_produto, status')
-        .in('status', ['AGUARDANDO', 'EM_ANDAMENTO']);
-
-      if (!ordens || ordens.length === 0) {
-        toast.info('Nenhuma ordem ativa para reclassificar.');
-        setReclassifying(false);
-        return;
-      }
+        .not('status', 'in', '("CONCLUIDA","CANCELADA")');
 
       let updated = 0;
       let created = 0;
 
-      // Group ordens by pedido_id
+      // Group existing ordens by pedido_id
       const ordensByPedido = new Map<string, typeof ordens>();
-      for (const o of ordens) {
+      for (const o of (ordens || [])) {
         const list = ordensByPedido.get(o.pedido_id) || [];
         list.push(o);
         ordensByPedido.set(o.pedido_id, list);
       }
 
-      for (const [pedidoId, pedidoOrdens] of ordensByPedido) {
+      // Also get ALL active pedidos to find those missing fivela orders
+      const { data: allPedidos } = await supabase
+        .from('pedidos')
+        .select('id')
+        .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")');
+
+      const allPedidoIds = new Set((allPedidos || []).map(p => p.id));
+      // Add pedidos from ordens too
+      for (const o of (ordens || [])) allPedidoIds.add(o.pedido_id);
+
+      for (const pedidoId of allPedidoIds) {
         const { data: itens } = await supabase
           .from('pedido_itens')
           .select('descricao_produto, categoria_produto, referencia_produto')
@@ -205,64 +208,57 @@ export default function Integracao() {
 
         if (!itens || itens.length === 0) continue;
 
-        // Detect types present
         const tiposPresentes = new Set<string>();
         for (const item of itens) {
           tiposPresentes.add(classifyProduct(item.descricao_produto, item.categoria_produto || '', item.referencia_produto || ''));
         }
         tiposPresentes.delete('OUTROS');
-
         if (tiposPresentes.size === 0) continue;
 
-        const tipos = Array.from(tiposPresentes);
+        const pedidoOrdens = ordensByPedido.get(pedidoId) || [];
+        const existingTypes = new Set(pedidoOrdens.map(o => o.tipo_produto));
 
-        // Update first ordem with first type
-        const firstOrdem = pedidoOrdens[0];
-        const firstTipo = tipos[0];
-        const firstPipelineId = pipelineMap[firstTipo];
-        if (firstPipelineId && firstOrdem.pipeline_id !== firstPipelineId) {
-          await supabase.from('ordens_producao').update({
-            pipeline_id: firstPipelineId,
-            tipo_produto: firstTipo,
-          }).eq('id', firstOrdem.id);
+        // Update existing ordens with wrong pipeline
+        for (const ordem of pedidoOrdens) {
+          const correctPipeline = pipelineMap[ordem.tipo_produto || ''];
+          if (correctPipeline && ordem.pipeline_id !== correctPipeline) {
+            await supabase.from('ordens_producao').update({
+              pipeline_id: correctPipeline,
+            }).eq('id', ordem.id);
 
-          // Recreate etapas for new pipeline
-          await supabase.from('op_etapas').delete().eq('ordem_id', firstOrdem.id);
-          const { data: etapas } = await supabase
-            .from('pipeline_etapas')
-            .select('*')
-            .eq('pipeline_id', firstPipelineId)
-            .order('ordem');
-          if (etapas && etapas.length > 0) {
-            await supabase.from('op_etapas').insert(
-              etapas.map((e, idx) => ({
-                ordem_id: firstOrdem.id,
-                pipeline_etapa_id: e.id,
-                nome_etapa: e.nome,
-                ordem_sequencia: e.ordem,
-                status: (idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as any,
-                ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
-              }))
-            );
+            await supabase.from('op_etapas').delete().eq('ordem_id', ordem.id);
+            const { data: etapas } = await supabase
+              .from('pipeline_etapas')
+              .select('*')
+              .eq('pipeline_id', correctPipeline)
+              .order('ordem');
+            if (etapas && etapas.length > 0) {
+              await supabase.from('op_etapas').insert(
+                etapas.map((e, idx) => ({
+                  ordem_id: ordem.id,
+                  pipeline_etapa_id: e.id,
+                  nome_etapa: e.nome,
+                  ordem_sequencia: e.ordem,
+                  status: (idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as any,
+                  ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
+                }))
+              );
+            }
+            updated++;
           }
-          updated++;
         }
 
-        // Create additional ordens for additional types
-        for (let i = 1; i < tipos.length; i++) {
-          const tipo = tipos[i];
+        // Create missing ordens for types not yet covered
+        for (const tipo of tiposPresentes) {
+          if (existingTypes.has(tipo)) continue;
           const pid = pipelineMap[tipo];
           if (!pid) continue;
-
-          // Check if already exists
-          const exists = pedidoOrdens.some(o => o.tipo_produto === tipo);
-          if (exists) continue;
 
           const { data: newOrdem } = await supabase.from('ordens_producao').insert({
             pedido_id: pedidoId,
             pipeline_id: pid,
-            sequencia: pedidoOrdens.length + i,
-            status: 'EM_ANDAMENTO' as any,
+            sequencia: pedidoOrdens.length + 1,
+            status: 'AGUARDANDO' as any,
             tipo_produto: tipo,
           }).select().single();
 
