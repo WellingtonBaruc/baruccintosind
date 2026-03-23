@@ -132,7 +132,11 @@ export default function CurvaABC() {
     const groups = new Map<string, { total: number; unidades: number; pedidoIds: Set<string>; meses: Record<string, number>; produtos: Map<string, { total: number; unidades: number; pedidoIds: Set<string>; meses: Record<string, number> }> }>();
 
     for (const item of filtered) {
-      const key = nivel === 'categoria' ? (item.categoria_produto || 'Sem Categoria') : item.descricao_produto;
+      const key = nivel === 'categoria'
+        ? (item.categoria_produto || 'Sem Categoria')
+        : nivel === 'fivela'
+          ? (parseItemAttributes(item.descricao_produto, item.categoria_produto).modelo_fivela || 'Sem Fivela')
+          : item.descricao_produto;
       const mesKey = item.data_venda ? format(new Date(item.data_venda + 'T12:00:00'), 'yyyy-MM') : 'sem-data';
 
       let val: number;
