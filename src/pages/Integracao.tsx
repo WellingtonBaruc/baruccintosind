@@ -149,9 +149,11 @@ export default function Integracao() {
     setFixing(false);
   };
 
-  const classifyProduct = (name: string): string => {
+  const classifyProduct = (name: string, categoria?: string, referencia?: string): string => {
     const upper = (name || '').toUpperCase();
-    if (upper.includes('FIVELA COBERTA') || upper.includes('FIVELA MATRIZ')) return 'FIVELA_COBERTA';
+    const catUpper = (categoria || '').toUpperCase();
+    const refUpper = (referencia || '').toUpperCase();
+    if (upper.includes('FIVELA COBERTA') || upper.includes('FIVELA MATRIZ') || catUpper === 'FIVELA COBERTA' || catUpper === 'FIVELA_COBERTA' || refUpper.startsWith('FVC')) return 'FIVELA_COBERTA';
     if (upper.includes('CINTO SINTETICO') || upper.includes('TIRA SINTETICO')) return 'SINTETICO';
     if (upper.includes('CINTO TECIDO') || upper.includes('TIRA TECIDO')) return 'TECIDO';
     return 'OUTROS';
