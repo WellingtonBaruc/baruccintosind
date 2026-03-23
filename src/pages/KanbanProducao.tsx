@@ -114,7 +114,7 @@ export default function KanbanProducao() {
     if (!etapas) { setLoading(false); return; }
 
     // Filter: keep cards where pedido is NOT yet at AGUARDANDO_FINANCEIRO or beyond
-    const HIDDEN_STATUSES = ['AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA'];
+    const HIDDEN_STATUSES = ['AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO'];
     const visibleEtapas = (etapas as any[]).filter(e => {
       const pedidoStatus = e.ordens_producao.pedidos.status_atual;
       // Show for 5 min after going to financeiro

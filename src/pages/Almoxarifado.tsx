@@ -44,11 +44,11 @@ export default function AlmoxarifadoPage() {
   useEffect(() => { fetchVendas(); }, []);
 
   const fetchVendas = async () => {
-    // Fetch pedidos em produção ou aguardando loja that have fivela items
+    // Fetch ALL active pedidos (exclude only HISTORICO, CANCELADO, FINALIZADO_SIMPLIFICA)
     const { data: pedidos } = await supabase
       .from('pedidos')
       .select('id, api_venda_id, cliente_nome, data_previsao_entrega, status_prazo, status_atual, status_api, fivelas_separadas')
-      .in('status_atual', ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO', 'AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO'])
+      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
       .order('data_previsao_entrega', { ascending: true });
 
     if (!pedidos || pedidos.length === 0) { setVendas([]); setLoading(false); return; }
