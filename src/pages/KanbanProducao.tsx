@@ -796,12 +796,62 @@ export default function KanbanProducao() {
                                   }
                                 </div>
 
-                                {/* Preparação checklist button */}
-                                {cardInPrep && (
-                                  <Button size="sm" variant="outline" className="w-full mt-2 h-7 text-[10px]" onClick={() => openPrepDialog(card)}>
-                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Sub-etapas da Preparação
-                                  </Button>
-                                )}
+                                {/* Preparação inline checklist */}
+                                {cardInPrep && (() => {
+                                  const isExpanded = expandedPrepCards.has(card.id);
+                                  const subs = subEtapasMap.get(card.id) || [];
+                                  const isLoading = loadingPrepCards.has(card.id);
+                                  const completedCount = subs.filter(s => s.concluida).length;
+                                  const newText = newSubEtapaMap.get(card.id) || '';
+
+                                  return (
+                                    <div className="mt-2">
+                                      <Button size="sm" variant="outline" className="w-full h-7 text-[10px] justify-between" onClick={() => togglePrepExpand(card)}>
+                                        <span className="flex items-center gap-1">
+                                          <CheckCircle2 className="h-3 w-3" /> Sub-etapas
+                                        </span>
+                                        {subs.length > 0 && <span className="text-muted-foreground">{completedCount}/{subs.length}</span>}
+                                      </Button>
+                                      {isExpanded && (
+                                        <div className="mt-1.5 space-y-1 border border-border rounded-md p-2 bg-muted/20">
+                                          {isLoading ? (
+                                            <div className="flex justify-center py-2"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div>
+                                          ) : (
+                                            <>
+                                              {subs.map(sub => (
+                                                <div key={sub.id} className="flex items-center gap-2 group">
+                                                  <Checkbox
+                                                    checked={sub.concluida}
+                                                    onCheckedChange={(checked) => toggleSubEtapa(card.id, sub.id, !!checked)}
+                                                    className="h-3.5 w-3.5"
+                                                  />
+                                                  <span className={`flex-1 text-[10px] ${sub.concluida ? 'line-through text-muted-foreground' : ''}`}>{sub.nome}</span>
+                                                  {isSupervisor && (
+                                                    <button className="h-4 w-4 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive" onClick={() => removeSubEtapa(card.id, sub.id)}>
+                                                      <X className="h-3 w-3" />
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              ))}
+                                              <div className="flex items-center gap-1 pt-1 border-t border-border/50">
+                                                <Input
+                                                  placeholder="Adicionar..."
+                                                  value={newText}
+                                                  onChange={e => setNewSubEtapaMap(prev => new Map(prev).set(card.id, e.target.value))}
+                                                  onKeyDown={e => e.key === 'Enter' && addCustomSubEtapa(card)}
+                                                  className="h-6 text-[10px] px-1.5"
+                                                />
+                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => addCustomSubEtapa(card)} disabled={!newText.trim()}>
+                                                  <Plus className="h-3 w-3" />
+                                                </Button>
+                                              </div>
+                                            </>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
 
                                 {/* Fivela transfer button */}
                                 {fivelaWithSintetico && isSupervisor && (
