@@ -387,8 +387,21 @@ export default function KanbanProducao() {
     return filtered;
   };
 
+  const prazoOrder: Record<string, number> = { ATRASADO: 0, ATENCAO: 1, NO_PRAZO: 2 };
+
   const getCardsForColumn = (tipoCards: KanbanCard[], column: string) =>
-    tipoCards.filter(c => mapEtapaToColumn(c.nome_etapa, c.etapa_status, c.ordem_status, c.tipo_produto) === column);
+    tipoCards
+      .filter(c => mapEtapaToColumn(c.nome_etapa, c.etapa_status, c.ordem_status, c.tipo_produto) === column)
+      .sort((a, b) => {
+        // 1. Priority by prazo status (ATRASADO first, then ATENCAO, then NO_PRAZO)
+        const pA = prazoOrder[a.status_prazo] ?? 2;
+        const pB = prazoOrder[b.status_prazo] ?? 2;
+        if (pA !== pB) return pA - pB;
+        // 2. Within same prazo, sort by delivery date ascending (earliest first)
+        const dA = a.data_previsao_entrega || '9999-12-31';
+        const dB = b.data_previsao_entrega || '9999-12-31';
+        return dA.localeCompare(dB);
+      });
 
   const prazoClasses: Record<string, string> = {
     ATRASADO: 'border-l-destructive bg-destructive/5',
