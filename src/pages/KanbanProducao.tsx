@@ -219,6 +219,8 @@ export default function KanbanProducao() {
         fivelas_recebidas: e.ordens_producao.fivelas_recebidas || false,
         fivelas_separadas: e.ordens_producao.pedidos.fivelas_separadas || false,
         sent_to_financeiro_at: recentFinanceiro.get(e.ordem_id) || null,
+        ordem_sequencia_op: e.ordens_producao.sequencia || 1,
+        ordem_observacao: e.ordens_producao.observacao || null,
       };
     });
 
