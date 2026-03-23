@@ -680,8 +680,6 @@ export default function KanbanProducao() {
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
   const isConcluido = (card: KanbanCard) => card.ordem_status === 'CONCLUIDA';
-  const isFivelaInConcluido = (card: KanbanCard, col: string) =>
-    col === 'Concluído' && card.tipo_produto === 'FIVELA_COBERTA' && isConcluido(card);
 
   const getConcluidoBadge = (card: KanbanCard) => {
     if (card.pedido_status === 'AGUARDANDO_FINANCEIRO') {
