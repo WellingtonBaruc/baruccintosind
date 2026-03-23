@@ -267,49 +267,52 @@ export default function AlmoxarifadoPage() {
             <p className="text-center py-12 text-muted-foreground">Nenhuma venda encontrada.</p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filtered.map(v => (
-                <Card key={v.pedido_id} className="border-border/60 shadow-sm">
+              {filtered.map(v => {
+                const urg = getCardUrgencia(v);
+                return (
+                <Card key={v.pedido_id} className={`shadow-sm overflow-hidden ${!v.fivelas_separadas && urg.bg ? urg.bg : 'border-border/60'}`}>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg font-bold">{v.api_venda_id}</CardTitle>
                       {v.fivelas_separadas ? (
-                        <Badge className="bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30 text-xs">
+                        <Badge className="bg-background/80 text-foreground text-xs">
                           <CheckCircle2 className="h-3 w-3 mr-1" /> Separado
                         </Badge>
+                      ) : urg.text ? (
+                        <Badge className="bg-background/20 text-inherit border-0 text-xs font-bold">{urg.text}</Badge>
                       ) : (
-                        <Badge variant="outline" className="text-xs text-muted-foreground">Pendente</Badge>
+                        <Badge variant="outline" className="text-xs">Pendente</Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{v.cliente_nome}</p>
+                    <p className="text-sm opacity-80">{v.cliente_nome}</p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       {v.data_previsao_entrega && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs opacity-70">
                           Entrega: {format(new Date(v.data_previsao_entrega + 'T00:00:00'), 'dd/MM/yy')}
                         </span>
-                      )}
-                      {v.status_prazo && prazoBadge[v.status_prazo] && (
-                        <Badge variant="outline" className={`text-[10px] ${prazoBadge[v.status_prazo].cls}`}>
-                          {prazoBadge[v.status_prazo].label}
-                        </Badge>
                       )}
                       {origemBadge(v.origem)}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {v.itens.map(item => (
-                        <ItemCard key={item.id} item={item} />
+                        <div key={item.id} className="flex items-center justify-between text-sm py-1 border-t border-current/10">
+                          <span className="font-medium truncate flex-1">{item.descricao_produto}</span>
+                          <span className="font-bold ml-2 shrink-0">{item.quantidade} un</span>
+                        </div>
                       ))}
                     </div>
 
                     {!v.fivelas_separadas && (
-                      <Button className="w-full min-h-[48px]" onClick={() => handleConfirmarSeparacao(v)}>
+                      <Button variant="secondary" className="w-full min-h-[48px] bg-background/20 hover:bg-background/30 text-inherit font-bold" onClick={() => handleConfirmarSeparacao(v)}>
                         <Package className="h-4 w-4 mr-2" /> Confirmar separação
                       </Button>
                     )}
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
