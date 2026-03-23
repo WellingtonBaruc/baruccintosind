@@ -192,6 +192,8 @@ export default function KanbanProducao() {
         perdas_pendentes: perdasCount.get(e.ordem_id) || 0,
         is_piloto: e.ordens_producao.pedidos.is_piloto || false,
         status_piloto: e.ordens_producao.pedidos.status_piloto || null,
+        fivelas_recebidas: e.ordens_producao.fivelas_recebidas || false,
+        fivelas_separadas: e.ordens_producao.pedidos.fivelas_separadas || false,
         sent_to_financeiro_at: recentFinanceiro.get(e.ordem_id) || null,
       };
     });
