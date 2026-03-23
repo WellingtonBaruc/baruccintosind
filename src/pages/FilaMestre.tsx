@@ -98,13 +98,25 @@ export default function FilaMestre() {
       .in('ordem_id', ordemIds.length > 0 ? ordemIds : ['none'])
       .order('ordem_sequencia', { ascending: true });
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const ATENCAO_DIAS = 3;
+
+    const calcStatusPrazo = (dataPrevisao: string | null): string => {
+      if (!dataPrevisao) return 'NO_PRAZO';
+      const previsao = new Date(dataPrevisao + 'T00:00:00');
+      const diffMs = previsao.getTime() - today.getTime();
+      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDias < 0) return 'ATRASADO';
+      if (diffDias <= ATENCAO_DIAS) return 'ATENCAO';
+      return 'NO_PRAZO';
+    };
+
     const vendas: VendaRow[] = pedidos.map(p => {
       const ordem = (ordens || []).find(o => o.pedido_id === p.id);
-      // Prioritize EM_ANDAMENTO etapa, fallback to first PENDENTE
       const ordemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
       const etapaAtiva = ordemEtapas.find(e => e.status === 'EM_ANDAMENTO') || ordemEtapas[0] || null;
       
-      // Determine display name for etapa — order status takes priority
       let etapaDisplay = '—';
       if (ordem) {
         if (ordem.status === 'AGUARDANDO') {
@@ -117,7 +129,7 @@ export default function FilaMestre() {
           etapaDisplay = ordem.status;
         }
       }
-      
+
       return {
         ...p,
         ordem_id: ordem?.id || null,
@@ -129,6 +141,7 @@ export default function FilaMestre() {
         is_piloto: (p as any).is_piloto || false,
         status_piloto: (p as any).status_piloto || null,
         fivelas_separadas: (p as any).fivelas_separadas || false,
+        status_prazo: calcStatusPrazo(p.data_previsao_entrega),
       };
     });
 
