@@ -1,8 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { STATUS_PRAZO_CONFIG, TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
 import { STATUS_PEDIDO_CONFIG } from '@/lib/producao';
+import { PcpCalendarData, calcularPrazoPcp } from '@/lib/pcpCalendario';
+import ConfigurarPcpDialog from '@/components/pcp/ConfigurarPcpDialog';
+import PcpIntelligenceBar from '@/components/pcp/PcpIntelligenceBar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, X, Calendar, AlertTriangle } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
@@ -41,6 +44,11 @@ interface VendaRow {
   is_piloto: boolean;
   status_piloto: string | null;
   fivelas_separadas: boolean;
+  // PCP calculated fields
+  dataPcpCalculada: string | null;
+  dataInicioIdeal: string | null;
+  atrasoDias: number;
+  prioridade: 'URGENTE' | 'ATENCAO' | 'NORMAL';
 }
 
 interface PedidoDetail {
@@ -60,6 +68,11 @@ export default function FilaMestre() {
   const [tipoFilter, setTipoFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [prazoFilter, setPrazoFilter] = useState('all');
+  const [configOpen, setConfigOpen] = useState(false);
+
+  // PCP data
+  const [calendarData, setCalendarData] = useState<PcpCalendarData>({ sabadoAtivo: false, domingoAtivo: false, feriados: [], pausas: [] });
+  const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
 
   // Side panel
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -70,10 +83,34 @@ export default function FilaMestre() {
   const [editingPcp, setEditingPcp] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
 
-  useEffect(() => { fetchRows(); }, []);
+  useEffect(() => { fetchAll(); }, []);
 
-  const fetchRows = async () => {
-    // Fetch pedidos that are not finalized
+  const fetchCalendarData = async () => {
+    const [configRes, feriadosRes, pausasRes, ltRes] = await Promise.all([
+      supabase.from('pcp_config_semana').select('*').limit(1).single(),
+      supabase.from('pcp_feriados').select('data'),
+      supabase.from('pcp_pausas').select('data_inicio, data_fim'),
+      supabase.from('pcp_lead_times').select('tipo, lead_time_dias').eq('ativo', true),
+    ]);
+    const cal: PcpCalendarData = {
+      sabadoAtivo: configRes.data?.sabado_ativo ?? false,
+      domingoAtivo: configRes.data?.domingo_ativo ?? false,
+      feriados: (feriadosRes.data || []).map((f: any) => f.data),
+      pausas: (pausasRes.data || []).map((p: any) => ({ inicio: p.data_inicio, fim: p.data_fim })),
+    };
+    const lts: Record<string, number> = {};
+    (ltRes.data || []).forEach((lt: any) => { lts[lt.tipo] = lt.lead_time_dias; });
+    setCalendarData(cal);
+    setLeadTimes(lts);
+    return { cal, lts };
+  };
+
+  const fetchAll = async () => {
+    const { cal, lts } = await fetchCalendarData();
+    await fetchRows(cal, lts);
+  };
+
+  const fetchRows = async (cal: PcpCalendarData, lts: Record<string, number>) => {
     const { data: pedidos } = await supabase
       .from('pedidos')
       .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
@@ -82,14 +119,12 @@ export default function FilaMestre() {
 
     if (!pedidos) { setLoading(false); return; }
 
-    // Fetch ordens with etapa info
     const pedidoIds = pedidos.map(p => p.id);
     const { data: ordens } = await supabase
       .from('ordens_producao')
       .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp')
       .in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']);
 
-    // Fetch active etapas (EM_ANDAMENTO first, fallback to first PENDENTE)
     const ordemIds = (ordens || []).map(o => o.id);
     const { data: etapas } = await supabase
       .from('op_etapas')
@@ -100,40 +135,40 @@ export default function FilaMestre() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const ATENCAO_DIAS = 3;
-
-    const calcStatusPrazo = (dataPrevisao: string | null): string => {
-      if (!dataPrevisao) return 'NO_PRAZO';
-      const previsao = new Date(dataPrevisao + 'T00:00:00');
-      const diffMs = previsao.getTime() - today.getTime();
-      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      if (diffDias < 0) return 'ATRASADO';
-      if (diffDias <= ATENCAO_DIAS) return 'ATENCAO';
-      return 'NO_PRAZO';
-    };
 
     const vendas: VendaRow[] = pedidos.map(p => {
       const ordem = (ordens || []).find(o => o.pedido_id === p.id);
       const ordemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
       const etapaAtiva = ordemEtapas.find(e => e.status === 'EM_ANDAMENTO') || ordemEtapas[0] || null;
-      
+
       let etapaDisplay = '—';
       if (ordem) {
-        if (ordem.status === 'AGUARDANDO') {
-          etapaDisplay = 'Aguardando Início';
-        } else if (ordem.status === 'CONCLUIDA') {
-          etapaDisplay = 'Concluída';
-        } else if (etapaAtiva) {
-          etapaDisplay = etapaAtiva.nome_etapa;
-        } else {
-          etapaDisplay = ordem.status;
-        }
+        if (ordem.status === 'AGUARDANDO') etapaDisplay = 'Aguardando Início';
+        else if (ordem.status === 'CONCLUIDA') etapaDisplay = 'Concluída';
+        else if (etapaAtiva) etapaDisplay = etapaAtiva.nome_etapa;
+        else etapaDisplay = ordem.status;
+      }
+
+      // PCP calculation
+      const tipoProduto = ordem?.tipo_produto || null;
+      const lt = lts[tipoProduto || ''] ?? 5;
+      const pcp = calcularPrazoPcp(p.data_previsao_entrega, lt, cal, new Date(today));
+
+      // Recalculate status_prazo based on delivery date
+      const ATENCAO_DIAS = 3;
+      let statusPrazo = 'NO_PRAZO';
+      if (p.data_previsao_entrega) {
+        const previsao = new Date(p.data_previsao_entrega + 'T00:00:00');
+        const diffMs = previsao.getTime() - today.getTime();
+        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDias < 0) statusPrazo = 'ATRASADO';
+        else if (diffDias <= ATENCAO_DIAS) statusPrazo = 'ATENCAO';
       }
 
       return {
         ...p,
         ordem_id: ordem?.id || null,
-        tipo_produto: ordem?.tipo_produto || null,
+        tipo_produto: tipoProduto,
         etapa_atual: etapaDisplay,
         operador_atual: (etapaAtiva?.usuarios as any)?.nome || '—',
         data_inicio_pcp: (ordem as any)?.data_inicio_pcp || null,
@@ -141,7 +176,11 @@ export default function FilaMestre() {
         is_piloto: (p as any).is_piloto || false,
         status_piloto: (p as any).status_piloto || null,
         fivelas_separadas: (p as any).fivelas_separadas || false,
-        status_prazo: calcStatusPrazo(p.data_previsao_entrega),
+        status_prazo: statusPrazo,
+        dataPcpCalculada: pcp.dataPcpCalculada,
+        dataInicioIdeal: pcp.dataInicioIdeal,
+        atrasoDias: pcp.atrasoDias,
+        prioridade: pcp.prioridade,
       };
     });
 
@@ -158,7 +197,6 @@ export default function FilaMestre() {
       supabase.from('pedido_historico').select('*, usuarios(nome)').eq('pedido_id', pedidoId).order('criado_em', { ascending: false }),
       supabase.from('ordens_producao').select('*, pipeline_producao(nome)').eq('pedido_id', pedidoId),
     ]);
-    // Fetch losses for all ordens of this pedido
     const ordemIds = (rOrdens.data || []).map((o: any) => o.id);
     const { data: perdas } = await supabase.from('ordem_perdas').select('*, usuarios:registrado_por(nome)').in('ordem_id', ordemIds.length > 0 ? ordemIds : ['none']);
     setDetail({
@@ -174,7 +212,7 @@ export default function FilaMestre() {
   const savePcpDate = async (ordemId: string, field: string, value: string) => {
     await supabase.from('ordens_producao').update({ [field]: value || null } as any).eq('id', ordemId);
     setEditingPcp(null);
-    fetchRows();
+    fetchAll();
   };
 
   // Filters
@@ -188,17 +226,33 @@ export default function FilaMestre() {
     return true;
   });
 
-  // Sort by earliest delivery date first, then by prazo urgency
+  // Smart sorting: 1. Priority (URGENTE first), 2. Earliest delivery, 3. Highest delay
+  const prioOrder: Record<string, number> = { URGENTE: 0, ATENCAO: 1, NORMAL: 2 };
   const sorted = [...filtered].sort((a, b) => {
-    // 1. Earliest delivery date first
+    const pa = prioOrder[a.prioridade] ?? 3;
+    const pb = prioOrder[b.prioridade] ?? 3;
+    if (pa !== pb) return pa - pb;
     const dA = a.data_previsao_entrega || '9999-12-31';
     const dB = b.data_previsao_entrega || '9999-12-31';
     if (dA !== dB) return dA.localeCompare(dB);
-    // 2. Within same date, by prazo urgency
-    const prazoOrder: Record<string, number> = { ATRASADO: 0, ATENCAO: 1, NO_PRAZO: 2 };
-    const pa = prazoOrder[a.status_prazo || 'NO_PRAZO'] ?? 3;
-    const pb = prazoOrder[b.status_prazo || 'NO_PRAZO'] ?? 3;
-    return pa - pb;
+    return a.atrasoDias - b.atrasoDias;
+  });
+
+  // Intelligence bar stats
+  const tipoStats = Object.entries(leadTimes).map(([tipo, lt]) => {
+    const tipoRows = rows.filter(r => r.tipo_produto === tipo);
+    const emProducao = tipoRows.filter(r => r.status_atual === 'EM_PRODUCAO').length;
+    const emFila = tipoRows.filter(r => r.status_atual === 'AGUARDANDO_PRODUCAO').length;
+    const atrasados = tipoRows.filter(r => r.prioridade === 'URGENTE');
+    const atrasoMedio = atrasados.length > 0 ? atrasados.reduce((s, r) => s + Math.abs(r.atrasoDias), 0) / atrasados.length : 0;
+    return {
+      tipo,
+      tipoLabel: TIPO_PRODUTO_LABELS[tipo] || tipo,
+      leadTime: lt,
+      emProducao,
+      emFila,
+      atrasoMedio,
+    };
   });
 
   const fmt = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -206,14 +260,30 @@ export default function FilaMestre() {
 
   const canEdit = profile && ['admin', 'gestor', 'supervisor_producao'].includes(profile.perfil);
 
+  const prioConfig: Record<string, { icon: string; color: string; label: string }> = {
+    URGENTE: { icon: '🔴', color: 'bg-destructive/15 text-destructive border-destructive/30', label: 'Urgente' },
+    ATENCAO: { icon: '🟡', color: 'bg-warning/15 text-warning border-warning/30', label: 'Atenção' },
+    NORMAL: { icon: '🟢', color: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30', label: 'Normal' },
+  };
+
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Fila Mestre</h1>
-        <Button variant="outline" onClick={() => navigate('/painel-dia')}>
-          <Calendar className="h-4 w-4 mr-1.5" /> Painel do Dia
-        </Button>
+        <div className="flex gap-2">
+          {canEdit && (
+            <Button variant="outline" onClick={() => setConfigOpen(true)}>
+              <Settings className="h-4 w-4 mr-1.5" /> Configurar PCP
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => navigate('/painel-dia')}>
+            <Calendar className="h-4 w-4 mr-1.5" /> Painel do Dia
+          </Button>
+        </div>
       </div>
+
+      {/* Intelligence Bar */}
+      <PcpIntelligenceBar stats={tipoStats} />
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
@@ -254,7 +324,10 @@ export default function FilaMestre() {
       <div className="flex gap-3 flex-wrap text-sm">
         <Badge variant="outline" className="text-sm py-1 px-3">{sorted.length} pedidos</Badge>
         <Badge className="bg-destructive/15 text-destructive border-destructive/30 py-1 px-3">
-          {sorted.filter(r => r.status_prazo === 'ATRASADO').length} atrasados
+          {sorted.filter(r => r.prioridade === 'URGENTE').length} urgentes
+        </Badge>
+        <Badge className="bg-warning/15 text-warning border-warning/30 py-1 px-3">
+          {sorted.filter(r => r.prioridade === 'ATENCAO').length} atenção
         </Badge>
       </div>
 
@@ -271,13 +344,15 @@ export default function FilaMestre() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-10">⏱</TableHead>
+                    <TableHead>Prioridade</TableHead>
                     <TableHead>Venda</TableHead>
-                    <TableHead>Pedido</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
-                    <TableHead>Dt. Venda</TableHead>
                     <TableHead>Prev. Entrega</TableHead>
+                    <TableHead>Data PCP Calc.</TableHead>
+                    <TableHead>Início Ideal</TableHead>
+                    <TableHead>Atraso</TableHead>
                     <TableHead>Início PCP</TableHead>
                     <TableHead>Fim PCP</TableHead>
                     <TableHead>Etapa</TableHead>
@@ -290,23 +365,36 @@ export default function FilaMestre() {
                     const statusCfg = STATUS_PEDIDO_CONFIG[r.status_atual] || { label: r.status_atual, color: 'bg-muted text-muted-foreground' };
                     const tipoBadge = TIPO_PRODUTO_BADGE[r.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border';
                     const tipoLabel = TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || 'A classificar';
+                    const prioCfg = prioConfig[r.prioridade];
 
                     return (
                       <TableRow
                         key={r.id}
-                        className="cursor-pointer hover:bg-accent/40 transition-colors"
+                        className={`cursor-pointer hover:bg-accent/40 transition-colors ${r.prioridade === 'URGENTE' ? 'bg-destructive/5' : ''}`}
                         onClick={() => openDetail(r.id)}
                       >
                         <TableCell>{prazoCfg?.icon}</TableCell>
-                        <TableCell className="font-medium text-sm">{r.api_venda_id || '—'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{r.numero_pedido}</TableCell>
+                        <TableCell>
+                          <Badge className={`text-xs font-normal ${prioCfg.color}`}>{prioCfg.label}</Badge>
+                        </TableCell>
+                        <TableCell className="font-medium text-sm">{r.api_venda_id || r.numero_pedido}</TableCell>
                         <TableCell className="text-sm">{r.cliente_nome}</TableCell>
                         <TableCell>
                           <Badge className={`text-xs font-normal ${tipoBadge}`}>{tipoLabel}</Badge>
                         </TableCell>
                         <TableCell className="text-right text-sm tabular-nums">{fmt(r.valor_liquido)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_venda_api)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_previsao_entrega)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{fmtDate(r.dataPcpCalculada)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{fmtDate(r.dataInicioIdeal)}</TableCell>
+                        <TableCell>
+                          {r.atrasoDias < 0 ? (
+                            <span className="text-xs font-semibold text-destructive tabular-nums">{r.atrasoDias}d</span>
+                          ) : r.atrasoDias <= 2 ? (
+                            <span className="text-xs font-semibold text-warning tabular-nums">{r.atrasoDias}d</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground tabular-nums">{r.atrasoDias}d</span>
+                          )}
+                        </TableCell>
                         <TableCell onClick={e => e.stopPropagation()}>
                           {editingPcp?.id === r.ordem_id && editingPcp?.field === 'data_inicio_pcp' ? (
                             <Input type="date" className="h-7 w-[120px] text-xs" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={() => r.ordem_id && savePcpDate(r.ordem_id, 'data_inicio_pcp', editValue)} autoFocus />
@@ -338,7 +426,7 @@ export default function FilaMestre() {
                             )}
                             {r.fivelas_separadas && (
                               <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
-                                Fivelas separadas ✓
+                                Fivelas ✓
                               </Badge>
                             )}
                           </div>
@@ -425,7 +513,7 @@ export default function FilaMestre() {
                           await supabase.from('pedidos').update({ is_piloto: checked, status_piloto: checked ? 'ENVIADO' : null }).eq('id', detail.pedido.id);
                           toast.success(checked ? 'Marcado como piloto' : 'Piloto removido');
                           openDetail(detail.pedido.id);
-                          fetchRows();
+                          fetchAll();
                         }}
                       />
                     </div>
@@ -445,7 +533,7 @@ export default function FilaMestre() {
                             });
                             toast.success(`Piloto marcado como ${v}`);
                             openDetail(detail.pedido.id);
-                            fetchRows();
+                            fetchAll();
                           }}>
                             <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
                             <SelectContent>
@@ -498,7 +586,14 @@ export default function FilaMestre() {
                 <div className="space-y-2">
                   {detail.itens.map((item: any) => (
                     <div key={item.id} className="rounded-lg border border-border/60 p-3 text-sm">
-                      <p className="font-medium">{item.descricao_produto}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-medium">{item.descricao_produto}</p>
+                        {item.disponivel === false && (
+                          <Badge className="bg-destructive/15 text-destructive border-destructive/30 text-[10px] shrink-0">
+                            Faltante{item.quantidade_faltante ? ` (${item.quantidade_faltante}/${item.quantidade})` : ''}
+                          </Badge>
+                        )}
+                      </div>
                       <div className="flex gap-4 text-muted-foreground mt-1">
                         <span>Qtd: {item.quantidade}</span>
                         <span>R$ {item.valor_total?.toFixed(2)}</span>
@@ -527,6 +622,9 @@ export default function FilaMestre() {
           ) : null}
         </SheetContent>
       </Sheet>
+
+      {/* Config Dialog */}
+      <ConfigurarPcpDialog open={configOpen} onOpenChange={setConfigOpen} onSaved={fetchAll} />
     </div>
   );
 }
