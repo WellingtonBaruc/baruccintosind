@@ -71,7 +71,7 @@ export function parseItemAttributes(descricao: string, categoria?: string | null
   let tipo_produto = 'OUTROS';
   if (desc.includes('FIVELA COBERTA') || cat === 'FIVELA COBERTA' || cat === 'FIVELA_COBERTA') {
     tipo_produto = 'FIVELA_COBERTA';
-  } else if (desc.includes('CINTO SINTETICO') || desc.includes('CINTO SINTÉTICO') || desc.includes('TIRA SINTETICO') || desc.includes('TIRA SINTÉTICO')) {
+  } else if (desc.includes('CINTO SINTETICO') || desc.includes('CINTO SINTÉTICO')) {
     tipo_produto = 'SINTETICO';
   } else if (desc.includes('CINTO TECIDO') || desc.includes('TIRA TECIDO')) {
     tipo_produto = 'TECIDO';
