@@ -2,31 +2,44 @@
 
 ## Diagnóstico
 
-A página Almoxarifado atualmente só exibe vendas que possuem itens com descrição/categoria contendo "FIVELA", "PASSANTE" ou "AVIAMENTO" (filtro `isFivelaItem` na linha 66). Vendas sem esses termos nos itens são ignoradas, mesmo que estejam "Em Produção" ou tenham solicitações da loja.
+Quando o almoxarifado confirma separação (`handleConfirmarSeparacao`):
+1. Marca `fivelas_separadas = true` no pedido
+2. Marca solicitações como `ATENDIDO`
+3. Registra histórico
 
-Além disso, a página não consulta a tabela `solicitacoes_almoxarifado` — ou seja, solicitações feitas pela loja nunca aparecem.
+**Problemas identificados:**
+- A **Loja** não é notificada — a página `VerificacaoLoja.tsx` verifica `solicitacoes.every(s => s.status === 'ATENDIDA')` mas o Almoxarifado está gravando `'ATENDIDO'` (masculino) em vez de `'ATENDIDA'` (feminino). Isso impede que a loja reconheça as solicitações como atendidas.
+- No Almoxarifado, o card fica com cor `bg-muted` quando separado, mas não tem destaque visual claro de "SEPARADO".
+- A Loja tem realtime subscription para atualizar quando solicitações mudam, mas o status inconsistente (`ATENDIDO` vs `ATENDIDA`) quebra a lógica.
 
-## Plano de Correção — `src/pages/Almoxarifado.tsx`
+## Plano de Correção
 
-### 1. Mostrar todas as vendas "Em Produção" com fivelas + solicitações da loja
+### 1. Corrigir status da solicitação no Almoxarifado (arquivo `src/pages/Almoxarifado.tsx`)
 
-Alterar `fetchVendas` para buscar dados de duas fontes:
+Na função `handleConfirmarSeparacao`, alterar:
+- `status: 'ATENDIDO'` → `status: 'ATENDIDA'`
 
-- **Fonte A — Fivelas automáticas**: Pedidos com `status_api = 'Em Produção'` que tenham itens do tipo fivela (lógica atual do `isFivelaItem`).
-- **Fonte B — Solicitações da loja**: Consultar `solicitacoes_almoxarifado` com status `PENDENTE`, trazer os pedidos associados e exibir como cards com a descrição e quantidade solicitada.
+Isso alinha com o que a Loja espera em `VerificacaoLoja.tsx` linha 108: `solicitacoes.every(s => s.status === 'ATENDIDA')`.
 
-### 2. Unificar a exibição
+### 2. Adicionar indicador visual "SEPARADO" no card do Almoxarifado
 
-Mesclar as duas fontes num único array de cards, evitando duplicatas por `pedido_id`. Quando um pedido aparece nas duas fontes, combinar os itens (fivelas + solicitações).
+Quando `fivelas_separadas = true`:
+- Card com fundo verde claro e badge "Separado ✓" no cabeçalho
+- Botão de confirmação desaparece (já funciona assim)
 
-### 3. Adicionar indicador de origem
+### 3. Adicionar badge "Fivelas Separadas ✓" na Fila da Loja e Verificação Loja
 
-Cada card terá um badge indicando se é "Fivelas" (automático) ou "Solicitação Loja" para o almoxarifado saber a origem.
+**Arquivo `src/pages/VerificacaoLoja.tsx`:**
+- Quando `pedido.fivelas_separadas === true`, exibir badge verde "Fivelas Separadas ✓" no cabeçalho do pedido
+- Quando todas as solicitações forem `ATENDIDA`, habilitar botão de finalização
+
+**Arquivo `src/pages/FilaLoja.tsx`:**
+- Na listagem, mostrar ícone/badge indicando que as fivelas já foram separadas para pedidos com `fivelas_separadas = true`
 
 ### Detalhes técnicos
 
-- Nova query: `supabase.from('solicitacoes_almoxarifado').select('*').eq('status', 'PENDENTE')`
-- Buscar pedidos relacionados às solicitações para obter `api_venda_id`, `cliente_nome`, etc.
-- Filtrar pedidos da Fonte A por `status_api = 'Em Produção'` (adicionar `.eq('status_api', 'Em Produção')`)
-- Interface `FivelaVenda` ganha campo `origem: 'fivela' | 'solicitacao' | 'ambos'` e os itens de solicitação usam a mesma estrutura
+- **Mudança crítica**: `'ATENDIDO'` → `'ATENDIDA'` em `src/pages/Almoxarifado.tsx` linha 169
+- Adicionar `fivelas_separadas` ao select da `FilaLoja.tsx`
+- Badge na VerificacaoLoja usando o campo `pedido.fivelas_separadas`
+- Nenhuma alteração de banco de dados necessária
 
