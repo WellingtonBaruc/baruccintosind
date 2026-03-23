@@ -124,6 +124,13 @@ export default function PainelDia() {
             <p className="text-sm text-muted-foreground">Concluídos</p>
           </CardContent>
         </Card>
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="p-5 text-center">
+            <p className="text-3xl font-bold text-destructive">{atrasados.length}</p>
+            <p className="text-sm text-muted-foreground">Atrasados</p>
+          </CardContent>
+        </Card>
+        </Card>
         <Card className="border-border/60">
           <CardContent className="p-5">
             <div className="flex justify-between text-sm mb-2">
