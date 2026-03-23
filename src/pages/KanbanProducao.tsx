@@ -768,6 +768,18 @@ export default function KanbanProducao() {
                                           </Button>
                                         )}
 
+                                        {/* Tecido transfer badges/buttons */}
+                                        {tecidoAlreadyTransferred && (
+                                          <Badge className="mt-2 text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                                            Transferido para Sintético ✓
+                                          </Badge>
+                                        )}
+                                        {tecidoNeedsTransfer && isSupervisor && (
+                                          <Button size="sm" className="w-full mt-2 h-8 text-xs" onClick={() => handleManualTecidoTransfer(card)}>
+                                            <ArrowRight className="h-3 w-3 mr-1" /> Transferir para Preparação Sintético
+                                          </Button>
+                                        )}
+
                                         {/* Register loss button */}
                                         {!inConcluido && col !== 'Aguardando Início' && (
                                           <Button size="sm" variant="ghost" className="w-full mt-1 h-7 text-[10px] text-muted-foreground" onClick={() => openLossDialog(card)}>
