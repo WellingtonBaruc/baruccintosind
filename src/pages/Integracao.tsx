@@ -200,7 +200,7 @@ export default function Integracao() {
       for (const [pedidoId, pedidoOrdens] of ordensByPedido) {
         const { data: itens } = await supabase
           .from('pedido_itens')
-          .select('descricao_produto')
+          .select('descricao_produto, categoria_produto, referencia_produto')
           .eq('pedido_id', pedidoId);
 
         if (!itens || itens.length === 0) continue;
@@ -208,7 +208,7 @@ export default function Integracao() {
         // Detect types present
         const tiposPresentes = new Set<string>();
         for (const item of itens) {
-          tiposPresentes.add(classifyProduct(item.descricao_produto));
+          tiposPresentes.add(classifyProduct(item.descricao_produto, item.categoria_produto || '', item.referencia_produto || ''));
         }
         tiposPresentes.delete('OUTROS');
 
