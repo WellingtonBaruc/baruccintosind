@@ -15,8 +15,6 @@ import { ptBR } from 'date-fns/locale';
 import {
   requerSeparacaoAlmoxarifado,
   parseItemAttributes,
-  TIPO_PRODUTO_ALMOX_LABELS,
-  TIPO_PRODUTO_ALMOX_COLORS,
   type ParsedItemAttributes,
 } from '@/lib/almoxarifado';
 import AlmoxProducaoMode from '@/components/almoxarifado/AlmoxProducaoMode';
