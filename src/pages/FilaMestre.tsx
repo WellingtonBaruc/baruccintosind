@@ -231,8 +231,48 @@ export default function FilaMestre() {
     setRows(vendas);
     setLoading(false);
   };
+  // Admin move order to a specific etapa
+  const handleMoveToEtapa = async (row: VendaRow, targetEtapa: EtapaInfo) => {
+    if (!profile || !['admin', 'gestor'].includes(profile.perfil)) return;
+    if (!row.ordem_id) return;
+    
+    const etapas = row.etapas || [];
+    for (const etapa of etapas) {
+      let newStatus: string;
+      if (etapa.ordem_sequencia < targetEtapa.ordem_sequencia) {
+        newStatus = 'CONCLUIDA';
+      } else if (etapa.ordem_sequencia === targetEtapa.ordem_sequencia) {
+        newStatus = 'EM_ANDAMENTO';
+      } else {
+        newStatus = 'PENDENTE';
+      }
+      if (etapa.status !== newStatus) {
+        await supabase.from('op_etapas').update({ 
+          status: newStatus,
+          ...(newStatus === 'EM_ANDAMENTO' ? { iniciado_em: new Date().toISOString() } : {}),
+          ...(newStatus === 'CONCLUIDA' ? { concluido_em: new Date().toISOString() } : {}),
+        } as any).eq('id', etapa.id);
+      }
+    }
+    await supabase.from('ordens_producao').update({ status: 'EM_ANDAMENTO' } as any).eq('id', row.ordem_id);
+    toast.success(`Ordem movida para: ${targetEtapa.nome_etapa}`);
+    fetchAll();
+  };
 
-  const openDetail = async (pedidoId: string) => {
+  const handleMoveToConcluido = async (row: VendaRow) => {
+    if (!profile || !['admin', 'gestor'].includes(profile.perfil)) return;
+    if (!row.ordem_id) return;
+    for (const et of row.etapas) {
+      if (et.status !== 'CONCLUIDA') {
+        await supabase.from('op_etapas').update({ status: 'CONCLUIDA', concluido_em: new Date().toISOString() } as any).eq('id', et.id);
+      }
+    }
+    await supabase.from('ordens_producao').update({ status: 'CONCLUIDA' } as any).eq('id', row.ordem_id);
+    toast.success('Ordem marcada como Concluída');
+    fetchAll();
+  };
+
+
     setSelectedId(pedidoId);
     setDetailLoading(true);
     const [rPedido, rItens, rHist, rOrdens] = await Promise.all([
