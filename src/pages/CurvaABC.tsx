@@ -143,7 +143,7 @@ export default function CurvaABC() {
       const key = nivel === 'categoria'
         ? (item.categoria_produto || 'Sem Categoria')
         : nivel === 'fivela'
-          ? (parseItemAttributes(item.descricao_produto, item.categoria_produto).modelo_fivela || 'Sem Fivela')
+          ? (extrairNomeFivela(item.descricao_produto) || 'Sem Fivela')
           : item.descricao_produto;
       const mesKey = item.data_venda ? format(new Date(item.data_venda + 'T12:00:00'), 'yyyy-MM') : 'sem-data';
 
