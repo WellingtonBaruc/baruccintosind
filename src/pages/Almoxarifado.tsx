@@ -31,7 +31,7 @@ interface FivelaVenda {
 function isFivelaItem(item: any): boolean {
   const desc = (item.descricao_produto || '').toUpperCase();
   const cat = (item.categoria_produto || '').toUpperCase();
-  return desc.includes('FIVELA') || cat.includes('FIVELA') || cat.includes('AVIAMENTO');
+  return desc.includes('FIVELA') || desc.includes('PASSANTE') || cat.includes('FIVELA') || cat.includes('AVIAMENTO');
 }
 
 export default function AlmoxarifadoPage() {
