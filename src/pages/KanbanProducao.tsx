@@ -613,10 +613,10 @@ export default function KanbanProducao() {
         return pA - pB;
       });
 
-  const prazoClasses: Record<string, string> = {
-    ATRASADO: 'border-l-destructive bg-destructive/10',
-    ATENCAO: 'border-l-[hsl(var(--warning))] bg-[hsl(var(--warning))]/10',
-    NO_PRAZO: 'border-l-[hsl(var(--success))] bg-[hsl(var(--success))]/10',
+  const prazoHeaderClasses: Record<string, string> = {
+    ATRASADO: 'bg-red-100 border-b border-red-200',
+    ATENCAO: 'bg-yellow-100 border-b border-yellow-200',
+    NO_PRAZO: 'bg-green-100 border-b border-green-200',
   };
 
   const prazoBadge: Record<string, { label: string; cls: string }> = {
