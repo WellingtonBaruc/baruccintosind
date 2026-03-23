@@ -105,9 +105,9 @@ export function calcularPrazoPcp(
   // dataInicioIdeal = dataPcpCalculada - lead_time business days  
   const dataInicioIdeal = subtrairDiasUteis(dataPcpCalculada, leadTimeDias, cal);
   
-  // atrasoDias = business days difference between today and dataInicioIdeal
-  // negative = already late, positive = days remaining
-  const atrasoDias = contarDiasUteis(hj, dataInicioIdeal, cal);
+  // atrasoDias = business days difference between today and delivery date
+  // negative = already late (past delivery date), positive = days remaining until delivery
+  const atrasoDias = contarDiasUteis(hj, entrega, cal);
   
   let prioridade: 'URGENTE' | 'ATENCAO' | 'NORMAL';
   if (atrasoDias < 0) {
