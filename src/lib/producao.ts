@@ -39,6 +39,7 @@ export interface PedidoItem {
   observacao_producao?: string | null;
   conferido?: boolean;
   disponivel?: boolean | null;
+  quantidade_faltante?: number | null;
 }
 
 export interface OrdemProducao {

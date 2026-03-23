@@ -606,9 +606,23 @@ export default function DetalheOrdem() {
                 <div className="divide-y divide-border">
                   {pedidoItens.map(item => (
                     <div key={item.id} className="px-4 py-3">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium">{item.descricao_produto}</span>
-                        <span className="text-sm tabular-nums">×{item.quantidade}</span>
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{item.descricao_produto}</span>
+                          {item.disponivel === false && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                              Faltante
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {item.disponivel === false && item.quantidade_faltante && (
+                            <span className="text-xs text-destructive font-medium">
+                              {item.quantidade_faltante} de {item.quantidade} faltantes
+                            </span>
+                          )}
+                          <span className="text-sm tabular-nums">×{item.quantidade}</span>
+                        </div>
                       </div>
                       {item.observacao_producao && (
                         <div className="mt-1 bg-warning/10 border border-warning/20 rounded px-2 py-1 text-xs text-warning">
