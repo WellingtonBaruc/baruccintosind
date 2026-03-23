@@ -421,165 +421,144 @@ export default function FilaMestre() {
         </Badge>
       </div>
 
-      {/* Table */}
-      <Card className="border-border/60 shadow-sm overflow-hidden">
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-          ) : sorted.length === 0 ? (
-            <p className="text-center py-12 text-muted-foreground text-sm">Nenhum pedido encontrado.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">⏱</TableHead>
-                    <TableHead>Prioridade</TableHead>
-                    <TableHead>Venda</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                    <TableHead>Data Venda</TableHead>
-                    <TableHead>Prev. Entrega</TableHead>
-                    <TableHead>Início Ideal</TableHead>
-                    <TableHead>Atraso</TableHead>
-                    <TableHead>Início PCP</TableHead>
-                    <TableHead>Fim PCP</TableHead>
-                    <TableHead>Etapa</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sorted.map(r => {
-                    const prazoCfg = STATUS_PRAZO_CONFIG[r.status_prazo || 'NO_PRAZO'];
-                    const tipoBadge = TIPO_PRODUTO_BADGE[r.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border';
-                    const tipoLabel = TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || 'A classificar';
-                    const prioCfg = prioConfig[r.prioridade];
-                    const isAdmin = profile && ['admin', 'gestor'].includes(profile.perfil);
-                    const etapas = r.etapas || [];
+      {/* Grid */}
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+      ) : sorted.length === 0 ? (
+        <p className="text-center py-12 text-muted-foreground text-sm">Nenhum pedido encontrado.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {sorted.map(r => {
+            const prazoCfg = STATUS_PRAZO_CONFIG[r.status_prazo || 'NO_PRAZO'];
+            const tipoBadge = TIPO_PRODUTO_BADGE[r.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border';
+            const tipoLabel = TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || 'A classificar';
+            const prioCfg = prioConfig[r.prioridade];
+            const isAdmin = profile && ['admin', 'gestor'].includes(profile.perfil);
+            const etapas = r.etapas || [];
 
-                    return (
-                      <React.Fragment key={r.id}>
-                        <TableRow
-                          className={`cursor-pointer hover:bg-accent/40 transition-colors ${r.prioridade === 'URGENTE' ? 'bg-destructive/5' : ''}`}
-                          onClick={() => openDetail(r.id)}
-                        >
-                          <TableCell>{prazoCfg?.icon}</TableCell>
-                          <TableCell>
-                            <Badge className={`text-xs font-normal ${prioCfg.color}`}>{prioCfg.label}</Badge>
-                          </TableCell>
-                          <TableCell className="font-medium text-sm">{r.api_venda_id || r.numero_pedido}</TableCell>
-                          <TableCell className="text-sm">{r.cliente_nome}</TableCell>
-                          <TableCell>
-                            <Badge className={`text-xs font-normal ${tipoBadge}`}>{tipoLabel}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right text-sm tabular-nums">{fmt(r.valor_liquido)}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_venda_api)}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_previsao_entrega)}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{fmtDate(r.dataInicioIdeal)}</TableCell>
-                          <TableCell>
-                            {r.atrasoDias < 0 ? (
-                              <span className="text-xs font-semibold text-destructive tabular-nums">{r.atrasoDias}d</span>
-                            ) : r.atrasoDias <= 2 ? (
-                              <span className="text-xs font-semibold text-warning tabular-nums">{r.atrasoDias}d</span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground tabular-nums">{r.atrasoDias}d</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-xs text-muted-foreground">{fmtDateTime(r.data_inicio_pcp)}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-xs text-muted-foreground">{fmtDateTime(r.data_fim_pcp)}</span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <span className="text-sm">{r.etapa_atual}</span>
-                              {r.is_piloto && (
-                                <Badge className={`text-[10px] ${r.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
-                                  {r.status_piloto === 'REPROVADO' ? 'PILOTO ✗' : 'PILOTO'}
-                                </Badge>
-                              )}
-                              {r.fivelas_separadas && (
-                                <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
-                                  Fivelas ✓
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        {/* Progress bar row */}
-                        {etapas.length > 0 && (
-                          <tr>
-                            <td colSpan={13} className="px-4 pb-2 pt-0 border-b">
-                              <TooltipProvider delayDuration={200}>
-                                <div className="flex items-center gap-0.5">
-                                  {etapas.map((etapa) => {
-                                    const isConcluida = etapa.status === 'CONCLUIDA';
-                                    const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
-                                    return (
-                                      <Tooltip key={etapa.id}>
-                                        <TooltipTrigger asChild>
-                                          <button
-                                            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-all ${
-                                              isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
-                                            } ${
-                                              isConcluida ? 'bg-green-100 text-green-700' :
-                                              isEmAndamento ? 'bg-primary/15 text-primary font-semibold ring-1 ring-primary/30' :
-                                              'bg-muted/60 text-muted-foreground'
-                                            }`}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              if (isAdmin) handleMoveToEtapa(r, etapa);
-                                            }}
-                                          >
-                                            {isConcluida && <CheckCircle2 className="h-2.5 w-2.5" />}
-                                            <span className="truncate max-w-[80px]">{etapa.nome_etapa}</span>
-                                          </button>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="top" className="text-xs">
-                                          <p className="font-medium">{etapa.nome_etapa}</p>
-                                          <p className="text-muted-foreground">{isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}</p>
-                                          {isAdmin && <p className="text-primary mt-0.5">Clique para mover</p>}
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    );
-                                  })}
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-all ${
-                                          isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
-                                        } ${
-                                          r.ordem_status === 'CONCLUIDA' ? 'bg-green-100 text-green-700 font-semibold' : 'bg-muted/60 text-muted-foreground'
-                                        }`}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (isAdmin) handleMoveToConcluido(r);
-                                        }}
-                                      >
-                                        {r.ordem_status === 'CONCLUIDA' && <CheckCircle2 className="h-2.5 w-2.5" />}
-                                        <span>Concluído</span>
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="text-xs">
-                                      <p className="font-medium">Concluído</p>
-                                      {isAdmin && <p className="text-primary mt-0.5">Clique para concluir</p>}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                              </TooltipProvider>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            return (
+              <Card
+                key={r.id}
+                className={`border-border/60 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${r.prioridade === 'URGENTE' ? 'border-destructive/40' : ''}`}
+                onClick={() => openDetail(r.id)}
+              >
+                {/* Header */}
+                <div className={`px-4 py-2.5 border-b flex items-center justify-between ${
+                  r.prioridade === 'URGENTE' ? 'bg-destructive/10' :
+                  r.prioridade === 'ATENCAO' ? 'bg-warning/10' :
+                  'bg-muted/30'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <span>{prazoCfg?.icon}</span>
+                    <span className="font-semibold text-sm">{r.api_venda_id || r.numero_pedido}</span>
+                    <Badge className={`text-[10px] font-normal ${prioCfg.color}`}>{prioCfg.label}</Badge>
+                  </div>
+                  <Badge className={`text-[10px] font-normal ${tipoBadge}`}>{tipoLabel}</Badge>
+                </div>
+
+                <CardContent className="p-4 space-y-3">
+                  {/* Client & Value */}
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium truncate">{r.cliente_nome}</p>
+                    <span className="text-sm font-semibold tabular-nums whitespace-nowrap">{fmt(r.valor_liquido)}</span>
+                  </div>
+
+                  {/* Dates grid */}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <div className="text-muted-foreground">Venda: <span className="text-foreground">{fmtDate(r.data_venda_api)}</span></div>
+                    <div className="text-muted-foreground">Entrega: <span className="text-foreground">{fmtDate(r.data_previsao_entrega)}</span></div>
+                    <div className="text-muted-foreground">Início Ideal: <span className="text-foreground">{fmtDate(r.dataInicioIdeal)}</span></div>
+                    <div className="text-muted-foreground">Atraso: {
+                      r.atrasoDias < 0 ? <span className="text-destructive font-semibold">{r.atrasoDias}d</span> :
+                      r.atrasoDias <= 2 ? <span className="text-warning font-semibold">{r.atrasoDias}d</span> :
+                      <span className="text-foreground">{r.atrasoDias}d</span>
+                    }</div>
+                    <div className="text-muted-foreground">Início PCP: <span className="text-foreground">{fmtDateTime(r.data_inicio_pcp)}</span></div>
+                    <div className="text-muted-foreground">Fim PCP: <span className="text-foreground">{fmtDateTime(r.data_fim_pcp)}</span></div>
+                  </div>
+
+                  {/* Etapa + badges */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs text-muted-foreground">Etapa:</span>
+                    <span className="text-xs font-medium">{r.etapa_atual}</span>
+                    {r.is_piloto && (
+                      <Badge className={`text-[10px] ${r.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
+                        {r.status_piloto === 'REPROVADO' ? 'PILOTO ✗' : 'PILOTO'}
+                      </Badge>
+                    )}
+                    {r.fivelas_separadas && (
+                      <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                        Fivelas ✓
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Progress bar */}
+                  {etapas.length > 0 && (
+                    <TooltipProvider delayDuration={200}>
+                      <div className="flex items-center gap-0.5 flex-wrap">
+                        {etapas.map((etapa) => {
+                          const isConcluida = etapa.status === 'CONCLUIDA';
+                          const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
+                          return (
+                            <Tooltip key={etapa.id}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-all ${
+                                    isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+                                  } ${
+                                    isConcluida ? 'bg-green-100 text-green-700' :
+                                    isEmAndamento ? 'bg-primary/15 text-primary font-semibold ring-1 ring-primary/30' :
+                                    'bg-muted/60 text-muted-foreground'
+                                  }`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isAdmin) handleMoveToEtapa(r, etapa);
+                                  }}
+                                >
+                                  {isConcluida && <CheckCircle2 className="h-2.5 w-2.5" />}
+                                  <span className="truncate max-w-[60px]">{etapa.nome_etapa}</span>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                <p className="font-medium">{etapa.nome_etapa}</p>
+                                <p className="text-muted-foreground">{isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}</p>
+                                {isAdmin && <p className="text-primary mt-0.5">Clique para mover</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-all ${
+                                isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+                              } ${
+                                r.ordem_status === 'CONCLUIDA' ? 'bg-green-100 text-green-700 font-semibold' : 'bg-muted/60 text-muted-foreground'
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isAdmin) handleMoveToConcluido(r);
+                              }}
+                            >
+                              {r.ordem_status === 'CONCLUIDA' && <CheckCircle2 className="h-2.5 w-2.5" />}
+                              <span>Concluído</span>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            <p className="font-medium">Concluído</p>
+                            {isAdmin && <p className="text-primary mt-0.5">Clique para concluir</p>}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TooltipProvider>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Side Panel */}
       <Sheet open={!!selectedId} onOpenChange={() => setSelectedId(null)}>
