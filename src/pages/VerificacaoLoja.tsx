@@ -187,30 +187,42 @@ export default function VerificacaoLoja() {
     setActionLoading(false);
   };
 
-  // Caminho C: solicitar ao almoxarifado
+  // Caminho C: solicitar ao almoxarifado — pre-fill with faltante items
   const handleCaminhoC = async () => {
+    // Pre-fill solicitações with faltante items
+    const faltantes = itensFaltantes.map(i => ({
+      itemId: i.id,
+      descricao: i.descricao_produto,
+      quantidade: i.quantidade_faltante ?? i.quantidade,
+    }));
+    setSolicitacoesAlmox(faltantes.length > 0 ? faltantes : [{ itemId: null, descricao: '', quantidade: 1 }]);
     setAlmoxDialogOpen(true);
   };
 
+  const [solicitacoesAlmox, setSolicitacoesAlmox] = useState<{ itemId: string | null; descricao: string; quantidade: number }[]>([]);
+
   const handleEnviarSolicitacaoAlmox = async () => {
-    if (!descricaoSolicitacao.trim()) { toast.error('Descrição é obrigatória.'); return; }
+    const validas = solicitacoesAlmox.filter(s => s.descricao.trim());
+    if (validas.length === 0) { toast.error('Nenhum item com descrição.'); return; }
     setActionLoading(true);
     try {
-      await supabase.from('solicitacoes_almoxarifado').insert({
-        pedido_id: pedido.id,
-        descricao: descricaoSolicitacao,
-        quantidade: qtdSolicitacao,
-        solicitado_por: profile.id,
-      });
+      for (const s of validas) {
+        await supabase.from('solicitacoes_almoxarifado').insert({
+          pedido_id: pedido.id,
+          pedido_item_id: s.itemId,
+          descricao: s.descricao,
+          quantidade: s.quantidade,
+          solicitado_por: profile.id,
+        });
+      }
 
       if (pedido.status_atual === 'LOJA_VERIFICANDO') {
         await definirCaminhoLoja(pedido.id, profile.id, 'C_FIVELAS', 'AGUARDANDO_ALMOXARIFADO');
       }
 
-      toast.success('Solicitação enviada ao almoxarifado!');
+      toast.success(`${validas.length} solicitação(ões) enviada(s) ao almoxarifado!`);
       setAlmoxDialogOpen(false);
-      setDescricaoSolicitacao('');
-      setQtdSolicitacao(1);
+      setSolicitacoesAlmox([]);
       fetchData();
     } catch { toast.error('Erro ao enviar solicitação.'); }
     setActionLoading(false);
