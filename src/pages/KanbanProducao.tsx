@@ -237,8 +237,15 @@ export default function KanbanProducao() {
 
   const advanceCard = async (card: KanbanCard, obs?: string) => {
     try {
-      await concluirEtapa(card.id, card.ordem_id, card.pedido_id, profile!.id, obs || `Avançado via kanban por ${profile!.nome}`);
-      toast.success('Etapa avançada com sucesso');
+      if (card.ordem_status === 'AGUARDANDO') {
+        // Transition: AGUARDANDO → EM_ANDAMENTO (start first etapa, don't conclude)
+        await supabase.from('ordens_producao').update({ status: 'EM_ANDAMENTO' }).eq('id', card.ordem_id);
+        await iniciarEtapa(card.id, profile!.id, card.pedido_id);
+        toast.success('Ordem iniciada com sucesso');
+      } else {
+        await concluirEtapa(card.id, card.ordem_id, card.pedido_id, profile!.id, obs || `Avançado via kanban por ${profile!.nome}`);
+        toast.success('Etapa avançada com sucesso');
+      }
       fetchCards();
     } catch {
       toast.error('Erro ao avançar etapa');
