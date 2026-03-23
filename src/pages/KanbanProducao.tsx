@@ -212,6 +212,11 @@ export default function KanbanProducao() {
       const tipoProduto = e.ordens_producao.tipo_produto || 'OUTROS';
       const hasSintetico = tipoProduto === 'FIVELA_COBERTA' && sinteticoMap.has(pedidoId);
 
+      // Calculate prazo dynamically using PCP engine (same as Fila Mestre)
+      const leadTime = leadTimeMap.get(tipoProduto) || 2;
+      const pcpResult = calcularPrazoPcp(e.ordens_producao.pedidos.data_previsao_entrega, leadTime, cal);
+      const dynamicPrazo = pcpResult.prioridade === 'URGENTE' ? 'ATRASADO' : pcpResult.prioridade === 'ATENCAO' ? 'ATENCAO' : 'NO_PRAZO';
+
       return {
         id: e.id,
         ordem_id: e.ordem_id,
@@ -225,16 +230,22 @@ export default function KanbanProducao() {
         cliente_nome: e.ordens_producao.pedidos.cliente_nome,
         tipo_produto: tipoProduto,
         quantidade: qtdMap.get(pedidoId) || 0,
-        // Calculate prazo dynamically using PCP engine (same as Fila Mestre)
-        const leadTime = leadTimeMap.get(tipoProduto) || 2;
-        const pcpResult = calcularPrazoPcp(e.ordens_producao.pedidos.data_previsao_entrega, leadTime, cal);
-        const dynamicPrazo = pcpResult.prioridade === 'URGENTE' ? 'ATRASADO' : pcpResult.prioridade === 'ATENCAO' ? 'ATENCAO' : 'NO_PRAZO';
-
-        return {
-          ...baseCard,
-          status_prazo: dynamicPrazo,
-        };
-      });
+        status_prazo: dynamicPrazo,
+        data_previsao_entrega: e.ordens_producao.pedidos.data_previsao_entrega,
+        ordem_status: e.ordens_producao.status,
+        has_sintetico_order: hasSintetico,
+        sintetico_ordem_id: hasSintetico ? sinteticoMap.get(pedidoId)! : null,
+        transferred: false,
+        pedido_status: e.ordens_producao.pedidos.status_atual,
+        perdas_pendentes: perdasCount.get(e.ordem_id) || 0,
+        is_piloto: e.ordens_producao.pedidos.is_piloto || false,
+        status_piloto: e.ordens_producao.pedidos.status_piloto || null,
+        fivelas_recebidas: e.ordens_producao.fivelas_recebidas || false,
+        fivelas_separadas: e.ordens_producao.pedidos.fivelas_separadas || false,
+        sent_to_financeiro_at: recentFinanceiro.get(e.ordem_id) || null,
+        ordem_sequencia_op: e.ordens_producao.sequencia || 1,
+        ordem_observacao: e.ordens_producao.observacao || null,
+      };
     });
 
     setCards(kanbanCards);
