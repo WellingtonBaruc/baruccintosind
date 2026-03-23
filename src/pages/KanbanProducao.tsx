@@ -635,10 +635,50 @@ export default function KanbanProducao() {
     if (card.pedido_status === 'AGUARDANDO_FINANCEIRO') {
       return { label: 'Enviado ao Financeiro', cls: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30' };
     }
-    if (card.pedido_status === 'AGUARDANDO_COMERCIAL' || card.pedido_status === 'PRODUCAO_CONCLUIDA' || card.pedido_status === 'EM_PRODUCAO') {
-      return { label: 'Aguardando Comercial', cls: 'bg-orange-500/15 text-orange-600 border-orange-500/30' };
+    if (card.pedido_status === 'AGUARDANDO_COMERCIAL') {
+      return { label: 'Enviado ao Comercial ✓', cls: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30' };
+    }
+    if (card.pedido_status === 'PRODUCAO_CONCLUIDA' || card.pedido_status === 'EM_PRODUCAO') {
+      return { label: 'Produção concluída', cls: 'bg-orange-500/15 text-orange-600 border-orange-500/30' };
     }
     return { label: 'Concluído', cls: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30' };
+  };
+
+  const canSendToComercial = (card: KanbanCard) => {
+    return card.ordem_status === 'CONCLUIDA' && 
+      (card.pedido_status === 'EM_PRODUCAO' || card.pedido_status === 'PRODUCAO_CONCLUIDA') &&
+      isSupervisor;
+  };
+
+  const handleEnviarParaComercial = async (card: KanbanCard) => {
+    if (!profile) return;
+    try {
+      // Verify all orders for this pedido are CONCLUIDA
+      const { data: allOrdens } = await supabase
+        .from('ordens_producao')
+        .select('id, status')
+        .eq('pedido_id', card.pedido_id);
+      
+      const allConcluidas = allOrdens?.every(o => o.status === 'CONCLUIDA');
+      if (!allConcluidas) {
+        toast.error('Ainda existem ordens em andamento para este pedido.');
+        return;
+      }
+
+      await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', card.pedido_id);
+      await supabase.from('pedido_historico').insert({
+        pedido_id: card.pedido_id,
+        usuario_id: profile.id,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: card.pedido_status,
+        status_novo: 'AGUARDANDO_COMERCIAL',
+        observacao: `Produção concluída. Enviado para comercial por ${profile.nome}.`,
+      });
+      toast.success(`Pedido #${card.api_venda_id} enviado para o Comercial`);
+      fetchCards();
+    } catch {
+      toast.error('Erro ao enviar para o comercial');
+    }
   };
 
   const filteredCards = getFilteredCards();
@@ -860,9 +900,16 @@ export default function KanbanProducao() {
                                   </Button>
                                 )}
 
-                                {fivelaSolo && isSupervisor && (
-                                  <Button size="sm" variant="outline" className="w-full mt-2 h-8 text-xs" onClick={() => handleFivelaSoloComplete(card)}>
-                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Encaminhar para Comercial
+                                {fivelaSolo && isSupervisor && card.pedido_status !== 'AGUARDANDO_COMERCIAL' && (
+                                  <Button size="sm" variant="outline" className="w-full mt-2 h-8 text-xs" onClick={() => handleEnviarParaComercial(card)}>
+                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Enviar para o Comercial
+                                  </Button>
+                                )}
+
+                                {/* General "Enviar para o Comercial" button for non-fivela cards */}
+                                {inConcluido && !fivelaWithSintetico && !fivelaSolo && canSendToComercial(card) && (
+                                  <Button size="sm" className="w-full mt-2 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => handleEnviarParaComercial(card)}>
+                                    <ArrowRight className="h-3 w-3 mr-1" /> Enviar para o Comercial
                                   </Button>
                                 )}
 

@@ -222,34 +222,7 @@ export async function concluirEtapa(
       .select('id, status')
       .eq('pedido_id', pedidoId);
 
-    const allConcluidas = allOrdens?.every(o => o.id === ordemId || o.status === 'CONCLUIDA');
-
-    if (allConcluidas) {
-      // Get current pedido status to avoid overwriting later statuses
-      const { data: pedido } = await supabase
-        .from('pedidos')
-        .select('status_atual')
-        .eq('id', pedidoId)
-        .single();
-
-      const statusesQueNaoDevemSerSobrescritos = [
-        'AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL', 'AGUARDANDO_FINANCEIRO',
-        'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO',
-        'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO',
-      ];
-
-      if (pedido && !statusesQueNaoDevemSerSobrescritos.includes(pedido.status_atual)) {
-        await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', pedidoId);
-        await supabase.from('pedido_historico').insert({
-          pedido_id: pedidoId,
-          usuario_id: userId,
-          tipo_acao: 'TRANSICAO',
-          status_anterior: pedido.status_atual,
-          status_novo: 'AGUARDANDO_COMERCIAL',
-          observacao: 'Todas as ordens de produção concluídas. Pedido encaminhado para comercial.',
-        });
-      }
-    }
+    // Auto-advance removed: supervisor must manually send to comercial via Kanban button
   }
 
   await supabase.from('pedido_historico').insert({
