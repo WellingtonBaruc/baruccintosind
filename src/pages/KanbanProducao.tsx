@@ -125,6 +125,10 @@ export default function KanbanProducao() {
   // Recently sent to financeiro
   const [recentFinanceiro, setRecentFinanceiro] = useState<Map<string, number>>(new Map());
 
+  // Fivela coberta modal
+  const [fivelaModal, setFivelaModal] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
+  const [fivelaStatusModal, setFivelaStatusModal] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
+
   // Detail sheet
   const [detailSheet, setDetailSheet] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean; pedido: any | null }>({ open: false, card: null, items: [], loading: false, pedido: null });
 
