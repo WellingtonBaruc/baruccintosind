@@ -351,7 +351,7 @@ export default function FilaMestre() {
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Data Venda</TableHead>
                     <TableHead>Prev. Entrega</TableHead>
-                    <TableHead>Data PCP Calc.</TableHead>
+                    
                     <TableHead>Início Ideal</TableHead>
                     <TableHead>Atraso</TableHead>
                     <TableHead>Início PCP</TableHead>
