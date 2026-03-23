@@ -158,10 +158,16 @@ export default function KanbanProducao() {
     const ordemMap = new Map<string, any>();
     for (const e of visibleEtapas as any[]) {
       const key = e.ordem_id;
+      const ordemStatus = e.ordens_producao?.status;
       const existing = ordemMap.get(key);
       if (!existing) { ordemMap.set(key, e); continue; }
-      if (e.status === 'EM_ANDAMENTO') ordemMap.set(key, e);
-      else if (existing.status !== 'EM_ANDAMENTO' && e.ordem_sequencia > existing.ordem_sequencia) ordemMap.set(key, e);
+      // For AGUARDANDO orders (all etapas PENDENTE), pick the FIRST etapa (lowest sequence)
+      if (ordemStatus === 'AGUARDANDO') {
+        if (e.ordem_sequencia < existing.ordem_sequencia) ordemMap.set(key, e);
+      } else {
+        if (e.status === 'EM_ANDAMENTO') ordemMap.set(key, e);
+        else if (existing.status !== 'EM_ANDAMENTO' && e.ordem_sequencia > existing.ordem_sequencia) ordemMap.set(key, e);
+      }
     }
 
     const kanbanCards: KanbanCard[] = Array.from(ordemMap.values()).map((e: any) => {
