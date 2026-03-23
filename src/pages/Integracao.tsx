@@ -55,6 +55,8 @@ export default function Integracao() {
   const [historicProgress, setHistoricProgress] = useState<string | null>(null);
   const [historicDone, setHistoricDone] = useState<{ date: string; count: number } | null>(null);
   const [lastDailyLog, setLastDailyLog] = useState<LogEntry | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
