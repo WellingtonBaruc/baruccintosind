@@ -12,8 +12,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
-import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X } from 'lucide-react';
+import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface KanbanCard {
@@ -119,6 +122,18 @@ export default function KanbanProducao() {
 
   // Recently sent to financeiro
   const [recentFinanceiro, setRecentFinanceiro] = useState<Map<string, number>>(new Map());
+
+  // Detail sheet
+  const [detailSheet, setDetailSheet] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean; pedido: any | null }>({ open: false, card: null, items: [], loading: false, pedido: null });
+
+  const openDetailSheet = async (card: KanbanCard) => {
+    setDetailSheet({ open: true, card, items: [], loading: true, pedido: null });
+    const [itemsRes, pedidoRes] = await Promise.all([
+      supabase.from('pedido_itens').select('*').eq('pedido_id', card.pedido_id).order('descricao_produto'),
+      supabase.from('pedidos').select('observacao_comercial, observacao_financeiro, observacao_logistica, observacao_api, observacao_interna_api, forma_pagamento, forma_envio, data_previsao_entrega, data_venda_api, valor_liquido, valor_bruto, valor_desconto').eq('id', card.pedido_id).single(),
+    ]);
+    setDetailSheet(prev => ({ ...prev, items: itemsRes.data || [], pedido: pedidoRes.data, loading: false }));
+  };
 
   const fetchCards = useCallback(async () => {
     const [etapasRes, semanaRes, feriadosRes, pausasRes, leadTimesRes] = await Promise.all([
@@ -768,14 +783,18 @@ export default function KanbanProducao() {
                                 ref={prov.innerRef}
                                 {...prov.draggableProps}
                                 {...prov.dragHandleProps}
-                                className={`rounded-lg border bg-white shadow-sm overflow-hidden ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''}`}
+                                className={`rounded-lg border bg-white shadow-sm overflow-hidden group ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''}`}
                               >
-                                <div className={`px-3 py-2 ${prazoHeaderClasses[card.status_prazo] || 'bg-muted/30 border-b border-border/40'}`}>
-                                  <p className="font-bold text-base leading-tight">
+                                <div
+                                  className={`px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity ${prazoHeaderClasses[card.status_prazo] || 'bg-muted/30 border-b border-border/40'}`}
+                                  onClick={() => openDetailSheet(card)}
+                                >
+                                  <p className="font-bold text-base leading-tight flex items-center gap-1">
                                     {card.api_venda_id}
                                     {card.ordem_sequencia_op > 1 && (
                                       <span className="text-xs font-medium text-primary ml-1.5">• OP {card.ordem_sequencia_op}</span>
                                     )}
+                                    <Eye className="h-3 w-3 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100" />
                                   </p>
                                   <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.cliente_nome}</p>
                                 </div>
@@ -1022,6 +1041,118 @@ export default function KanbanProducao() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Detail Sheet */}
+      <Sheet open={detailSheet.open} onOpenChange={(open) => setDetailSheet(prev => ({ ...prev, open }))}>
+        <SheetContent className="w-[420px] sm:w-[480px] p-0">
+          <SheetHeader className="px-6 pt-6 pb-4 border-b">
+            <SheetTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              Venda {detailSheet.card?.api_venda_id}
+            </SheetTitle>
+            <p className="text-sm text-muted-foreground">{detailSheet.card?.cliente_nome}</p>
+          </SheetHeader>
+          <ScrollArea className="h-[calc(100vh-120px)]">
+            <div className="px-6 py-4 space-y-4">
+              {detailSheet.loading ? (
+                <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+              ) : (
+                <>
+                  {/* Resumo */}
+                  {detailSheet.pedido && (
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-muted-foreground text-xs">Valor Líquido</span>
+                        <p className="font-semibold">R$ {Number(detailSheet.pedido.valor_liquido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground text-xs">Pagamento</span>
+                        <p className="font-medium text-xs">{detailSheet.pedido.forma_pagamento || '—'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground text-xs">Envio</span>
+                        <p className="font-medium text-xs">{detailSheet.pedido.forma_envio || '—'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground text-xs">Previsão Entrega</span>
+                        <p className="font-medium text-xs">{detailSheet.pedido.data_previsao_entrega ? new Date(detailSheet.pedido.data_previsao_entrega + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  {/* Itens */}
+                  <div>
+                    <h3 className="font-semibold text-sm mb-3 flex items-center gap-1.5">
+                      <Package className="h-4 w-4" /> Produtos ({detailSheet.items.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {detailSheet.items.map((item: any) => (
+                        <div key={item.id} className="rounded-lg border bg-muted/20 p-3">
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium leading-tight">{item.descricao_produto}</p>
+                              {item.referencia_produto && (
+                                <p className="text-[11px] text-muted-foreground mt-0.5">Ref: {item.referencia_produto}</p>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-semibold">{item.quantidade} {item.unidade_medida || 'un'}</p>
+                              <p className="text-[11px] text-muted-foreground">R$ {Number(item.valor_unitario || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            </div>
+                          </div>
+                          {item.observacao_producao && (
+                            <div className="mt-2 flex items-start gap-1.5 bg-yellow-50 border border-yellow-200 rounded-md p-2">
+                              <MessageSquare className="h-3.5 w-3.5 text-yellow-600 mt-0.5 shrink-0" />
+                              <p className="text-[11px] text-yellow-800">{item.observacao_producao}</p>
+                            </div>
+                          )}
+                          {item.categoria_produto && (
+                            <Badge variant="outline" className="mt-1.5 text-[10px]">{item.categoria_produto}</Badge>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Observações do pedido */}
+                  {detailSheet.pedido && (detailSheet.pedido.observacao_api || detailSheet.pedido.observacao_interna_api || detailSheet.pedido.observacao_comercial) && (
+                    <>
+                      <Separator />
+                      <div>
+                        <h3 className="font-semibold text-sm mb-3 flex items-center gap-1.5">
+                          <MessageSquare className="h-4 w-4" /> Observações
+                        </h3>
+                        <div className="space-y-2">
+                          {detailSheet.pedido.observacao_api && (
+                            <div className="rounded-md border p-2.5 bg-muted/20">
+                              <p className="text-[10px] font-medium text-muted-foreground mb-1">Observação da Venda</p>
+                              <p className="text-xs">{detailSheet.pedido.observacao_api}</p>
+                            </div>
+                          )}
+                          {detailSheet.pedido.observacao_interna_api && (
+                            <div className="rounded-md border p-2.5 bg-muted/20">
+                              <p className="text-[10px] font-medium text-muted-foreground mb-1">Observação Interna</p>
+                              <p className="text-xs">{detailSheet.pedido.observacao_interna_api}</p>
+                            </div>
+                          )}
+                          {detailSheet.pedido.observacao_comercial && (
+                            <div className="rounded-md border p-2.5 bg-muted/20">
+                              <p className="text-[10px] font-medium text-muted-foreground mb-1">Obs. Comercial</p>
+                              <p className="text-xs">{detailSheet.pedido.observacao_comercial}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
