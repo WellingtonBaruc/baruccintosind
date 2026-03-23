@@ -46,6 +46,7 @@ const App = () => (
               <Route path="/dashboard" element={<DashboardGestao />} />
               <Route path="/producao" element={<FilaMestre />} />
               <Route path="/kanban" element={<KanbanProducao />} />
+              <Route path="/kanban-venda" element={<KanbanVenda />} />
               <Route path="/painel-dia" element={<PainelDia />} />
 
               {/* Config / Admin */}
