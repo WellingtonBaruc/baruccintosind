@@ -463,24 +463,37 @@ export default function FilaMestre() {
                     <span className="text-sm font-semibold tabular-nums whitespace-nowrap">{fmt(r.valor_liquido)}</span>
                   </div>
 
+                  {/* Status & Operador */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge className={`text-[10px] font-normal ${(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).color || 'bg-muted text-muted-foreground'}`}>
+                      {(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual}
+                    </Badge>
+                    {r.operador_atual !== '—' && (
+                      <span className="text-xs text-muted-foreground">👤 {r.operador_atual}</span>
+                    )}
+                    {r.status_api && (
+                      <span className="text-[10px] text-muted-foreground border border-border/60 rounded px-1.5 py-0.5">{r.status_api}</span>
+                    )}
+                  </div>
+
                   {/* Dates grid */}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-xs">
                     <div className="text-muted-foreground">Venda: <span className="text-foreground">{fmtDate(r.data_venda_api)}</span></div>
-                    <div className="text-muted-foreground">Entrega: <span className="text-foreground">{fmtDate(r.data_previsao_entrega)}</span></div>
+                    <div className="text-muted-foreground">Entrega: <span className="text-foreground font-medium">{fmtDate(r.data_previsao_entrega)}</span></div>
                     <div className="text-muted-foreground">Início Ideal: <span className="text-foreground">{fmtDate(r.dataInicioIdeal)}</span></div>
+                    <div className="text-muted-foreground">Início PCP: <span className="text-foreground">{fmtDateTime(r.data_inicio_pcp)}</span></div>
+                    <div className="text-muted-foreground">Fim PCP: <span className="text-foreground">{fmtDateTime(r.data_fim_pcp)}</span></div>
                     <div className="text-muted-foreground">Atraso: {
                       r.atrasoDias < 0 ? <span className="text-destructive font-semibold">{r.atrasoDias}d</span> :
                       r.atrasoDias <= 2 ? <span className="text-warning font-semibold">{r.atrasoDias}d</span> :
                       <span className="text-foreground">{r.atrasoDias}d</span>
                     }</div>
-                    <div className="text-muted-foreground">Início PCP: <span className="text-foreground">{fmtDateTime(r.data_inicio_pcp)}</span></div>
-                    <div className="text-muted-foreground">Fim PCP: <span className="text-foreground">{fmtDateTime(r.data_fim_pcp)}</span></div>
                   </div>
 
                   {/* Etapa + badges */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap border-t border-border/40 pt-2">
                     <span className="text-xs text-muted-foreground">Etapa:</span>
-                    <span className="text-xs font-medium">{r.etapa_atual}</span>
+                    <span className="text-xs font-semibold">{r.etapa_atual}</span>
                     {r.is_piloto && (
                       <Badge className={`text-[10px] ${r.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
                         {r.status_piloto === 'REPROVADO' ? 'PILOTO ✗' : 'PILOTO'}
@@ -489,6 +502,11 @@ export default function FilaMestre() {
                     {r.fivelas_separadas && (
                       <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
                         Fivelas ✓
+                      </Badge>
+                    )}
+                    {r.ordem_status && (
+                      <Badge variant="outline" className="text-[10px] font-normal ml-auto">
+                        OP: {r.ordem_status === 'AGUARDANDO' ? 'Aguardando' : r.ordem_status === 'EM_ANDAMENTO' ? 'Em Andamento' : r.ordem_status === 'CONCLUIDA' ? 'Concluída' : r.ordem_status}
                       </Badge>
                     )}
                   </div>
