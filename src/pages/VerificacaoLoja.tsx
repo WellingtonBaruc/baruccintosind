@@ -198,7 +198,6 @@ export default function VerificacaoLoja() {
     setAlmoxDialogOpen(true);
   };
 
-  const [solicitacoesAlmox, setSolicitacoesAlmox] = useState<{ itemId: string | null; descricao: string; quantidade: number }[]>([]);
 
   const handleEnviarSolicitacaoAlmox = async () => {
     const validas = solicitacoesAlmox.filter(s => s.descricao.trim());
