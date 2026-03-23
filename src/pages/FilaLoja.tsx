@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Search, Clock, Package, Eye } from 'lucide-react';
+import { Loader2, Search, Clock, Package, Eye, CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -44,7 +44,7 @@ export default function FilaLoja() {
   const fetchPedidos = async () => {
     const { data } = await supabase
       .from('pedidos')
-      .select('*')
+      .select('*, fivelas_separadas')
       .in('status_atual', STATUS_LOJA)
       .order('criado_em', { ascending: true });
 
@@ -143,7 +143,14 @@ export default function FilaLoja() {
                         {p.valor_liquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </TableCell>
                       <TableCell>
-                        <Badge className={`font-normal ${cfg.color}`}>{cfg.label}</Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge className={`font-normal ${cfg.color}`}>{cfg.label}</Badge>
+                          {(p as any).fivelas_separadas && (
+                            <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px]" variant="outline">
+                              <CheckCircle2 className="h-3 w-3 mr-0.5" /> Fivelas ✓
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
