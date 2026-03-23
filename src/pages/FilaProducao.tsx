@@ -10,12 +10,20 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Loader2, Search, Clock } from 'lucide-react';
+import { Plus, Loader2, Search, Clock, CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const PERFIS_PRODUCAO = ['operador_producao', 'supervisor_producao', 'gestor', 'admin'];
+
+interface EtapaInfo {
+  id: string;
+  nome_etapa: string;
+  ordem_sequencia: number;
+  status: string;
+}
 
 interface OrdemView {
   id: string;
@@ -29,6 +37,7 @@ interface OrdemView {
   pipeline_producao: { nome: string };
   etapa_atual?: string;
   operador_atual?: string;
+  etapas?: EtapaInfo[];
 }
 
 interface UnitCounters {
@@ -65,29 +74,40 @@ export default function FilaProducao() {
       .order('criado_em', { ascending: false });
 
     if (data) {
-      const ordensWithEtapa = await Promise.all(
-        data.map(async (o: any) => {
-          const { data: etapa } = await supabase
-            .from('op_etapas')
-            .select('nome_etapa, operador_id, usuarios(nome)')
-            .eq('ordem_id', o.id)
-            .eq('status', 'EM_ANDAMENTO')
-            .limit(1)
-            .maybeSingle();
-          return {
-            ...o,
-            etapa_atual: etapa?.nome_etapa || (o.status === 'CONCLUIDA' ? 'Aguardando aprovação' : '—'),
-            operador_atual: (etapa?.usuarios as any)?.nome || '—',
-          };
-        })
-      );
+      const ordemIds = data.map((o: any) => o.id);
+      
+      // Fetch all etapas for all ordens in one query
+      const { data: allEtapas } = await supabase
+        .from('op_etapas')
+        .select('id, ordem_id, nome_etapa, ordem_sequencia, status, operador_id, usuarios(nome)')
+        .in('ordem_id', ordemIds)
+        .order('ordem_sequencia', { ascending: true });
+
+      const etapasMap = new Map<string, any[]>();
+      if (allEtapas) {
+        for (const e of allEtapas) {
+          const list = etapasMap.get(e.ordem_id) || [];
+          list.push(e);
+          etapasMap.set(e.ordem_id, list);
+        }
+      }
+
+      const ordensWithEtapa = data.map((o: any) => {
+        const etapas = etapasMap.get(o.id) || [];
+        const emAndamento = etapas.find((e: any) => e.status === 'EM_ANDAMENTO');
+        return {
+          ...o,
+          etapa_atual: emAndamento?.nome_etapa || (o.status === 'CONCLUIDA' ? 'Concluído' : '—'),
+          operador_atual: emAndamento ? ((emAndamento.usuarios as any)?.nome || '—') : '—',
+          etapas: etapas.map((e: any) => ({ id: e.id, nome_etapa: e.nome_etapa, ordem_sequencia: e.ordem_sequencia, status: e.status })),
+        };
+      });
       setOrdens(ordensWithEtapa);
     }
     setLoading(false);
   };
 
   const fetchUnitCounters = async () => {
-    // Get all pedidos that are active (Em Produção or Pedido Enviado)
     const { data: pedidos } = await supabase
       .from('pedidos')
       .select('id')
@@ -96,7 +116,6 @@ export default function FilaProducao() {
     if (!pedidos || pedidos.length === 0) return;
 
     const pedidoIds = pedidos.map(p => p.id);
-    // Fetch items in batches if needed
     const { data: itens } = await supabase
       .from('pedido_itens')
       .select('descricao_produto, quantidade, categoria_produto')
@@ -108,7 +127,6 @@ export default function FilaProducao() {
     for (const item of itens) {
       const cat = (item.categoria_produto || '').toUpperCase();
       const desc = (item.descricao_produto || '').toUpperCase();
-      // Exclude ADICIONAIS
       if (cat === 'ADICIONAIS' || desc.includes('ADICIONAL')) continue;
       const tipo = classificarProduto(item.descricao_produto);
       if (tipo in counters) {
@@ -118,6 +136,39 @@ export default function FilaProducao() {
       }
     }
     setUnitCounters(counters);
+  };
+
+  // Admin move order to a specific etapa
+  const handleMoveToEtapa = async (ordem: OrdemView, targetEtapa: EtapaInfo) => {
+    if (!profile || !['admin', 'gestor'].includes(profile.perfil)) return;
+    
+    const etapas = ordem.etapas || [];
+    
+    // Update all etapas: before target = CONCLUIDA, target = EM_ANDAMENTO, after = PENDENTE
+    for (const etapa of etapas) {
+      let newStatus: string;
+      if (etapa.ordem_sequencia < targetEtapa.ordem_sequencia) {
+        newStatus = 'CONCLUIDA';
+      } else if (etapa.ordem_sequencia === targetEtapa.ordem_sequencia) {
+        newStatus = 'EM_ANDAMENTO';
+      } else {
+        newStatus = 'PENDENTE';
+      }
+      if (etapa.status !== newStatus) {
+        await supabase.from('op_etapas').update({ 
+          status: newStatus,
+          ...(newStatus === 'EM_ANDAMENTO' ? { iniciado_em: new Date().toISOString() } : {}),
+          ...(newStatus === 'CONCLUIDA' ? { concluido_em: new Date().toISOString() } : {}),
+        } as any).eq('id', etapa.id);
+      }
+    }
+
+    // Update ordem status
+    const ordemStatus = targetEtapa.ordem_sequencia === 0 ? 'AGUARDANDO' : 'EM_ANDAMENTO';
+    await supabase.from('ordens_producao').update({ status: ordemStatus } as any).eq('id', ordem.id);
+
+    toast.success(`Ordem movida para: ${targetEtapa.nome_etapa}`);
+    fetchOrdens();
   };
 
   if (!profile || !PERFIS_PRODUCAO.includes(profile.perfil)) {
@@ -142,7 +193,6 @@ export default function FilaProducao() {
     return new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime();
   });
 
-  // Counters
   const emProducaoCount = filtered.filter(o => o.pedidos.status_api === 'Em Produção').length;
   const pedidoEnviadoCount = filtered.filter(o => o.pedidos.status_api === 'Pedido Enviado').length;
   const atrasadoCount = filtered.filter(o => (o.pedidos.status_prazo || 'NO_PRAZO') === 'ATRASADO').length;
@@ -150,6 +200,20 @@ export default function FilaProducao() {
   const noPrazoCount = filtered.filter(o => (o.pedidos.status_prazo || 'NO_PRAZO') === 'NO_PRAZO').length;
 
   const formatNum = (n: number) => n.toLocaleString('pt-BR');
+
+  const isAdmin = profile && ['admin', 'gestor'].includes(profile.perfil);
+
+  const getStepColor = (status: string) => {
+    if (status === 'CONCLUIDA') return 'bg-green-500';
+    if (status === 'EM_ANDAMENTO') return 'bg-primary';
+    return 'bg-muted';
+  };
+
+  const getStepTextColor = (status: string) => {
+    if (status === 'CONCLUIDA') return 'text-green-700';
+    if (status === 'EM_ANDAMENTO') return 'text-primary font-semibold';
+    return 'text-muted-foreground';
+  };
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -255,73 +319,132 @@ export default function FilaProducao() {
           ) : sorted.length === 0 ? (
             <p className="text-center py-12 text-muted-foreground text-sm">Nenhuma ordem encontrada.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8">Prazo</TableHead>
-                  <TableHead>Pedido</TableHead>
-                  <TableHead>Venda Simplifica</TableHead>
-                  <TableHead>Situação</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Pipeline</TableHead>
-                  <TableHead>Etapa Atual</TableHead>
-                  <TableHead>Operador</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Tempo</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sorted.map(o => {
-                  const cfg = STATUS_ORDEM_CONFIG[o.status] || { label: o.status, color: 'bg-muted text-muted-foreground' };
-                  const prazoCfg = STATUS_PRAZO_CONFIG[o.pedidos.status_prazo || 'NO_PRAZO'];
-                  const tipoLabel = TIPO_PRODUTO_LABELS[o.tipo_produto || ''] || o.tipo_produto || '—';
+            <div className="divide-y divide-border">
+              {sorted.map(o => {
+                const prazoCfg = STATUS_PRAZO_CONFIG[o.pedidos.status_prazo || 'NO_PRAZO'];
+                const tipoLabel = TIPO_PRODUTO_LABELS[o.tipo_produto || ''] || o.tipo_produto || '—';
+                const etapas = o.etapas || [];
 
-                  return (
-                    <TableRow
-                      key={o.id}
-                      className="cursor-pointer hover:bg-accent/40 transition-colors"
+                return (
+                  <div key={o.id} className="hover:bg-accent/20 transition-colors">
+                    {/* Main row */}
+                    <div
+                      className="grid grid-cols-[32px_1fr_1fr_auto_1fr_auto_1fr_1fr_auto] items-center gap-3 px-4 py-3 cursor-pointer"
                       onClick={() => navigate(`/producao/ordem/${o.id}`)}
                     >
-                      <TableCell className="w-8">
-                        {prazoCfg && (
-                          <span title={prazoCfg.label} className="text-sm">{prazoCfg.icon}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium">{o.pedidos.numero_pedido}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{o.pedidos.api_venda_id || '—'}</TableCell>
-                      <TableCell>
+                      <div>
+                        {prazoCfg && <span title={prazoCfg.label} className="text-sm">{prazoCfg.icon}</span>}
+                      </div>
+                      <div>
+                        <span className="font-medium text-sm">{o.pedidos.numero_pedido}</span>
+                        {o.sequencia > 1 && <Badge variant="outline" className="ml-1.5 text-[10px]">OP {o.sequencia}</Badge>}
+                      </div>
+                      <div className="text-muted-foreground text-sm">{o.pedidos.api_venda_id || '—'}</div>
+                      <div>
                         {(() => {
                           const sa = o.pedidos.status_api;
-                          if (sa === 'Em Produção') return <Badge className="bg-blue-500/15 text-blue-700 border-blue-200 font-normal">Em Produção</Badge>;
-                          if (sa === 'Pedido Enviado') return <Badge className="bg-orange-500/15 text-orange-700 border-orange-200 font-normal">Pedido Enviado</Badge>;
-                          if (sa === 'Finalizado') return <Badge className="bg-muted text-muted-foreground font-normal">Finalizado</Badge>;
-                          return <Badge variant="outline" className="font-normal text-muted-foreground">Sem status</Badge>;
+                          if (sa === 'Em Produção') return <Badge className="bg-blue-500/15 text-blue-700 border-blue-200 font-normal text-xs">Em Produção</Badge>;
+                          if (sa === 'Pedido Enviado') return <Badge className="bg-orange-500/15 text-orange-700 border-orange-200 font-normal text-xs">Pedido Enviado</Badge>;
+                          if (sa === 'Finalizado') return <Badge className="bg-muted text-muted-foreground font-normal text-xs">Finalizado</Badge>;
+                          return <Badge variant="outline" className="font-normal text-muted-foreground text-xs">—</Badge>;
                         })()}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{o.pedidos.cliente_nome}</TableCell>
-                      <TableCell>
-                        <Badge className={`text-xs font-normal ${TIPO_PRODUTO_BADGE[o.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border'}`}>
-                          {tipoLabel || 'A classificar'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{o.pipeline_producao?.nome}</TableCell>
-                      <TableCell className="text-sm">{o.etapa_atual}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{o.operador_atual}</TableCell>
-                      <TableCell>
-                        <Badge className={`font-normal ${cfg.color}`}>{cfg.label}</Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatDistanceToNow(new Date(o.criado_em), { locale: ptBR, addSuffix: true })}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                      </div>
+                      <div className="text-muted-foreground text-sm truncate">{o.pedidos.cliente_nome}</div>
+                      <Badge className={`text-[10px] font-normal ${TIPO_PRODUTO_BADGE[o.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border'}`}>
+                        {tipoLabel || 'A classificar'}
+                      </Badge>
+                      <div className="text-sm text-muted-foreground truncate">{o.pipeline_producao?.nome}</div>
+                      <div className="text-sm text-muted-foreground">{o.operador_atual !== '—' ? o.operador_atual : ''}</div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatDistanceToNow(new Date(o.criado_em), { locale: ptBR, addSuffix: true })}
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    {etapas.length > 0 && (
+                      <div className="px-4 pb-3 pt-0">
+                        <TooltipProvider delayDuration={200}>
+                          <div className="flex items-center gap-0.5">
+                            {etapas.map((etapa, idx) => {
+                              const isLast = idx === etapas.length - 1;
+                              const isConcluida = etapa.status === 'CONCLUIDA';
+                              const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
+                              const isPendente = etapa.status === 'PENDENTE';
+
+                              return (
+                                <Tooltip key={etapa.id}>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-all ${
+                                        isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+                                      } ${
+                                        isConcluida ? 'bg-green-100 text-green-700' :
+                                        isEmAndamento ? 'bg-primary/15 text-primary font-semibold ring-1 ring-primary/30' :
+                                        'bg-muted/60 text-muted-foreground'
+                                      }`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (isAdmin) handleMoveToEtapa(o, etapa);
+                                      }}
+                                    >
+                                      {isConcluida && <CheckCircle2 className="h-3 w-3" />}
+                                      <span className="truncate max-w-[80px]">{etapa.nome_etapa}</span>
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    <p className="font-medium">{etapa.nome_etapa}</p>
+                                    <p className="text-muted-foreground">
+                                      {isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}
+                                    </p>
+                                    {isAdmin && <p className="text-primary mt-0.5">Clique para mover para esta etapa</p>}
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })}
+
+                            {/* Concluído final step */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-all ${
+                                    isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+                                  } ${
+                                    o.status === 'CONCLUIDA' ? 'bg-green-100 text-green-700 font-semibold' : 'bg-muted/60 text-muted-foreground'
+                                  }`}
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (!isAdmin) return;
+                                    // Mark all etapas as CONCLUIDA and ordem as CONCLUIDA
+                                    for (const et of etapas) {
+                                      if (et.status !== 'CONCLUIDA') {
+                                        await supabase.from('op_etapas').update({ status: 'CONCLUIDA', concluido_em: new Date().toISOString() } as any).eq('id', et.id);
+                                      }
+                                    }
+                                    await supabase.from('ordens_producao').update({ status: 'CONCLUIDA' } as any).eq('id', o.id);
+                                    toast.success('Ordem marcada como Concluída');
+                                    fetchOrdens();
+                                  }}
+                                >
+                                  {o.status === 'CONCLUIDA' && <CheckCircle2 className="h-3 w-3" />}
+                                  <span>Concluído</span>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                <p className="font-medium">Concluído</p>
+                                {isAdmin && <p className="text-primary mt-0.5">Clique para concluir a ordem</p>}
+                              </TooltipContent>
+                            </Tooltip>
+
+                            {/* Connecting lines between steps */}
+                          </div>
+                        </TooltipProvider>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>
