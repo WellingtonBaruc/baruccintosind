@@ -480,13 +480,18 @@ export default function KanbanProducao() {
     } catch { toast.error('Erro ao avançar pedido'); }
   };
 
-  // --- Preparação Sub-etapas ---
-  const openPrepDialog = async (card: KanbanCard) => {
-    setPrepDialog({ open: true, card });
-    setLoadingSubEtapas(true);
-    setNewSubEtapa('');
+  // --- Preparação Sub-etapas (inline expandable) ---
+  const togglePrepExpand = async (card: KanbanCard) => {
+    const isExpanded = expandedPrepCards.has(card.id);
+    if (isExpanded) {
+      setExpandedPrepCards(prev => { const n = new Set(prev); n.delete(card.id); return n; });
+      return;
+    }
 
-    // Fetch existing sub-etapas for this op_etapa
+    // Expand and load
+    setExpandedPrepCards(prev => new Set(prev).add(card.id));
+    setLoadingPrepCards(prev => new Set(prev).add(card.id));
+
     const { data: existing } = await supabase
       .from('op_etapa_subetapas')
       .select('id, nome, concluida')
@@ -494,39 +499,51 @@ export default function KanbanProducao() {
       .order('criado_em');
 
     if (existing && existing.length > 0) {
-      setSubEtapas(existing.map(s => ({ id: s.id, nome: s.nome, concluida: s.concluida ?? false })));
+      setSubEtapasMap(prev => new Map(prev).set(card.id, existing.map(s => ({ id: s.id, nome: s.nome, concluida: s.concluida ?? false }))));
     } else {
-      // Create default sub-etapas
       const defaults = PREPARACAO_SUBETAPAS[card.tipo_produto] || [];
       if (defaults.length > 0) {
         const inserts = defaults.map(nome => ({ op_etapa_id: card.id, nome, concluida: false }));
         const { data: created } = await supabase.from('op_etapa_subetapas').insert(inserts).select('id, nome, concluida');
-        setSubEtapas((created || []).map(s => ({ id: s.id, nome: s.nome, concluida: s.concluida ?? false })));
+        setSubEtapasMap(prev => new Map(prev).set(card.id, (created || []).map(s => ({ id: s.id, nome: s.nome, concluida: s.concluida ?? false }))));
       } else {
-        setSubEtapas([]);
+        setSubEtapasMap(prev => new Map(prev).set(card.id, []));
       }
     }
-    setLoadingSubEtapas(false);
+    setLoadingPrepCards(prev => { const n = new Set(prev); n.delete(card.id); return n; });
   };
 
-  const toggleSubEtapa = async (subId: string, concluida: boolean) => {
+  const toggleSubEtapa = async (cardId: string, subId: string, concluida: boolean) => {
     await supabase.from('op_etapa_subetapas').update({ concluida }).eq('id', subId);
-    setSubEtapas(prev => prev.map(s => s.id === subId ? { ...s, concluida } : s));
+    setSubEtapasMap(prev => {
+      const next = new Map(prev);
+      const list = (next.get(cardId) || []).map(s => s.id === subId ? { ...s, concluida } : s);
+      next.set(cardId, list);
+      return next;
+    });
   };
 
-  const addCustomSubEtapa = async () => {
-    const card = prepDialog.card;
-    if (!card || !newSubEtapa.trim()) return;
-    const { data } = await supabase.from('op_etapa_subetapas').insert({ op_etapa_id: card.id, nome: newSubEtapa.trim(), concluida: false }).select('id, nome, concluida').single();
+  const addCustomSubEtapa = async (card: KanbanCard) => {
+    const text = newSubEtapaMap.get(card.id)?.trim();
+    if (!text) return;
+    const { data } = await supabase.from('op_etapa_subetapas').insert({ op_etapa_id: card.id, nome: text, concluida: false }).select('id, nome, concluida').single();
     if (data) {
-      setSubEtapas(prev => [...prev, { id: data.id, nome: data.nome, concluida: data.concluida ?? false }]);
-      setNewSubEtapa('');
+      setSubEtapasMap(prev => {
+        const next = new Map(prev);
+        next.set(card.id, [...(next.get(card.id) || []), { id: data.id, nome: data.nome, concluida: data.concluida ?? false }]);
+        return next;
+      });
+      setNewSubEtapaMap(prev => { const n = new Map(prev); n.delete(card.id); return n; });
     }
   };
 
-  const removeSubEtapa = async (subId: string) => {
+  const removeSubEtapa = async (cardId: string, subId: string) => {
     await supabase.from('op_etapa_subetapas').delete().eq('id', subId);
-    setSubEtapas(prev => prev.filter(s => s.id !== subId));
+    setSubEtapasMap(prev => {
+      const next = new Map(prev);
+      next.set(cardId, (next.get(cardId) || []).filter(s => s.id !== subId));
+      return next;
+    });
   };
 
   // --- Loss Registration ---
