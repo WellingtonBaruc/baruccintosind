@@ -123,6 +123,18 @@ export default function KanbanProducao() {
   // Recently sent to financeiro
   const [recentFinanceiro, setRecentFinanceiro] = useState<Map<string, number>>(new Map());
 
+  // Detail sheet
+  const [detailSheet, setDetailSheet] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean; pedido: any | null }>({ open: false, card: null, items: [], loading: false, pedido: null });
+
+  const openDetailSheet = async (card: KanbanCard) => {
+    setDetailSheet({ open: true, card, items: [], loading: true, pedido: null });
+    const [itemsRes, pedidoRes] = await Promise.all([
+      supabase.from('pedido_itens').select('*').eq('pedido_id', card.pedido_id).order('descricao_produto'),
+      supabase.from('pedidos').select('observacao_comercial, observacao_financeiro, observacao_logistica, observacao_api, observacao_interna_api, forma_pagamento, forma_envio, data_previsao_entrega, data_venda_api, valor_liquido, valor_bruto, valor_desconto').eq('id', card.pedido_id).single(),
+    ]);
+    setDetailSheet(prev => ({ ...prev, items: itemsRes.data || [], pedido: pedidoRes.data, loading: false }));
+  };
+
   const fetchCards = useCallback(async () => {
     const [etapasRes, semanaRes, feriadosRes, pausasRes, leadTimesRes] = await Promise.all([
       supabase
