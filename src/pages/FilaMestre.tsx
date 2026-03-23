@@ -349,6 +349,7 @@ export default function FilaMestre() {
                     <TableHead>Cliente</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>Data Venda</TableHead>
                     <TableHead>Prev. Entrega</TableHead>
                     <TableHead>Data PCP Calc.</TableHead>
                     <TableHead>Início Ideal</TableHead>
@@ -383,6 +384,7 @@ export default function FilaMestre() {
                           <Badge className={`text-xs font-normal ${tipoBadge}`}>{tipoLabel}</Badge>
                         </TableCell>
                         <TableCell className="text-right text-sm tabular-nums">{fmt(r.valor_liquido)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_venda_api)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_previsao_entrega)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{fmtDate(r.dataPcpCalculada)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{fmtDate(r.dataInicioIdeal)}</TableCell>
