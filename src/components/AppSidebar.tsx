@@ -32,11 +32,7 @@ const navItems: NavItem[] = [
 
   // Operador — only kanban (above)
 
-  // Comercial
-  { title: 'Para Validar', url: '/comercial', icon: ShoppingBag, perfis: ['comercial'] },
-
-  // Financeiro
-  { title: 'Para Aprovar', url: '/financeiro', icon: DollarSign, perfis: ['financeiro'] },
+  // Comercial / Financeiro / Logística → agora usam Kanban Venda (já incluído acima)
 
   // Loja
   { title: 'Verificar Pedidos', url: '/loja', icon: Store, perfis: ['loja'] },
@@ -44,11 +40,8 @@ const navItems: NavItem[] = [
   // Almoxarifado
   { title: 'Separação Fivelas', url: '/almoxarifado', icon: Package, perfis: ['almoxarifado'] },
 
-  // Admin extras — under Configurações group
+  // Admin extras — under Setores group
   { title: 'Loja', url: '/loja', icon: Store, perfis: ['admin', 'gestor'], group: 'setores' },
-  { title: 'Comercial', url: '/comercial', icon: ShoppingBag, perfis: ['admin', 'gestor'], group: 'setores' },
-  { title: 'Financeiro', url: '/financeiro', icon: DollarSign, perfis: ['admin', 'gestor'], group: 'setores' },
-  { title: 'Logística', url: '/logistica', icon: Truck, perfis: ['admin', 'gestor'], group: 'setores' },
   { title: 'Almoxarifado', url: '/almoxarifado', icon: Package, perfis: ['admin', 'gestor'], group: 'setores' },
   // Config
   { title: 'Relatórios', url: '/relatorios/abc', icon: BarChart3, perfis: ['admin', 'gestor'], group: 'config' },
