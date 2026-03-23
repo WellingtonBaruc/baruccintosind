@@ -172,9 +172,12 @@ export default function Usuarios() {
                     <TableCell>
                       <Switch checked={u.ativo} onCheckedChange={() => toggleAtivo(u)} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(u)}>
                         <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(u)}>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
