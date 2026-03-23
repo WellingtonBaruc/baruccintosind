@@ -12,11 +12,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
-import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye } from 'lucide-react';
+import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface KanbanCard {
@@ -936,26 +937,27 @@ export default function KanbanProducao() {
                                   </Button>
                                 )}
 
-                                {!inConcluido && col !== 'Aguardando Início' && (
-                                  <Button size="sm" variant="ghost" className="w-full mt-1 h-7 text-[10px] text-muted-foreground" onClick={() => openLossDialog(card)}>
-                                    + Registrar Perda
-                                  </Button>
-                                )}
-
-                                {isSupervisor && col !== 'Aguardando Início' && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className={`w-full mt-1 h-7 text-[10px] ${card.is_piloto ? 'text-purple-600' : 'text-muted-foreground'}`}
-                                    onClick={async () => {
-                                      const newVal = !card.is_piloto;
-                                      await supabase.from('pedidos').update({ is_piloto: newVal, status_piloto: newVal ? 'ENVIADO' : null }).eq('id', card.pedido_id);
-                                      toast.success(newVal ? 'Marcado como piloto' : 'Piloto removido');
-                                      fetchCards();
-                                    }}
-                                  >
-                                    {card.is_piloto ? '✦ Piloto ativo' : '+ Marcar Piloto'}
-                                  </Button>
+                                {!inConcluido && col !== 'Aguardando Início' && isSupervisor && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button size="sm" variant="ghost" className="w-full mt-1 h-7 text-[10px] text-muted-foreground">
+                                        <MoreHorizontal className="h-3 w-3 mr-1" /> Ações
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-48">
+                                      <DropdownMenuItem onClick={() => openLossDialog(card)}>
+                                        <AlertTriangle className="h-3.5 w-3.5 mr-2" /> Registrar Perda
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={async () => {
+                                        const newVal = !card.is_piloto;
+                                        await supabase.from('pedidos').update({ is_piloto: newVal, status_piloto: newVal ? 'ENVIADO' : null }).eq('id', card.pedido_id);
+                                        toast.success(newVal ? 'Marcado como piloto' : 'Piloto removido');
+                                        fetchCards();
+                                      }}>
+                                        <Star className="h-3.5 w-3.5 mr-2" /> {card.is_piloto ? 'Remover Piloto' : 'Marcar Piloto'}
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 )}
 
                                 {profile?.perfil === 'operador_producao' && card.operador_id === profile.id && !inConcluido && col !== 'Aguardando Início' && (
@@ -1071,7 +1073,7 @@ export default function KanbanProducao() {
       </Dialog>
 
       {/* Detail Sheet */}
-      <Sheet open={detailSheet.open} onOpenChange={(open) => setDetailSheet(prev => ({ ...prev, open }))}>
+      <Sheet open={detailSheet.open} onOpenChange={(open) => setDetailSheet(prev => ({ ...prev, open }))} modal={false}>
         <SheetContent className="w-[420px] sm:w-[480px] p-0">
           <SheetHeader className="px-6 pt-6 pb-4 border-b">
             <SheetTitle className="flex items-center gap-2">
