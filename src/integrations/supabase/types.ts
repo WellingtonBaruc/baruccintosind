@@ -427,6 +427,27 @@ export type Database = {
           },
         ]
       }
+      pcp_config_semana: {
+        Row: {
+          atualizado_em: string
+          domingo_ativo: boolean
+          id: string
+          sabado_ativo: boolean
+        }
+        Insert: {
+          atualizado_em?: string
+          domingo_ativo?: boolean
+          id?: string
+          sabado_ativo?: boolean
+        }
+        Update: {
+          atualizado_em?: string
+          domingo_ativo?: boolean
+          id?: string
+          sabado_ativo?: boolean
+        }
+        Relationships: []
+      }
       pcp_configuracao: {
         Row: {
           criado_em: string
@@ -458,6 +479,84 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pcp_feriados: {
+        Row: {
+          criado_em: string
+          data: string
+          id: string
+          nome: string
+          tipo: string
+        }
+        Insert: {
+          criado_em?: string
+          data: string
+          id?: string
+          nome: string
+          tipo?: string
+        }
+        Update: {
+          criado_em?: string
+          data?: string
+          id?: string
+          nome?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
+      pcp_lead_times: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          criado_em: string
+          id: string
+          lead_time_dias: number
+          observacao: string | null
+          tipo: string
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          lead_time_dias?: number
+          observacao?: string | null
+          tipo: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          lead_time_dias?: number
+          observacao?: string | null
+          tipo?: string
+        }
+        Relationships: []
+      }
+      pcp_pausas: {
+        Row: {
+          criado_em: string
+          data_fim: string
+          data_inicio: string
+          id: string
+          motivo: string
+        }
+        Insert: {
+          criado_em?: string
+          data_fim: string
+          data_inicio: string
+          id?: string
+          motivo: string
+        }
+        Update: {
+          criado_em?: string
+          data_fim?: string
+          data_inicio?: string
+          id?: string
+          motivo?: string
+        }
+        Relationships: []
       }
       pedido_financeiro: {
         Row: {
