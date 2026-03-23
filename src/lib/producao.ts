@@ -213,8 +213,43 @@ export async function concluirEtapa(
       iniciado_em: new Date().toISOString(),
     }).eq('id', nextEtapa.id);
   } else {
-    // All steps done — order awaits supervisor approval
+    // All steps done — mark order as concluded
     await supabase.from('ordens_producao').update({ status: 'CONCLUIDA' }).eq('id', ordemId);
+
+    // Check if ALL orders for this pedido are now CONCLUIDA
+    const { data: allOrdens } = await supabase
+      .from('ordens_producao')
+      .select('id, status')
+      .eq('pedido_id', pedidoId);
+
+    const allConcluidas = allOrdens?.every(o => o.id === ordemId || o.status === 'CONCLUIDA');
+
+    if (allConcluidas) {
+      // Get current pedido status to avoid overwriting later statuses
+      const { data: pedido } = await supabase
+        .from('pedidos')
+        .select('status_atual')
+        .eq('id', pedidoId)
+        .single();
+
+      const statusesQueNaoDevemSerSobrescritos = [
+        'AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL', 'AGUARDANDO_FINANCEIRO',
+        'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO',
+        'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO',
+      ];
+
+      if (pedido && !statusesQueNaoDevemSerSobrescritos.includes(pedido.status_atual)) {
+        await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', pedidoId);
+        await supabase.from('pedido_historico').insert({
+          pedido_id: pedidoId,
+          usuario_id: userId,
+          tipo_acao: 'TRANSICAO',
+          status_anterior: pedido.status_atual,
+          status_novo: 'AGUARDANDO_COMERCIAL',
+          observacao: 'Todas as ordens de produção concluídas. Pedido encaminhado para comercial.',
+        });
+      }
+    }
   }
 
   await supabase.from('pedido_historico').insert({
