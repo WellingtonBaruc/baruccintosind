@@ -723,6 +723,10 @@ export default function KanbanProducao() {
   const isInPreparacao = (card: KanbanCard) =>
     mapEtapaToColumn(card.nome_etapa, card.etapa_status, card.ordem_status, card.tipo_produto) === 'Preparação';
 
+  // KPI: Fivela coberta aguardando
+  const fivelaAguardandoCards = cards.filter(c => c.tem_fivela_coberta && c.fivela_coberta_status !== 'CONCLUIDO');
+  const [showFivelaKpiList, setShowFivelaKpiList] = useState(false);
+
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -742,6 +746,44 @@ export default function KanbanProducao() {
           </Select>
         </div>
       </div>
+
+      {/* KPI bar */}
+      <div className="flex gap-3 flex-wrap">
+        <button
+          onClick={() => setShowFivelaKpiList(!showFivelaKpiList)}
+          className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition-colors hover:bg-accent/50 ${showFivelaKpiList ? 'border-primary bg-primary/5' : 'border-border bg-background'}`}
+        >
+          <span className="text-muted-foreground">Fivela Coberta Pendente</span>
+          <Badge className={`text-xs ${fivelaAguardandoCards.length > 0 ? 'bg-orange-100 text-orange-700 border-orange-300' : 'bg-muted text-muted-foreground'}`}>
+            {fivelaAguardandoCards.length}
+          </Badge>
+        </button>
+      </div>
+
+      {/* Fivela KPI expanded list */}
+      {showFivelaKpiList && fivelaAguardandoCards.length > 0 && (
+        <div className="rounded-lg border border-border bg-background p-3 space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="text-sm font-semibold">Vendas com Fivela Coberta Pendente</h4>
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setShowFivelaKpiList(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            {fivelaAguardandoCards.map(card => (
+              <div key={card.id} className="flex items-center justify-between rounded-md border p-2.5 bg-muted/20 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-xs truncate">#{card.api_venda_id}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{card.cliente_nome}</p>
+                </div>
+                <Badge className={`shrink-0 ml-2 text-[10px] ${card.fivela_coberta_status === 'EM_ANDAMENTO' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 'bg-orange-100 text-orange-700 border-orange-300'}`}>
+                  {card.fivela_coberta_status === 'EM_ANDAMENTO' ? 'Em Andamento' : 'Aguardando'}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filter buttons */}
       <div className="flex gap-2 flex-wrap">
