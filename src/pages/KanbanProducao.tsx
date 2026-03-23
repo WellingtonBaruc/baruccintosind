@@ -740,7 +740,6 @@ export default function KanbanProducao() {
     { key: 'all', label: 'Todos' },
     { key: 'SINTETICO', label: 'Sintético' },
     { key: 'TECIDO', label: 'Tecido' },
-    { key: 'FIVELA_COBERTA', label: 'Fivela Coberta' },
   ];
 
   const isInPreparacao = (card: KanbanCard) =>
