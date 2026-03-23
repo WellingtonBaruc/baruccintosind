@@ -35,6 +35,7 @@ interface KanbanCard {
   has_sintetico_order: boolean;
   sintetico_ordem_id: string | null;
   transferred: boolean;
+  tecido_transferred: boolean;
   pedido_status: string;
   perdas_pendentes: number;
   is_piloto: boolean;
