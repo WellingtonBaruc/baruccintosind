@@ -432,7 +432,25 @@ export default function VerificacaoLoja() {
                 )}
               </div>
 
-              {/* For path D: classify missing items */}
+              {/* Quantidade faltante input */}
+              {isVerificando && item.disponivel === false && (
+                <div className="flex items-center gap-2 pt-1">
+                  <Label className="text-xs text-muted-foreground whitespace-nowrap">Qtd faltante:</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={item.quantidade}
+                    value={item.quantidade_faltante ?? item.quantidade}
+                    onChange={e => {
+                      const val = Math.max(1, Math.min(item.quantidade, parseInt(e.target.value) || 1));
+                      handleQtdFaltanteChange(item.id, val);
+                    }}
+                    className="h-7 w-20 text-xs"
+                  />
+                  <span className="text-xs text-muted-foreground">/ {item.quantidade}</span>
+                </div>
+              )}
+
               {isVerificando && item.disponivel === false && caminhoSelecionado === 'D_MISTO' && (
                 <div className="flex items-center gap-2 pt-1">
                   <Label className="text-xs text-muted-foreground">Tipo:</Label>
