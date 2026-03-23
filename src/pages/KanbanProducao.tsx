@@ -78,9 +78,9 @@ function mapEtapaToColumn(etapaName: string, etapaStatus: string, ordemStatus: s
     return etapaName;
   }
 
-  // Sintético mappings
+  // Sintético mappings (skip Conferência/Fusionagem)
   if (tipoProduto === 'SINTETICO') {
-    if (etapaName === 'Corte') return 'Conferência';
+    if (etapaName === 'Corte') return 'Aguardando Início';
     if (etapaName === 'Preparação') return 'Preparação';
     if (etapaName === 'Montagem') return 'Montagem';
     if (etapaName === 'Embalagem') return 'Embalagem';
