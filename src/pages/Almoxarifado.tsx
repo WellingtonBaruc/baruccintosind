@@ -49,6 +49,7 @@ export default function AlmoxarifadoPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('PENDENTE');
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'producao'>('cards');
 
   useEffect(() => { fetchVendas(); }, []);
 
