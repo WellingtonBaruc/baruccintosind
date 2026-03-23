@@ -83,7 +83,7 @@ export default function Usuarios() {
     setSaving(true);
     try {
       if (editing) {
-        const { error } = await supabase.from('usuarios').update({ nome, perfil, setor: setor || null }).eq('id', editing.id);
+        const { error } = await supabase.from('usuarios').update({ nome, email, perfil, setor: setor || null }).eq('id', editing.id);
         if (error) throw error;
         toast.success('Usuário atualizado.');
       } else {
