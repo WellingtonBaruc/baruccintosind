@@ -272,7 +272,7 @@ export default function FilaMestre() {
     fetchAll();
   };
 
-
+  const openDetail = async (pedidoId: string) => {
     setSelectedId(pedidoId);
     setDetailLoading(true);
     const [rPedido, rItens, rHist, rOrdens] = await Promise.all([
