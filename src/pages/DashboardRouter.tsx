@@ -20,9 +20,9 @@ export default function DashboardRouter() {
     case 'loja':
       return <DashboardLoja />;
     case 'comercial':
-      return <DashboardComercial />;
     case 'financeiro':
-      return <DashboardFinanceiro />;
+    case 'logistica':
+      return <Navigate to="/kanban-venda" replace />;
     case 'almoxarifado':
       return <Navigate to="/almoxarifado" replace />;
     default:
