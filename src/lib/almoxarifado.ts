@@ -46,10 +46,9 @@ export function requerSeparacaoAlmoxarifado(descricao: string, categoria?: strin
   if (
     desc.includes('CINTO SINTETICO') || desc.includes('CINTO SINTÉTICO') ||
     desc.includes('CINTO TECIDO') ||
-    desc.includes('TIRA SINTETICO') || desc.includes('TIRA SINTÉTICO') ||
-    desc.includes('TIRA TECIDO') ||
     desc.includes('FIVELA COBERTA')
   ) {
+    // TIRA SINTETICO e TIRA TECIDO NÃO requerem separação no almoxarifado
     return true;
   }
 
@@ -72,9 +71,9 @@ export function parseItemAttributes(descricao: string, categoria?: string | null
   let tipo_produto = 'OUTROS';
   if (desc.includes('FIVELA COBERTA') || cat === 'FIVELA COBERTA' || cat === 'FIVELA_COBERTA') {
     tipo_produto = 'FIVELA_COBERTA';
-  } else if (desc.includes('CINTO SINTETICO') || desc.includes('CINTO SINTÉTICO') || desc.includes('TIRA SINTETICO') || desc.includes('TIRA SINTÉTICO')) {
+  } else if (desc.includes('CINTO SINTETICO') || desc.includes('CINTO SINTÉTICO')) {
     tipo_produto = 'SINTETICO';
-  } else if (desc.includes('CINTO TECIDO') || desc.includes('TIRA TECIDO')) {
+  } else if (desc.includes('CINTO TECIDO')) {
     tipo_produto = 'TECIDO';
   } else if (desc.includes('FIVELA') || desc.includes('PASSANTE') || cat.includes('AVIAMENTO')) {
     tipo_produto = 'AVIAMENTO';
