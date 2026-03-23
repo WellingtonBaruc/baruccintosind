@@ -317,6 +317,11 @@ export default function VerificacaoLoja() {
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-semibold tracking-tight">{pedido.numero_pedido}</h1>
             <Badge className={statusCfg.color}>{statusCfg.label}</Badge>
+            {pedido.fivelas_separadas && (
+              <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-xs">
+                <CheckCircle2 className="h-3 w-3 mr-1" /> Fivelas Separadas ✓
+              </Badge>
+            )}
             {pedido.subtipo_pronta_entrega && (
               <Badge variant="outline" className="text-xs">
                 {SUBTIPO_PRONTA_ENTREGA_CONFIG[pedido.subtipo_pronta_entrega]?.label || pedido.subtipo_pronta_entrega}
