@@ -23,6 +23,13 @@ import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+interface EtapaInfo {
+  id: string;
+  nome_etapa: string;
+  ordem_sequencia: number;
+  status: string;
+}
+
 interface VendaRow {
   id: string;
   api_venda_id: string | null;
@@ -36,6 +43,7 @@ interface VendaRow {
   status_api: string | null;
   criado_em: string;
   ordem_id: string | null;
+  ordem_status: string | null;
   tipo_produto: string | null;
   etapa_atual: string;
   operador_atual: string;
@@ -49,6 +57,7 @@ interface VendaRow {
   dataInicioIdeal: string | null;
   atrasoDias: number;
   prioridade: 'URGENTE' | 'ATENCAO' | 'NORMAL';
+  etapas: EtapaInfo[];
 }
 
 interface PedidoDetail {
