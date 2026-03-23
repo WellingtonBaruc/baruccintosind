@@ -301,6 +301,11 @@ export default function FilaMestre() {
                                 {r.status_piloto === 'REPROVADO' ? 'PILOTO ✗' : 'PILOTO'}
                               </Badge>
                             )}
+                            {r.fivelas_separadas && (
+                              <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                                Fivelas separadas ✓
+                              </Badge>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
