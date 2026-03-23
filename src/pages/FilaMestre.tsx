@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { STATUS_PRAZO_CONFIG, TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
@@ -17,11 +17,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+
+interface EtapaInfo {
+  id: string;
+  nome_etapa: string;
+  ordem_sequencia: number;
+  status: string;
+}
 
 interface VendaRow {
   id: string;
@@ -36,6 +44,7 @@ interface VendaRow {
   status_api: string | null;
   criado_em: string;
   ordem_id: string | null;
+  ordem_status: string | null;
   tipo_produto: string | null;
   etapa_atual: string;
   operador_atual: string;
@@ -49,6 +58,7 @@ interface VendaRow {
   dataInicioIdeal: string | null;
   atrasoDias: number;
   prioridade: 'URGENTE' | 'ATENCAO' | 'NORMAL';
+  etapas: EtapaInfo[];
 }
 
 interface PedidoDetail {
@@ -162,8 +172,7 @@ export default function FilaMestre() {
     const ordemIds = (ordens || []).map(o => o.id);
     const { data: etapas } = await supabase
       .from('op_etapas')
-      .select('ordem_id, nome_etapa, operador_id, status, ordem_sequencia, usuarios(nome)')
-      .in('status', ['EM_ANDAMENTO', 'PENDENTE'])
+      .select('id, ordem_id, nome_etapa, operador_id, status, ordem_sequencia, usuarios(nome)')
       .in('ordem_id', ordemIds.length > 0 ? ordemIds : ['none'])
       .order('ordem_sequencia', { ascending: true });
 
@@ -172,8 +181,8 @@ export default function FilaMestre() {
 
     const vendas: VendaRow[] = pedidos.map(p => {
       const ordem = (ordens || []).find(o => o.pedido_id === p.id);
-      const ordemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
-      const etapaAtiva = ordemEtapas.find(e => e.status === 'EM_ANDAMENTO') || ordemEtapas[0] || null;
+      const allOrdemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
+      const etapaAtiva = allOrdemEtapas.find(e => e.status === 'EM_ANDAMENTO') || allOrdemEtapas.find(e => e.status === 'PENDENTE') || null;
 
       let etapaDisplay = '—';
       if (ordem) {
@@ -202,6 +211,7 @@ export default function FilaMestre() {
       return {
         ...p,
         ordem_id: ordem?.id || null,
+        ordem_status: ordem?.status || null,
         tipo_produto: tipoProduto,
         etapa_atual: etapaDisplay,
         operador_atual: (etapaAtiva?.usuarios as any)?.nome || '—',
@@ -215,11 +225,52 @@ export default function FilaMestre() {
         dataInicioIdeal: pcp.dataInicioIdeal,
         atrasoDias: pcp.atrasoDias,
         prioridade: pcp.prioridade,
+        etapas: allOrdemEtapas.map((e: any) => ({ id: e.id, nome_etapa: e.nome_etapa, ordem_sequencia: e.ordem_sequencia, status: e.status })),
       };
     });
 
     setRows(vendas);
     setLoading(false);
+  };
+  // Admin move order to a specific etapa
+  const handleMoveToEtapa = async (row: VendaRow, targetEtapa: EtapaInfo) => {
+    if (!profile || !['admin', 'gestor'].includes(profile.perfil)) return;
+    if (!row.ordem_id) return;
+    
+    const etapas = row.etapas || [];
+    for (const etapa of etapas) {
+      let newStatus: string;
+      if (etapa.ordem_sequencia < targetEtapa.ordem_sequencia) {
+        newStatus = 'CONCLUIDA';
+      } else if (etapa.ordem_sequencia === targetEtapa.ordem_sequencia) {
+        newStatus = 'EM_ANDAMENTO';
+      } else {
+        newStatus = 'PENDENTE';
+      }
+      if (etapa.status !== newStatus) {
+        await supabase.from('op_etapas').update({ 
+          status: newStatus,
+          ...(newStatus === 'EM_ANDAMENTO' ? { iniciado_em: new Date().toISOString() } : {}),
+          ...(newStatus === 'CONCLUIDA' ? { concluido_em: new Date().toISOString() } : {}),
+        } as any).eq('id', etapa.id);
+      }
+    }
+    await supabase.from('ordens_producao').update({ status: 'EM_ANDAMENTO' } as any).eq('id', row.ordem_id);
+    toast.success(`Ordem movida para: ${targetEtapa.nome_etapa}`);
+    fetchAll();
+  };
+
+  const handleMoveToConcluido = async (row: VendaRow) => {
+    if (!profile || !['admin', 'gestor'].includes(profile.perfil)) return;
+    if (!row.ordem_id) return;
+    for (const et of row.etapas) {
+      if (et.status !== 'CONCLUIDA') {
+        await supabase.from('op_etapas').update({ status: 'CONCLUIDA', concluido_em: new Date().toISOString() } as any).eq('id', et.id);
+      }
+    }
+    await supabase.from('ordens_producao').update({ status: 'CONCLUIDA' } as any).eq('id', row.ordem_id);
+    toast.success('Ordem marcada como Concluída');
+    fetchAll();
   };
 
   const openDetail = async (pedidoId: string) => {
@@ -390,75 +441,137 @@ export default function FilaMestre() {
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Data Venda</TableHead>
                     <TableHead>Prev. Entrega</TableHead>
-                    
                     <TableHead>Início Ideal</TableHead>
                     <TableHead>Atraso</TableHead>
                     <TableHead>Início PCP</TableHead>
                     <TableHead>Fim PCP</TableHead>
                     <TableHead>Etapa</TableHead>
-                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sorted.map(r => {
                     const prazoCfg = STATUS_PRAZO_CONFIG[r.status_prazo || 'NO_PRAZO'];
-                    const statusCfg = STATUS_PEDIDO_CONFIG[r.status_atual] || { label: r.status_atual, color: 'bg-muted text-muted-foreground' };
                     const tipoBadge = TIPO_PRODUTO_BADGE[r.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border';
                     const tipoLabel = TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || 'A classificar';
                     const prioCfg = prioConfig[r.prioridade];
+                    const isAdmin = profile && ['admin', 'gestor'].includes(profile.perfil);
+                    const etapas = r.etapas || [];
 
                     return (
-                      <TableRow
-                        key={r.id}
-                        className={`cursor-pointer hover:bg-accent/40 transition-colors ${r.prioridade === 'URGENTE' ? 'bg-destructive/5' : ''}`}
-                        onClick={() => openDetail(r.id)}
-                      >
-                        <TableCell>{prazoCfg?.icon}</TableCell>
-                        <TableCell>
-                          <Badge className={`text-xs font-normal ${prioCfg.color}`}>{prioCfg.label}</Badge>
-                        </TableCell>
-                        <TableCell className="font-medium text-sm">{r.api_venda_id || r.numero_pedido}</TableCell>
-                        <TableCell className="text-sm">{r.cliente_nome}</TableCell>
-                        <TableCell>
-                          <Badge className={`text-xs font-normal ${tipoBadge}`}>{tipoLabel}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-sm tabular-nums">{fmt(r.valor_liquido)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_venda_api)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_previsao_entrega)}</TableCell>
-                        
-                        <TableCell className="text-xs text-muted-foreground">{fmtDate(r.dataInicioIdeal)}</TableCell>
-                        <TableCell>
-                          {r.atrasoDias < 0 ? (
-                            <span className="text-xs font-semibold text-destructive tabular-nums">{r.atrasoDias}d</span>
-                          ) : r.atrasoDias <= 2 ? (
-                            <span className="text-xs font-semibold text-warning tabular-nums">{r.atrasoDias}d</span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground tabular-nums">{r.atrasoDias}d</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-xs text-muted-foreground">{fmtDateTime(r.data_inicio_pcp)}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-xs text-muted-foreground">{fmtDateTime(r.data_fim_pcp)}</span>
-                        </TableCell>
-                        <TableCell className="text-sm">{r.etapa_atual}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Badge className={`font-normal text-xs ${statusCfg.color}`}>{statusCfg.label}</Badge>
-                            {r.is_piloto && (
-                              <Badge className={`text-[10px] ${r.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
-                                {r.status_piloto === 'REPROVADO' ? 'PILOTO ✗' : 'PILOTO'}
-                              </Badge>
+                      <React.Fragment key={r.id}>
+                        <TableRow
+                          className={`cursor-pointer hover:bg-accent/40 transition-colors ${r.prioridade === 'URGENTE' ? 'bg-destructive/5' : ''}`}
+                          onClick={() => openDetail(r.id)}
+                        >
+                          <TableCell>{prazoCfg?.icon}</TableCell>
+                          <TableCell>
+                            <Badge className={`text-xs font-normal ${prioCfg.color}`}>{prioCfg.label}</Badge>
+                          </TableCell>
+                          <TableCell className="font-medium text-sm">{r.api_venda_id || r.numero_pedido}</TableCell>
+                          <TableCell className="text-sm">{r.cliente_nome}</TableCell>
+                          <TableCell>
+                            <Badge className={`text-xs font-normal ${tipoBadge}`}>{tipoLabel}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">{fmt(r.valor_liquido)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_venda_api)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_previsao_entrega)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{fmtDate(r.dataInicioIdeal)}</TableCell>
+                          <TableCell>
+                            {r.atrasoDias < 0 ? (
+                              <span className="text-xs font-semibold text-destructive tabular-nums">{r.atrasoDias}d</span>
+                            ) : r.atrasoDias <= 2 ? (
+                              <span className="text-xs font-semibold text-warning tabular-nums">{r.atrasoDias}d</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground tabular-nums">{r.atrasoDias}d</span>
                             )}
-                            {r.fivelas_separadas && (
-                              <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
-                                Fivelas ✓
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground">{fmtDateTime(r.data_inicio_pcp)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground">{fmtDateTime(r.data_fim_pcp)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm">{r.etapa_atual}</span>
+                              {r.is_piloto && (
+                                <Badge className={`text-[10px] ${r.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
+                                  {r.status_piloto === 'REPROVADO' ? 'PILOTO ✗' : 'PILOTO'}
+                                </Badge>
+                              )}
+                              {r.fivelas_separadas && (
+                                <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                                  Fivelas ✓
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {/* Progress bar row */}
+                        {etapas.length > 0 && (
+                          <tr>
+                            <td colSpan={13} className="px-4 pb-2 pt-0 border-b">
+                              <TooltipProvider delayDuration={200}>
+                                <div className="flex items-center gap-0.5">
+                                  {etapas.map((etapa) => {
+                                    const isConcluida = etapa.status === 'CONCLUIDA';
+                                    const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
+                                    return (
+                                      <Tooltip key={etapa.id}>
+                                        <TooltipTrigger asChild>
+                                          <button
+                                            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-all ${
+                                              isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+                                            } ${
+                                              isConcluida ? 'bg-green-100 text-green-700' :
+                                              isEmAndamento ? 'bg-primary/15 text-primary font-semibold ring-1 ring-primary/30' :
+                                              'bg-muted/60 text-muted-foreground'
+                                            }`}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (isAdmin) handleMoveToEtapa(r, etapa);
+                                            }}
+                                          >
+                                            {isConcluida && <CheckCircle2 className="h-2.5 w-2.5" />}
+                                            <span className="truncate max-w-[80px]">{etapa.nome_etapa}</span>
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="text-xs">
+                                          <p className="font-medium">{etapa.nome_etapa}</p>
+                                          <p className="text-muted-foreground">{isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}</p>
+                                          {isAdmin && <p className="text-primary mt-0.5">Clique para mover</p>}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    );
+                                  })}
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-all ${
+                                          isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+                                        } ${
+                                          r.ordem_status === 'CONCLUIDA' ? 'bg-green-100 text-green-700 font-semibold' : 'bg-muted/60 text-muted-foreground'
+                                        }`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (isAdmin) handleMoveToConcluido(r);
+                                        }}
+                                      >
+                                        {r.ordem_status === 'CONCLUIDA' && <CheckCircle2 className="h-2.5 w-2.5" />}
+                                        <span>Concluído</span>
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-xs">
+                                      <p className="font-medium">Concluído</p>
+                                      {isAdmin && <p className="text-primary mt-0.5">Clique para concluir</p>}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </TooltipProvider>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </TableBody>
