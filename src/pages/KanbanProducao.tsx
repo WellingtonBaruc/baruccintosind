@@ -111,11 +111,11 @@ export default function KanbanProducao() {
   const [lossForm, setLossForm] = useState({ pedido_item_id: '', nm_item: '', quantidade_perdida: '', motivo: '', etapa: '' });
   const [lossEtapas, setLossEtapas] = useState<string[]>([]);
 
-  // Preparação sub-etapas dialog
-  const [prepDialog, setPrepDialog] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
-  const [subEtapas, setSubEtapas] = useState<{ id: string; nome: string; concluida: boolean }[]>([]);
-  const [newSubEtapa, setNewSubEtapa] = useState('');
-  const [loadingSubEtapas, setLoadingSubEtapas] = useState(false);
+  // Preparação sub-etapas inline expansion
+  const [expandedPrepCards, setExpandedPrepCards] = useState<Set<string>>(new Set());
+  const [subEtapasMap, setSubEtapasMap] = useState<Map<string, { id: string; nome: string; concluida: boolean }[]>>(new Map());
+  const [newSubEtapaMap, setNewSubEtapaMap] = useState<Map<string, string>>(new Map());
+  const [loadingPrepCards, setLoadingPrepCards] = useState<Set<string>>(new Set());
 
   // Recently sent to financeiro
   const [recentFinanceiro, setRecentFinanceiro] = useState<Map<string, number>>(new Map());
