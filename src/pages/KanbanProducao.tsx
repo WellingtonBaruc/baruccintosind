@@ -862,7 +862,9 @@ export default function KanbanProducao() {
                                   <p className="font-bold text-base leading-tight flex items-center gap-1">
                                     {card.api_venda_id}
                                     {card.ordem_sequencia_op > 1 && (
-                                      <span className="text-xs font-medium text-primary ml-1.5">• OP {card.ordem_sequencia_op}</span>
+                                      <Badge className="ml-1.5 text-[9px] px-1.5 py-0 bg-primary/15 text-primary border-primary/30 font-semibold">
+                                        OP {card.ordem_sequencia_op} — Complementar
+                                      </Badge>
                                     )}
                                     <Eye className="h-3 w-3 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100" />
                                   </p>
