@@ -25,6 +25,7 @@ import DashboardComercial from "./pages/DashboardComercial";
 import DashboardFinanceiro from "./pages/DashboardFinanceiro";
 import DashboardLoja from "./pages/DashboardLoja";
 import CurvaABC from "./pages/CurvaABC";
+import AlmoxarifadoPage from "./pages/Almoxarifado";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 
