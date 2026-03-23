@@ -144,15 +144,28 @@ export default function CurvaABC() {
     const startStr = format(dateRange.start, 'yyyy-MM-dd');
     const endStr = format(dateRange.end, 'yyyy-MM-dd');
 
-    // Get historical + finalized pedidos
-    const { data: pedidos } = await supabase
-      .from('pedidos')
-      .select('id, data_venda_api, status_atual, status_api')
-      .or('status_atual.eq.HISTORICO,status_api.eq.Finalizado,status_atual.eq.FINALIZADO_SIMPLIFICA')
-      .gte('data_venda_api', startStr)
-      .lte('data_venda_api', endStr);
+    // Get historical + finalized pedidos (paginated to avoid 1000 row limit)
+    const allPedidos: { id: string; data_venda_api: string | null; status_atual: string; status_api: string | null }[] = [];
+    let from = 0;
+    const pageSize = 1000;
+    while (true) {
+      const { data: batch } = await supabase
+        .from('pedidos')
+        .select('id, data_venda_api, status_atual, status_api')
+        .or('status_atual.eq.HISTORICO,status_api.eq.Finalizado,status_atual.eq.FINALIZADO_SIMPLIFICA')
+        .gte('data_venda_api', startStr)
+        .lte('data_venda_api', endStr)
+        .range(from, from + pageSize - 1);
 
-    if (!pedidos || pedidos.length === 0) {
+      if (!batch || batch.length === 0) break;
+      allPedidos.push(...batch);
+      if (batch.length < pageSize) break;
+      from += pageSize;
+    }
+
+    const pedidos = allPedidos;
+
+    if (pedidos.length === 0) {
       setItens([]);
       setLoading(false);
       return;
