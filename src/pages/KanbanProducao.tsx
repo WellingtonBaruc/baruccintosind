@@ -864,15 +864,27 @@ export default function KanbanProducao() {
                                 )}
 
                                 {/* Concluído lifecycle badges */}
-                                {inConcluido && !fivelaWithSintetico && (() => {
+                                {inConcluido && (() => {
                                   const badge = getConcluidoBadge(card);
                                   return <Badge className={`mt-2 text-[10px] ${badge.cls}`}>{badge.label}</Badge>;
                                 })()}
 
-                                {inConcluido && fivelaWithSintetico && (
-                                  <Badge className="mt-2 text-[10px] bg-orange-500/15 text-orange-600 border-orange-500/30">
-                                    Aguardando transferência
-                                  </Badge>
+                                {/* Fivela coberta badge/button */}
+                                {card.tem_fivela_coberta && (
+                                  card.fivela_coberta_status === 'CONCLUIDO' ? (
+                                    <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                                      Fivela coberta pronta ✓
+                                    </Badge>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className={`w-full mt-1.5 h-7 text-[10px] ${card.fivela_coberta_status === 'EM_ANDAMENTO' ? 'border-[hsl(var(--warning))] text-[hsl(var(--warning))]' : 'border-orange-400 text-orange-600'}`}
+                                      onClick={(e) => { e.stopPropagation(); setFivelaStatusModal({ open: true, card }); }}
+                                    >
+                                      Fivela Coberta: {card.fivela_coberta_status === 'EM_ANDAMENTO' ? 'Em Andamento' : 'Aguardando'}
+                                    </Button>
+                                  )
                                 )}
 
                                 {card.data_previsao_entrega && (
