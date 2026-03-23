@@ -7,10 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Search, CheckCircle2, Package, Store } from 'lucide-react';
+import { Loader2, Search, CheckCircle2, Package, Store, Ruler, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import {
+  requerSeparacaoAlmoxarifado,
+  parseItemAttributes,
+  TIPO_PRODUTO_ALMOX_LABELS,
+  TIPO_PRODUTO_ALMOX_COLORS,
+  type ParsedItemAttributes,
+} from '@/lib/almoxarifado';
 
 interface AlmoxItem {
   id: string;
@@ -20,6 +27,7 @@ interface AlmoxItem {
   observacao_producao: string | null;
   origem: 'fivela' | 'solicitacao';
   solicitacao_id?: string;
+  parsed: ParsedItemAttributes;
 }
 
 interface AlmoxVenda {
@@ -31,12 +39,6 @@ interface AlmoxVenda {
   fivelas_separadas: boolean;
   origem: 'fivela' | 'solicitacao' | 'ambos';
   itens: AlmoxItem[];
-}
-
-function isFivelaItem(item: any): boolean {
-  const desc = (item.descricao_produto || '').toUpperCase();
-  const cat = (item.categoria_produto || '').toUpperCase();
-  return desc.includes('FIVELA') || desc.includes('PASSANTE') || cat.includes('FIVELA') || cat.includes('AVIAMENTO');
 }
 
 export default function AlmoxarifadoPage() {
@@ -51,7 +53,7 @@ export default function AlmoxarifadoPage() {
   const fetchVendas = async () => {
     setLoading(true);
 
-    // ── Fonte A: Pedidos "Em Produção" com itens de fivela ──
+    // ── Fonte A: Pedidos "Em Produção" com itens que requerem separação ──
     const { data: pedidosA } = await supabase
       .from('pedidos')
       .select('id, api_venda_id, cliente_nome, data_previsao_entrega, status_prazo, status_atual, status_api, fivelas_separadas')
@@ -72,8 +74,11 @@ export default function AlmoxarifadoPage() {
     const mapA = new Map<string, AlmoxVenda>();
     for (const p of (pedidosA || [])) {
       const pedidoItens = allItensA.filter(i => i.pedido_id === p.id);
-      const fivelaItens = pedidoItens.filter(isFivelaItem);
-      if (fivelaItens.length === 0) continue;
+      // Use new detection: requerSeparacaoAlmoxarifado
+      const itensRequerem = pedidoItens.filter(i =>
+        requerSeparacaoAlmoxarifado(i.descricao_produto, i.categoria_produto)
+      );
+      if (itensRequerem.length === 0) continue;
 
       mapA.set(p.id, {
         pedido_id: p.id,
@@ -83,13 +88,14 @@ export default function AlmoxarifadoPage() {
         status_prazo: p.status_prazo,
         fivelas_separadas: (p as any).fivelas_separadas || false,
         origem: 'fivela',
-        itens: fivelaItens.map(i => ({
+        itens: itensRequerem.map(i => ({
           id: i.id,
           descricao_produto: i.descricao_produto,
           referencia_produto: i.referencia_produto,
           quantidade: i.quantidade,
           observacao_producao: i.observacao_producao,
           origem: 'fivela' as const,
+          parsed: parseItemAttributes(i.descricao_produto, i.categoria_produto),
         })),
       });
     }
@@ -122,6 +128,7 @@ export default function AlmoxarifadoPage() {
         observacao_producao: null,
         origem: 'solicitacao',
         solicitacao_id: sol.id,
+        parsed: parseItemAttributes(sol.descricao),
       };
 
       if (existing) {
@@ -155,7 +162,6 @@ export default function AlmoxarifadoPage() {
         fivelas_separadas_em: new Date().toISOString(),
       } as any).eq('id', venda.pedido_id);
 
-      // Atender solicitações pendentes desse pedido
       const solIds = venda.itens.filter(i => i.solicitacao_id).map(i => i.solicitacao_id!);
       if (solIds.length > 0) {
         await supabase.from('solicitacoes_almoxarifado').update({
@@ -210,7 +216,7 @@ export default function AlmoxarifadoPage() {
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Separação de Fivelas</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Separação — Almoxarifado</h1>
         <Badge variant="outline" className="text-sm py-1 px-3">{filtered.length} vendas</Badge>
       </div>
 
@@ -230,7 +236,7 @@ export default function AlmoxarifadoPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-center py-12 text-muted-foreground">Nenhuma venda com fivelas encontrada.</p>
+        <p className="text-center py-12 text-muted-foreground">Nenhuma venda encontrada.</p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map(v => (
@@ -264,21 +270,7 @@ export default function AlmoxarifadoPage() {
               <CardContent className="space-y-3">
                 <div className="space-y-2">
                   {v.itens.map(item => (
-                    <div key={item.id} className="rounded-md border border-border/60 p-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium flex-1">{item.descricao_produto}</p>
-                        {item.origem === 'solicitacao' && (
-                          <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-600 border-purple-500/20 shrink-0">Loja</Badge>
-                        )}
-                      </div>
-                      {item.referencia_produto && <p className="text-xs text-muted-foreground">Ref: {item.referencia_produto}</p>}
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs font-medium">{item.quantidade} un</span>
-                        {item.observacao_producao && (
-                          <span className="text-xs text-muted-foreground italic">"{item.observacao_producao}"</span>
-                        )}
-                      </div>
-                    </div>
+                    <ItemCard key={item.id} item={item} />
                   ))}
                 </div>
 
@@ -292,6 +284,50 @@ export default function AlmoxarifadoPage() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ItemCard({ item }: { item: AlmoxItem }) {
+  const { parsed } = item;
+  const tipoLabel = TIPO_PRODUTO_ALMOX_LABELS[parsed.tipo_produto] || parsed.tipo_produto;
+  const tipoColor = TIPO_PRODUTO_ALMOX_COLORS[parsed.tipo_produto] || TIPO_PRODUTO_ALMOX_COLORS.OUTROS;
+
+  return (
+    <div className="rounded-md border border-border/60 p-2.5 text-sm space-y-1.5">
+      <div className="flex items-start gap-2">
+        <p className="font-medium flex-1 leading-snug">{item.descricao_produto}</p>
+        {item.origem === 'solicitacao' && (
+          <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-600 border-purple-500/20 shrink-0">Loja</Badge>
+        )}
+      </div>
+
+      {/* Parsed attributes */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Badge variant="outline" className={`text-[10px] ${tipoColor}`}>
+          <Tag className="h-2.5 w-2.5 mr-0.5" />
+          {tipoLabel}
+        </Badge>
+        {parsed.modelo_fivela && (
+          <Badge variant="outline" className="text-[10px] bg-accent/50 text-accent-foreground border-border">
+            {parsed.modelo_fivela}
+          </Badge>
+        )}
+        {parsed.largura_mm && (
+          <Badge variant="outline" className="text-[10px] bg-accent/50 text-accent-foreground border-border">
+            <Ruler className="h-2.5 w-2.5 mr-0.5" />
+            {parsed.largura_mm}mm
+          </Badge>
+        )}
+      </div>
+
+      {item.referencia_produto && <p className="text-xs text-muted-foreground">Ref: {item.referencia_produto}</p>}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-medium">{item.quantidade} un</span>
+        {item.observacao_producao && (
+          <span className="text-xs text-muted-foreground italic">"{item.observacao_producao}"</span>
+        )}
+      </div>
     </div>
   );
 }
