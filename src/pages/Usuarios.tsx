@@ -46,6 +46,7 @@ export default function Usuarios() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<UsuarioRow | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UsuarioRow | null>(null);
 
   // Form state
   const [nome, setNome] = useState('');
