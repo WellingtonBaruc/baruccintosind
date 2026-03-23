@@ -86,26 +86,44 @@ export default function FilaMestre() {
     const pedidoIds = pedidos.map(p => p.id);
     const { data: ordens } = await supabase
       .from('ordens_producao')
-      .select('id, pedido_id, tipo_produto, data_inicio_pcp, data_fim_pcp')
+      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp')
       .in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']);
 
-    // Fetch active etapas
+    // Fetch active etapas (EM_ANDAMENTO first, fallback to first PENDENTE)
     const ordemIds = (ordens || []).map(o => o.id);
     const { data: etapas } = await supabase
       .from('op_etapas')
-      .select('ordem_id, nome_etapa, operador_id, status, usuarios(nome)')
-      .eq('status', 'EM_ANDAMENTO')
-      .in('ordem_id', ordemIds.length > 0 ? ordemIds : ['none']);
+      .select('ordem_id, nome_etapa, operador_id, status, ordem_sequencia, usuarios(nome)')
+      .in('status', ['EM_ANDAMENTO', 'PENDENTE'])
+      .in('ordem_id', ordemIds.length > 0 ? ordemIds : ['none'])
+      .order('ordem_sequencia', { ascending: true });
 
     const vendas: VendaRow[] = pedidos.map(p => {
       const ordem = (ordens || []).find(o => o.pedido_id === p.id);
-      const etapa = ordem ? (etapas || []).find(e => e.ordem_id === ordem.id) : null;
+      // Prioritize EM_ANDAMENTO etapa, fallback to first PENDENTE
+      const ordemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
+      const etapaAtiva = ordemEtapas.find(e => e.status === 'EM_ANDAMENTO') || ordemEtapas[0] || null;
+      
+      // Determine display name for etapa
+      let etapaDisplay = '—';
+      if (ordem) {
+        if (etapaAtiva) {
+          etapaDisplay = etapaAtiva.nome_etapa;
+        } else if (ordem.status === 'AGUARDANDO') {
+          etapaDisplay = 'Aguardando Início';
+        } else if (ordem.status === 'CONCLUIDA') {
+          etapaDisplay = 'Concluída';
+        } else {
+          etapaDisplay = ordem.status;
+        }
+      }
+      
       return {
         ...p,
         ordem_id: ordem?.id || null,
         tipo_produto: ordem?.tipo_produto || null,
-        etapa_atual: etapa?.nome_etapa || '—',
-        operador_atual: (etapa?.usuarios as any)?.nome || '—',
+        etapa_atual: etapaDisplay,
+        operador_atual: (etapaAtiva?.usuarios as any)?.nome || '—',
         data_inicio_pcp: (ordem as any)?.data_inicio_pcp || null,
         data_fim_pcp: (ordem as any)?.data_fim_pcp || null,
         is_piloto: (p as any).is_piloto || false,
