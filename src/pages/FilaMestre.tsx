@@ -104,15 +104,15 @@ export default function FilaMestre() {
       const ordemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
       const etapaAtiva = ordemEtapas.find(e => e.status === 'EM_ANDAMENTO') || ordemEtapas[0] || null;
       
-      // Determine display name for etapa
+      // Determine display name for etapa — order status takes priority
       let etapaDisplay = '—';
       if (ordem) {
-        if (etapaAtiva) {
-          etapaDisplay = etapaAtiva.nome_etapa;
-        } else if (ordem.status === 'AGUARDANDO') {
+        if (ordem.status === 'AGUARDANDO') {
           etapaDisplay = 'Aguardando Início';
         } else if (ordem.status === 'CONCLUIDA') {
           etapaDisplay = 'Concluída';
+        } else if (etapaAtiva) {
+          etapaDisplay = etapaAtiva.nome_etapa;
         } else {
           etapaDisplay = ordem.status;
         }
