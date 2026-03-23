@@ -111,11 +111,11 @@ export default function KanbanProducao() {
   const [lossForm, setLossForm] = useState({ pedido_item_id: '', nm_item: '', quantidade_perdida: '', motivo: '', etapa: '' });
   const [lossEtapas, setLossEtapas] = useState<string[]>([]);
 
-  // Preparação sub-etapas dialog
-  const [prepDialog, setPrepDialog] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
-  const [subEtapas, setSubEtapas] = useState<{ id: string; nome: string; concluida: boolean }[]>([]);
-  const [newSubEtapa, setNewSubEtapa] = useState('');
-  const [loadingSubEtapas, setLoadingSubEtapas] = useState(false);
+  // Preparação sub-etapas inline expansion
+  const [expandedPrepCards, setExpandedPrepCards] = useState<Set<string>>(new Set());
+  const [subEtapasMap, setSubEtapasMap] = useState<Map<string, { id: string; nome: string; concluida: boolean }[]>>(new Map());
+  const [newSubEtapaMap, setNewSubEtapaMap] = useState<Map<string, string>>(new Map());
+  const [loadingPrepCards, setLoadingPrepCards] = useState<Set<string>>(new Set());
 
   // Recently sent to financeiro
   const [recentFinanceiro, setRecentFinanceiro] = useState<Map<string, number>>(new Map());
@@ -480,13 +480,18 @@ export default function KanbanProducao() {
     } catch { toast.error('Erro ao avançar pedido'); }
   };
 
-  // --- Preparação Sub-etapas ---
-  const openPrepDialog = async (card: KanbanCard) => {
-    setPrepDialog({ open: true, card });
-    setLoadingSubEtapas(true);
-    setNewSubEtapa('');
+  // --- Preparação Sub-etapas (inline expandable) ---
+  const togglePrepExpand = async (card: KanbanCard) => {
+    const isExpanded = expandedPrepCards.has(card.id);
+    if (isExpanded) {
+      setExpandedPrepCards(prev => { const n = new Set(prev); n.delete(card.id); return n; });
+      return;
+    }
 
-    // Fetch existing sub-etapas for this op_etapa
+    // Expand and load
+    setExpandedPrepCards(prev => new Set(prev).add(card.id));
+    setLoadingPrepCards(prev => new Set(prev).add(card.id));
+
     const { data: existing } = await supabase
       .from('op_etapa_subetapas')
       .select('id, nome, concluida')
@@ -494,39 +499,51 @@ export default function KanbanProducao() {
       .order('criado_em');
 
     if (existing && existing.length > 0) {
-      setSubEtapas(existing.map(s => ({ id: s.id, nome: s.nome, concluida: s.concluida ?? false })));
+      setSubEtapasMap(prev => new Map(prev).set(card.id, existing.map(s => ({ id: s.id, nome: s.nome, concluida: s.concluida ?? false }))));
     } else {
-      // Create default sub-etapas
       const defaults = PREPARACAO_SUBETAPAS[card.tipo_produto] || [];
       if (defaults.length > 0) {
         const inserts = defaults.map(nome => ({ op_etapa_id: card.id, nome, concluida: false }));
         const { data: created } = await supabase.from('op_etapa_subetapas').insert(inserts).select('id, nome, concluida');
-        setSubEtapas((created || []).map(s => ({ id: s.id, nome: s.nome, concluida: s.concluida ?? false })));
+        setSubEtapasMap(prev => new Map(prev).set(card.id, (created || []).map(s => ({ id: s.id, nome: s.nome, concluida: s.concluida ?? false }))));
       } else {
-        setSubEtapas([]);
+        setSubEtapasMap(prev => new Map(prev).set(card.id, []));
       }
     }
-    setLoadingSubEtapas(false);
+    setLoadingPrepCards(prev => { const n = new Set(prev); n.delete(card.id); return n; });
   };
 
-  const toggleSubEtapa = async (subId: string, concluida: boolean) => {
+  const toggleSubEtapa = async (cardId: string, subId: string, concluida: boolean) => {
     await supabase.from('op_etapa_subetapas').update({ concluida }).eq('id', subId);
-    setSubEtapas(prev => prev.map(s => s.id === subId ? { ...s, concluida } : s));
+    setSubEtapasMap(prev => {
+      const next = new Map(prev);
+      const list = (next.get(cardId) || []).map(s => s.id === subId ? { ...s, concluida } : s);
+      next.set(cardId, list);
+      return next;
+    });
   };
 
-  const addCustomSubEtapa = async () => {
-    const card = prepDialog.card;
-    if (!card || !newSubEtapa.trim()) return;
-    const { data } = await supabase.from('op_etapa_subetapas').insert({ op_etapa_id: card.id, nome: newSubEtapa.trim(), concluida: false }).select('id, nome, concluida').single();
+  const addCustomSubEtapa = async (card: KanbanCard) => {
+    const text = newSubEtapaMap.get(card.id)?.trim();
+    if (!text) return;
+    const { data } = await supabase.from('op_etapa_subetapas').insert({ op_etapa_id: card.id, nome: text, concluida: false }).select('id, nome, concluida').single();
     if (data) {
-      setSubEtapas(prev => [...prev, { id: data.id, nome: data.nome, concluida: data.concluida ?? false }]);
-      setNewSubEtapa('');
+      setSubEtapasMap(prev => {
+        const next = new Map(prev);
+        next.set(card.id, [...(next.get(card.id) || []), { id: data.id, nome: data.nome, concluida: data.concluida ?? false }]);
+        return next;
+      });
+      setNewSubEtapaMap(prev => { const n = new Map(prev); n.delete(card.id); return n; });
     }
   };
 
-  const removeSubEtapa = async (subId: string) => {
+  const removeSubEtapa = async (cardId: string, subId: string) => {
     await supabase.from('op_etapa_subetapas').delete().eq('id', subId);
-    setSubEtapas(prev => prev.filter(s => s.id !== subId));
+    setSubEtapasMap(prev => {
+      const next = new Map(prev);
+      next.set(cardId, (next.get(cardId) || []).filter(s => s.id !== subId));
+      return next;
+    });
   };
 
   // --- Loss Registration ---
@@ -779,12 +796,62 @@ export default function KanbanProducao() {
                                   }
                                 </div>
 
-                                {/* Preparação checklist button */}
-                                {cardInPrep && (
-                                  <Button size="sm" variant="outline" className="w-full mt-2 h-7 text-[10px]" onClick={() => openPrepDialog(card)}>
-                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Sub-etapas da Preparação
-                                  </Button>
-                                )}
+                                {/* Preparação inline checklist */}
+                                {cardInPrep && (() => {
+                                  const isExpanded = expandedPrepCards.has(card.id);
+                                  const subs = subEtapasMap.get(card.id) || [];
+                                  const isLoading = loadingPrepCards.has(card.id);
+                                  const completedCount = subs.filter(s => s.concluida).length;
+                                  const newText = newSubEtapaMap.get(card.id) || '';
+
+                                  return (
+                                    <div className="mt-2">
+                                      <Button size="sm" variant="outline" className="w-full h-7 text-[10px] justify-between" onClick={() => togglePrepExpand(card)}>
+                                        <span className="flex items-center gap-1">
+                                          <CheckCircle2 className="h-3 w-3" /> Sub-etapas
+                                        </span>
+                                        {subs.length > 0 && <span className="text-muted-foreground">{completedCount}/{subs.length}</span>}
+                                      </Button>
+                                      {isExpanded && (
+                                        <div className="mt-1.5 space-y-1 border border-border rounded-md p-2 bg-muted/20">
+                                          {isLoading ? (
+                                            <div className="flex justify-center py-2"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div>
+                                          ) : (
+                                            <>
+                                              {subs.map(sub => (
+                                                <div key={sub.id} className="flex items-center gap-2 group">
+                                                  <Checkbox
+                                                    checked={sub.concluida}
+                                                    onCheckedChange={(checked) => toggleSubEtapa(card.id, sub.id, !!checked)}
+                                                    className="h-3.5 w-3.5"
+                                                  />
+                                                  <span className={`flex-1 text-[10px] ${sub.concluida ? 'line-through text-muted-foreground' : ''}`}>{sub.nome}</span>
+                                                  {isSupervisor && (
+                                                    <button className="h-4 w-4 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive" onClick={() => removeSubEtapa(card.id, sub.id)}>
+                                                      <X className="h-3 w-3" />
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              ))}
+                                              <div className="flex items-center gap-1 pt-1 border-t border-border/50">
+                                                <Input
+                                                  placeholder="Adicionar..."
+                                                  value={newText}
+                                                  onChange={e => setNewSubEtapaMap(prev => new Map(prev).set(card.id, e.target.value))}
+                                                  onKeyDown={e => e.key === 'Enter' && addCustomSubEtapa(card)}
+                                                  className="h-6 text-[10px] px-1.5"
+                                                />
+                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => addCustomSubEtapa(card)} disabled={!newText.trim()}>
+                                                  <Plus className="h-3 w-3" />
+                                                </Button>
+                                              </div>
+                                            </>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
 
                                 {/* Fivela transfer button */}
                                 {fivelaWithSintetico && isSupervisor && (
@@ -878,61 +945,6 @@ export default function KanbanProducao() {
         </DialogContent>
       </Dialog>
 
-      {/* Preparação sub-etapas dialog */}
-      <Dialog open={prepDialog.open} onOpenChange={o => !o && setPrepDialog({ open: false, card: null })}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              Sub-etapas da Preparação — #{prepDialog.card?.api_venda_id}
-            </DialogTitle>
-            <DialogDescription>
-              {prepDialog.card?.tipo_produto === 'TECIDO' ? 'Tecido' : prepDialog.card?.tipo_produto === 'SINTETICO' ? 'Sintético' : prepDialog.card?.tipo_produto}
-              {' • '}{prepDialog.card?.cliente_nome}
-            </DialogDescription>
-          </DialogHeader>
-          {loadingSubEtapas ? (
-            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
-          ) : (
-            <div className="space-y-3">
-              {subEtapas.map(sub => (
-                <div key={sub.id} className="flex items-center gap-3 group">
-                  <Checkbox
-                    checked={sub.concluida}
-                    onCheckedChange={(checked) => toggleSubEtapa(sub.id, !!checked)}
-                  />
-                  <span className={`flex-1 text-sm ${sub.concluida ? 'line-through text-muted-foreground' : ''}`}>{sub.nome}</span>
-                  {isSupervisor && (
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100" onClick={() => removeSubEtapa(sub.id)}>
-                      <X className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-
-              {/* Add custom sub-etapa */}
-              <div className="flex items-center gap-2 pt-2 border-t border-border">
-                <Input
-                  placeholder="Adicionar outra sub-etapa..."
-                  value={newSubEtapa}
-                  onChange={e => setNewSubEtapa(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addCustomSubEtapa()}
-                  className="h-8 text-sm"
-                />
-                <Button size="sm" variant="outline" className="h-8 px-2" onClick={addCustomSubEtapa} disabled={!newSubEtapa.trim()}>
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </div>
-
-              <div className="text-xs text-muted-foreground pt-1">
-                {subEtapas.filter(s => s.concluida).length}/{subEtapas.length} concluídas
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPrepDialog({ open: false, card: null })}>Fechar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Loss registration dialog */}
       <Dialog open={lossDialog.open} onOpenChange={o => !o && setLossDialog({ open: false, card: null })}>
