@@ -116,7 +116,7 @@ export default function DashboardLoja() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-medium">{p.cliente_nome}</p>
-                    <p className="text-sm text-muted-foreground">Pedido {p.numero_pedido}</p>
+                    <p className="text-sm text-muted-foreground">Venda {p.api_venda_id || p.numero_pedido}</p>
                   </div>
                   <Badge className={`font-normal ${cfg.color}`}>{cfg.label}</Badge>
                 </div>

@@ -132,7 +132,7 @@ export default function FilaLoja() {
                   const cfg = STATUS_PEDIDO_CONFIG[p.status_atual] || { label: p.status_atual, color: 'bg-muted text-muted-foreground' };
                   return (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.numero_pedido}</TableCell>
+                      <TableCell className="font-medium">{p.api_venda_id || p.numero_pedido}</TableCell>
                       <TableCell className="text-muted-foreground">{p.cliente_nome}</TableCell>
                       <TableCell>
                         <span className="flex items-center gap-1 text-sm">
