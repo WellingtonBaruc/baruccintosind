@@ -24,7 +24,7 @@ interface PedidoItem {
 }
 
 type Criterio = 'receita' | 'volume' | 'frequencia';
-type Nivel = 'categoria' | 'produto';
+type Nivel = 'categoria' | 'produto' | 'fivela';
 type TipoFiltro = 'todos' | 'sintetico' | 'tecido' | 'fivela';
 
 interface ABCRow {
