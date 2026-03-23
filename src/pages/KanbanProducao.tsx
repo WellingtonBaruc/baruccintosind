@@ -785,12 +785,16 @@ export default function KanbanProducao() {
                                 {...prov.dragHandleProps}
                                 className={`rounded-lg border bg-white shadow-sm overflow-hidden ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''}`}
                               >
-                                <div className={`px-3 py-2 ${prazoHeaderClasses[card.status_prazo] || 'bg-muted/30 border-b border-border/40'}`}>
-                                  <p className="font-bold text-base leading-tight">
+                                <div
+                                  className={`px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity ${prazoHeaderClasses[card.status_prazo] || 'bg-muted/30 border-b border-border/40'}`}
+                                  onClick={() => openDetailSheet(card)}
+                                >
+                                  <p className="font-bold text-base leading-tight flex items-center gap-1">
                                     {card.api_venda_id}
                                     {card.ordem_sequencia_op > 1 && (
                                       <span className="text-xs font-medium text-primary ml-1.5">• OP {card.ordem_sequencia_op}</span>
                                     )}
+                                    <Eye className="h-3 w-3 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100" />
                                   </p>
                                   <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.cliente_nome}</p>
                                 </div>
