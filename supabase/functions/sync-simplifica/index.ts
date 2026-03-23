@@ -523,7 +523,7 @@ async function inserirNovoPedido(
           pedido_id: pedido.id,
           pipeline_id: pipelineId,
           sequencia,
-          status: 'EM_ANDAMENTO',
+          status: 'AGUARDANDO',
           tipo_produto: tipoProduto,
         })
         .select('id')
@@ -535,8 +535,7 @@ async function inserirNovoPedido(
           pipeline_etapa_id: e.id,
           nome_etapa: e.nome,
           ordem_sequencia: e.ordem,
-          status: idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE',
-          ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
+          status: 'PENDENTE',
         }));
         await supabase.from('op_etapas').insert(opEtapas);
       }
