@@ -220,72 +220,88 @@ export default function AlmoxarifadoPage() {
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Separação — Almoxarifado</h1>
-        <Badge variant="outline" className="text-sm py-1 px-3">{filtered.length} vendas</Badge>
-      </div>
-
-      <div className="flex gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[180px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar venda ou cliente..." value={search} onChange={e => setSearch(e.target.value)} />
+        <div className="flex items-center gap-3">
+          <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as 'cards' | 'producao')}>
+            <ToggleGroupItem value="cards" aria-label="Modo Cards" className="gap-1.5 text-xs px-3">
+              <LayoutGrid className="h-3.5 w-3.5" /> Cards
+            </ToggleGroupItem>
+            <ToggleGroupItem value="producao" aria-label="Modo Produção" className="gap-1.5 text-xs px-3">
+              <ListOrdered className="h-3.5 w-3.5" /> Produção
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <Badge variant="outline" className="text-sm py-1 px-3">{filtered.length} vendas</Badge>
         </div>
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="PENDENTE">Pendentes</SelectItem>
-            <SelectItem value="SEPARADO">Separados</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
-      {filtered.length === 0 ? (
-        <p className="text-center py-12 text-muted-foreground">Nenhuma venda encontrada.</p>
+      {viewMode === 'producao' ? (
+        <AlmoxProducaoMode vendas={vendas} onConfirmar={handleConfirmarSeparacao} />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map(v => (
-            <Card key={v.pedido_id} className="border-border/60 shadow-sm">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-bold">{v.api_venda_id}</CardTitle>
-                  {v.fivelas_separadas ? (
-                    <Badge className="bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30 text-xs">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> Separado
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-xs text-muted-foreground">Pendente</Badge>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">{v.cliente_nome}</p>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  {v.data_previsao_entrega && (
-                    <span className="text-xs text-muted-foreground">
-                      Entrega: {format(new Date(v.data_previsao_entrega + 'T00:00:00'), 'dd/MM/yy')}
-                    </span>
-                  )}
-                  {v.status_prazo && prazoBadge[v.status_prazo] && (
-                    <Badge variant="outline" className={`text-[10px] ${prazoBadge[v.status_prazo].cls}`}>
-                      {prazoBadge[v.status_prazo].label}
-                    </Badge>
-                  )}
-                  {origemBadge(v.origem)}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  {v.itens.map(item => (
-                    <ItemCard key={item.id} item={item} />
-                  ))}
-                </div>
+        <>
+          <div className="flex gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[180px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Buscar venda ou cliente..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="PENDENTE">Pendentes</SelectItem>
+                <SelectItem value="SEPARADO">Separados</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-                {!v.fivelas_separadas && (
-                  <Button className="w-full min-h-[48px]" onClick={() => handleConfirmarSeparacao(v)}>
-                    <Package className="h-4 w-4 mr-2" /> Confirmar separação
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+          {filtered.length === 0 ? (
+            <p className="text-center py-12 text-muted-foreground">Nenhuma venda encontrada.</p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filtered.map(v => (
+                <Card key={v.pedido_id} className="border-border/60 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg font-bold">{v.api_venda_id}</CardTitle>
+                      {v.fivelas_separadas ? (
+                        <Badge className="bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30 text-xs">
+                          <CheckCircle2 className="h-3 w-3 mr-1" /> Separado
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">Pendente</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{v.cliente_nome}</p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {v.data_previsao_entrega && (
+                        <span className="text-xs text-muted-foreground">
+                          Entrega: {format(new Date(v.data_previsao_entrega + 'T00:00:00'), 'dd/MM/yy')}
+                        </span>
+                      )}
+                      {v.status_prazo && prazoBadge[v.status_prazo] && (
+                        <Badge variant="outline" className={`text-[10px] ${prazoBadge[v.status_prazo].cls}`}>
+                          {prazoBadge[v.status_prazo].label}
+                        </Badge>
+                      )}
+                      {origemBadge(v.origem)}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      {v.itens.map(item => (
+                        <ItemCard key={item.id} item={item} />
+                      ))}
+                    </div>
+
+                    {!v.fivelas_separadas && (
+                      <Button className="w-full min-h-[48px]" onClick={() => handleConfirmarSeparacao(v)}>
+                        <Package className="h-4 w-4 mr-2" /> Confirmar separação
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
