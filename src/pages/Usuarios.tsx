@@ -1,18 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { Plus, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
-import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Loader2, Pencil, Trash2 } from 'lucide-react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
 const PERFIS: PerfilUsuario[] = ['admin', 'gestor', 'supervisor_producao', 'operador_producao', 'comercial', 'financeiro', 'logistica', 'loja', 'almoxarifado'];
@@ -29,6 +38,8 @@ const PERFIL_LABELS: Record<PerfilUsuario, string> = {
   almoxarifado: 'Almoxarifado',
 };
 
+const ADMIN_USER_FUNCTION = 'admin-user-management';
+
 interface UsuarioRow {
   id: string;
   nome: string;
@@ -39,16 +50,18 @@ interface UsuarioRow {
   criado_em: string;
 }
 
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
 export default function Usuarios() {
   const { profile } = useAuth();
   const [usuarios, setUsuarios] = useState<UsuarioRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<UsuarioRow | null>(null);
-  const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UsuarioRow | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  // Form state
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -56,75 +69,137 @@ export default function Usuarios() {
   const [setor, setSetor] = useState('');
 
   const fetchUsuarios = async () => {
-    const { data } = await supabase.from('usuarios').select('*').order('criado_em', { ascending: false });
-    setUsuarios(data || []);
+    setLoading(true);
+    const { data, error } = await supabase.from('usuarios').select('*').order('criado_em', { ascending: false });
+    if (error) {
+      toast.error('Erro ao carregar usuários.');
+      setUsuarios([]);
+    } else {
+      setUsuarios(data || []);
+    }
     setLoading(false);
   };
 
-  useEffect(() => { fetchUsuarios(); }, []);
+  useEffect(() => {
+    fetchUsuarios();
+  }, []);
 
   if (profile?.perfil !== 'admin') return <Navigate to="/dashboard" replace />;
 
+  const resetForm = () => {
+    setNome('');
+    setEmail('');
+    setSenha('');
+    setPerfil('operador_producao');
+    setSetor('');
+  };
+
   const openCreate = () => {
     setEditing(null);
-    setNome(''); setEmail(''); setSenha(''); setPerfil('operador_producao'); setSetor('');
+    resetForm();
     setDialogOpen(true);
   };
 
-  const openEdit = (u: UsuarioRow) => {
-    setEditing(u);
-    setNome(u.nome); setEmail(u.email); setSenha(''); setPerfil(u.perfil); setSetor(u.setor || '');
+  const openEdit = (usuario: UsuarioRow) => {
+    setEditing(usuario);
+    setNome(usuario.nome);
+    setEmail(usuario.email);
+    setSenha('');
+    setPerfil(usuario.perfil);
+    setSetor(usuario.setor || '');
     setDialogOpen(true);
+  };
+
+  const callAdminUserFunction = async (payload: Record<string, unknown>) => {
+    const { data, error } = await supabase.functions.invoke(ADMIN_USER_FUNCTION, { body: payload });
+
+    if (error) {
+      throw error;
+    }
+
+    if (data?.error) {
+      throw new Error(data.error);
+    }
+
+    return data;
   };
 
   const handleSave = async () => {
-    if (!nome.trim() || !email.trim()) {
+    const nomeSanitizado = nome.trim();
+    const emailSanitizado = normalizeEmail(email);
+    const setorSanitizado = setor.trim() || null;
+
+    if (!nomeSanitizado || !emailSanitizado) {
       toast.error('Nome e email são obrigatórios.');
       return;
     }
+
     setSaving(true);
+
     try {
       if (editing) {
-        const { error } = await supabase.from('usuarios').update({ nome, email, perfil, setor: setor || null }).eq('id', editing.id);
-        if (error) throw error;
+        await callAdminUserFunction({
+          action: 'update',
+          userId: editing.id,
+          nome: nomeSanitizado,
+          email: emailSanitizado,
+          perfil,
+          setor: setorSanitizado,
+        });
         toast.success('Usuário atualizado.');
       } else {
         if (!senha || senha.length < 6) {
           toast.error('Senha deve ter pelo menos 6 caracteres.');
-          setSaving(false);
           return;
         }
-        // Create auth user first via edge function or admin — for now use signUp
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password: senha,
-          options: { data: { nome } },
-        });
-        if (authError) throw authError;
-        if (!authData.user) throw new Error('Falha ao criar usuário.');
 
-        const { error: insertError } = await supabase.from('usuarios').insert({
-          id: authData.user.id,
-          nome,
-          email,
+        await callAdminUserFunction({
+          action: 'create',
+          nome: nomeSanitizado,
+          email: emailSanitizado,
+          senha,
           perfil,
-          setor: setor || null,
+          setor: setorSanitizado,
         });
-        if (insertError) throw insertError;
         toast.success('Usuário criado com sucesso.');
       }
+
       setDialogOpen(false);
-      fetchUsuarios();
-    } catch (err: any) {
-      toast.error(err.message || 'Erro ao salvar.');
+      resetForm();
+      await fetchUsuarios();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao salvar usuário.';
+      toast.error(message);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
-  const toggleAtivo = async (u: UsuarioRow) => {
-    const { error } = await supabase.from('usuarios').update({ ativo: !u.ativo }).eq('id', u.id);
-    if (error) { toast.error('Erro ao alterar status.'); return; }
-    toast.success(u.ativo ? 'Usuário desativado.' : 'Usuário ativado.');
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+
+    setDeleting(true);
+
+    try {
+      await callAdminUserFunction({ action: 'delete', userId: deleteTarget.id });
+      toast.success('Usuário excluído.');
+      setDeleteTarget(null);
+      await fetchUsuarios();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao excluir usuário.';
+      toast.error(message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const toggleAtivo = async (usuario: UsuarioRow) => {
+    const { error } = await supabase.from('usuarios').update({ ativo: !usuario.ativo }).eq('id', usuario.id);
+    if (error) {
+      toast.error('Erro ao alterar status.');
+      return;
+    }
+    toast.success(usuario.ativo ? 'Usuário desativado.' : 'Usuário ativado.');
     fetchUsuarios();
   };
 
@@ -133,10 +208,10 @@ export default function Usuarios() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
-          <p className="text-muted-foreground mt-1">Gerencie os usuários do sistema.</p>
+          <p className="mt-1 text-muted-foreground">Gerencie os usuários do sistema.</p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-1" /> Novo usuário
+          <Plus className="mr-1 h-4 w-4" /> Novo usuário
         </Button>
       </div>
 
@@ -155,28 +230,33 @@ export default function Usuarios() {
                   <TableHead>Perfil</TableHead>
                   <TableHead>Setor</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-20">Ações</TableHead>
+                  <TableHead className="w-24">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {usuarios.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.nome}</TableCell>
-                    <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                {usuarios.map((usuario) => (
+                  <TableRow key={usuario.id}>
+                    <TableCell className="font-medium">{usuario.nome}</TableCell>
+                    <TableCell className="text-muted-foreground">{usuario.email}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="font-normal">
-                        {PERFIL_LABELS[u.perfil]}
+                        {PERFIL_LABELS[usuario.perfil]}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{u.setor || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{usuario.setor || '—'}</TableCell>
                     <TableCell>
-                      <Switch checked={u.ativo} onCheckedChange={() => toggleAtivo(u)} />
+                      <Switch checked={usuario.ativo} onCheckedChange={() => toggleAtivo(usuario)} />
                     </TableCell>
                     <TableCell className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(u)}>
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(usuario)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(u)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleteTarget(usuario)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
@@ -184,7 +264,7 @@ export default function Usuarios() {
                 ))}
                 {usuarios.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                       Nenhum usuário cadastrado.
                     </TableCell>
                   </TableRow>
@@ -207,7 +287,7 @@ export default function Usuarios() {
             </div>
             <div className="space-y-2">
               <Label>Email</Label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@empresa.com" disabled={false} />
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@empresa.com" />
             </div>
             {!editing && (
               <div className="space-y-2">
@@ -217,13 +297,15 @@ export default function Usuarios() {
             )}
             <div className="space-y-2">
               <Label>Perfil</Label>
-              <Select value={perfil} onValueChange={(v) => setPerfil(v as PerfilUsuario)}>
+              <Select value={perfil} onValueChange={(value) => setPerfil(value as PerfilUsuario)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PERFIS.map((p) => (
-                    <SelectItem key={p} value={p}>{PERFIL_LABELS[p]}</SelectItem>
+                  {PERFIS.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {PERFIL_LABELS[item]}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -234,13 +316,16 @@ export default function Usuarios() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancelar
+            </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : editing ? 'Salvar' : 'Criar'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -250,15 +335,14 @@ export default function Usuarios() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
-              if (!deleteTarget) return;
-              const { error } = await supabase.from('usuarios').delete().eq('id', deleteTarget.id);
-              if (error) { toast.error('Erro ao excluir usuário.'); return; }
-              toast.success('Usuário excluído.');
-              setDeleteTarget(null);
-              fetchUsuarios();
-            }}>Excluir</AlertDialogAction>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excluir'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
