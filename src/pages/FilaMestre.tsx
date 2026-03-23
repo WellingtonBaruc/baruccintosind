@@ -122,19 +122,36 @@ export default function FilaMestre() {
   };
 
   const fetchRows = async (cal: PcpCalendarData, lts: Record<string, number>) => {
-    const { data: pedidos } = await supabase
+    // 1) Fetch pedidos with status_api = 'Em Produção'
+    const { data: pedidosEmProducao } = await supabase
       .from('pedidos')
       .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
-      .not('status_api', 'eq', 'Finalizado')
+      .eq('status_api', 'Em Produção')
       .order('criado_em', { ascending: false });
 
-    if (!pedidos) { setLoading(false); return; }
+    // 2) Fetch all ordens_producao to find OPs from Loja (complementary)
+    const { data: todasOrdens } = await supabase
+      .from('ordens_producao')
+      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp');
+
+    // 3) Find pedido_ids that have OPs but are NOT in the first query (e.g. Pedido Enviado with complementary OPs)
+    const emProducaoIds = new Set((pedidosEmProducao || []).map(p => p.id));
+    const opPedidoIds = [...new Set((todasOrdens || []).map(o => o.pedido_id))].filter(id => !emProducaoIds.has(id));
+
+    let pedidosComOp: any[] = [];
+    if (opPedidoIds.length > 0) {
+      const { data } = await supabase
+        .from('pedidos')
+        .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
+        .in('id', opPedidoIds);
+      pedidosComOp = data || [];
+    }
+
+    const pedidos = [...(pedidosEmProducao || []), ...pedidosComOp];
+    if (pedidos.length === 0) { setRows([]); setLoading(false); return; }
 
     const pedidoIds = pedidos.map(p => p.id);
-    const { data: ordens } = await supabase
-      .from('ordens_producao')
-      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp')
-      .in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']);
+    const ordens = (todasOrdens || []).filter(o => pedidoIds.includes(o.pedido_id));
 
     const ordemIds = (ordens || []).map(o => o.id);
     const { data: etapas } = await supabase
