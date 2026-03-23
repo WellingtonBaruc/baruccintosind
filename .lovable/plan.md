@@ -1,50 +1,64 @@
 
 
-# Fix OP Complementar: Status, Kanban visibility, and Faltantes display
+# Fix: Kanban card duplication and wrong etapa being concluded
 
-## Summary
-Three fixes for the complementary production order (OP) flow generated from the Store menu.
+## Problem
+
+When order 3095425 was dragged from "Aguardando Início" to "Corte", two critical bugs triggered:
+
+1. **Wrong etapa concluded**: For AGUARDANDO orders (all etapas PENDENTE), the card selection logic picks the etapa with the highest `ordem_sequencia` — "Produção Finalizada" (step 5). When the user drags, `concluirEtapa` is called on that step, which concludes it and marks the entire order as CONCLUIDA (since it's the last step). The order jumps from "Aguardando" straight to "Concluído".
+
+2. **Duplication**: This pedido has 2 orders (original + OP complementar), both SINTETICO. Both appear as separate cards. After the bug above, both are stuck in "Concluído" with all intermediate etapas still PENDENTE.
+
+## Root Cause
+
+The `handleDragEnd` → `advanceCard` → `concluirEtapa` flow doesn't handle the AGUARDANDO → first-etapa transition. It always calls `concluirEtapa(card.id)`, but for AGUARDANDO orders, the correct action is to **start** the first etapa, not conclude any etapa.
 
 ## Changes
 
-### 1. OP Complementar must start in "Aguardando Início"
-**Files:** `src/pages/VerificacaoLoja.tsx`
+### 1. Fix `KanbanProducao.tsx` — etapa selection for AGUARDANDO orders
 
-In `handleCaminhoB` (line 162) and `handleCaminhoD` (line 246), the OP is created with `status: 'EM_ANDAMENTO'` and the first etapa with `status: 'EM_ANDAMENTO'`. Change both to:
-- Order status: `'AGUARDANDO'`
-- All etapas: `status: 'PENDENTE'`, no `iniciado_em`
+**Lines 158-165**: When the order status is AGUARDANDO, select the **first** etapa (lowest `ordem_sequencia`) instead of the highest. This ensures the card references the correct starting etapa.
 
-This matches the rule already applied to sync-simplifica.
+### 2. Fix `KanbanProducao.tsx` — handle AGUARDANDO → first column transition
 
-### 2. OP Complementar appears as a card in the Kanban
-**Files:** `src/pages/KanbanProducao.tsx`, `src/pages/VerificacaoLoja.tsx`
+**`handleDragEnd` / `advanceCard` (lines 207-240)**: When a card's `ordem_status` is `'AGUARDANDO'` and the destination is the first production column (e.g., "Corte"):
+- Set the order status to `EM_ANDAMENTO`
+- Call `iniciarEtapa` on the first etapa (not `concluirEtapa`)
+- Refresh the board
 
-Currently, OP_COMPLEMENTAR cards have `tipo_produto: 'OP_COMPLEMENTAR'` which doesn't match any Kanban tab (SINTETICO, TECIDO, FIVELA_COBERTA). The fix:
+### 3. Fix corrupted data for order 3095425
 
-- In `VerificacaoLoja.tsx`, when creating the OP complementar, set `tipo_produto` to the appropriate pipeline type (default to `'SINTETICO'` since the default pipeline is Cinto Sintético). The OP will then appear in the correct Kanban tab.
-- The card will show in Kanban with the order's `observacao` field containing the faltante items info, and the `api_venda_id` from the parent pedido.
-
-### 3. Show faltante items in DetalheOrdem (Fila Mestre detail)
-**File:** `src/pages/DetalheOrdem.tsx`
-
-In the "Itens do Pedido" section (line 601), add visual indicators for items marked as faltante:
-- Show a red badge "Faltante" next to items where `disponivel === false`
-- Display `quantidade_faltante` when set (e.g., "3 de 10 faltantes")
-- Add `disponivel` and `quantidade_faltante` to the query (already fetched since we select `*` from `pedido_itens`)
+Run SQL to reset both orders back to AGUARDANDO with all etapas PENDENTE:
+- Reset `ordens_producao.status` to `AGUARDANDO`
+- Reset all `op_etapas` to `PENDENTE`, clear `concluido_em` and `iniciado_em`
 
 ### Technical details
 
-**VerificacaoLoja.tsx — handleCaminhoB (lines 158-181):**
-- Change `status: 'EM_ANDAMENTO'` → `status: 'AGUARDANDO'`
-- Change `tipo_produto: 'OP_COMPLEMENTAR'` → `tipo_produto: 'SINTETICO'` (or based on pipeline)
-- All etapas: `status: 'PENDENTE'`, remove `iniciado_em` conditional
+**KanbanProducao.tsx — ordemMap logic (line 158-165):**
+```text
+For AGUARDANDO orders:
+  → pick etapa with LOWEST ordem_sequencia (first step)
+For EM_ANDAMENTO orders:
+  → keep existing logic (pick EM_ANDAMENTO etapa, or highest)
+```
 
-**VerificacaoLoja.tsx — handleCaminhoD (lines 242-264):**
-- Same changes as handleCaminhoB for the OP creation
+**KanbanProducao.tsx — advanceCard (line 232-240):**
+```text
+if card.ordem_status === 'AGUARDANDO':
+  1. UPDATE ordens_producao SET status = 'EM_ANDAMENTO'
+  2. Call iniciarEtapa(card.id, userId, pedidoId)  // starts first etapa
+  3. fetchCards()
+else:
+  existing concluirEtapa logic
+```
 
-**DetalheOrdem.tsx — Itens section (lines 607-619):**
-- Add faltante badge and quantity display for items with `disponivel === false`
+**SQL data fix:**
+```sql
+UPDATE ordens_producao SET status = 'AGUARDANDO'
+WHERE id IN ('208f39d8-...', 'cb9b5cae-...');
 
-**Database correction:**
-- Update existing `ordens_producao` with `tipo_produto = 'OP_COMPLEMENTAR'` to `tipo_produto = 'SINTETICO'` and `status = 'AGUARDANDO'` where no progress has been made
+UPDATE op_etapas SET status = 'PENDENTE', concluido_em = NULL, iniciado_em = NULL
+WHERE ordem_id IN ('208f39d8-...', 'cb9b5cae-...');
+```
 
