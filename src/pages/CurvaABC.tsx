@@ -55,15 +55,30 @@ function extrairFivelaBase(descricao: string): string {
     return match ? `MATRIZ ${match[1]}` : 'MATRIZ';
   }
 
-  // For products with "FIVELA(S) <NOME>" pattern — extract the buckle name
-  // e.g. "FIVELA ANNY LATONADA 15MM" → ANNY
-  // e.g. "CINTO SINTETICO 2 FIVELAS PALOMA LAT 20MM..." → PALOMA
-  const fivelaMatch = upper.match(/FIVELAS?\s+(?:COBERTA\s+)?([A-ZÁÉÍÓÚÂÊÔÃÕÇ]+)/);
+  const ignorar = new Set(['LATONADA', 'NIQUELADA', 'LAT', 'NIQ', 'MET', '3FUROS', 'COBERTA',
+    'DE', 'DO', 'DA', 'EM', 'COM', 'PARA', 'MM', 'CM', 'UN', 'CINTO', 'CINTOS',
+    'TIRA', 'TIRAS', 'SINTETICO', 'SINTÉTICO', 'TECIDO', 'FIVELA', 'FIVELAS']);
+
+  // Extract all words after FIVELA(S) and find the first real name
+  const fivelaMatch = upper.match(/FIVELAS?\s+(?:COBERTA\s+)?((?:[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9]+\s*)+)/);
   if (fivelaMatch) {
-    const nome = fivelaMatch[1];
-    // Ignore suffixes that are not names (LATONADA, NIQUELADA, 3FUROS, etc.)
-    const ignorar = ['LATONADA', 'NIQUELADA', 'LAT', 'NIQ', 'MET', '3FUROS', 'COBERTA'];
-    if (!ignorar.includes(nome)) return nome;
+    const words = fivelaMatch[1].trim().split(/\s+/);
+    for (const word of words) {
+      if (!ignorar.has(word) && word.length > 1 && !/^\d+$/.test(word) && !/^\d+MM$/.test(word)) {
+        return word;
+      }
+    }
+  }
+
+  // Try to extract name from "CINTO/TIRA ... FIVELA(S) <NOME>" or just any capitalized name
+  const allWords = upper.split(/\s+/);
+  for (const word of allWords) {
+    if (!ignorar.has(word) && word.length > 2 && !/^\d/.test(word) && !/MM$/.test(word)) {
+      // Skip generic product prefixes
+      if (!['CINTO', 'TIRA', 'FIVELA', 'FIVELAS', 'COBERTA'].includes(word)) {
+        return word;
+      }
+    }
   }
 
   return 'OUTROS';
