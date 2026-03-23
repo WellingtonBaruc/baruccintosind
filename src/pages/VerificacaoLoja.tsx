@@ -54,8 +54,7 @@ export default function VerificacaoLoja() {
   const [caminhoSelecionado, setCaminhoSelecionado] = useState('');
   const [opDialogOpen, setOpDialogOpen] = useState(false);
   const [almoxDialogOpen, setAlmoxDialogOpen] = useState(false);
-  const [descricaoSolicitacao, setDescricaoSolicitacao] = useState('');
-  const [qtdSolicitacao, setQtdSolicitacao] = useState(1);
+  const [solicitacoesAlmox, setSolicitacoesAlmox] = useState<{ itemId: string | null; descricao: string; quantidade: number }[]>([]);
 
   const [opComplementarDone, setOpComplementarDone] = useState(false);
 
@@ -187,30 +186,41 @@ export default function VerificacaoLoja() {
     setActionLoading(false);
   };
 
-  // Caminho C: solicitar ao almoxarifado
+  // Caminho C: solicitar ao almoxarifado — pre-fill with faltante items
   const handleCaminhoC = async () => {
+    // Pre-fill solicitações with faltante items
+    const faltantes = itensFaltantes.map(i => ({
+      itemId: i.id,
+      descricao: i.descricao_produto,
+      quantidade: i.quantidade_faltante ?? i.quantidade,
+    }));
+    setSolicitacoesAlmox(faltantes.length > 0 ? faltantes : [{ itemId: null, descricao: '', quantidade: 1 }]);
     setAlmoxDialogOpen(true);
   };
 
+
   const handleEnviarSolicitacaoAlmox = async () => {
-    if (!descricaoSolicitacao.trim()) { toast.error('Descrição é obrigatória.'); return; }
+    const validas = solicitacoesAlmox.filter(s => s.descricao.trim());
+    if (validas.length === 0) { toast.error('Nenhum item com descrição.'); return; }
     setActionLoading(true);
     try {
-      await supabase.from('solicitacoes_almoxarifado').insert({
-        pedido_id: pedido.id,
-        descricao: descricaoSolicitacao,
-        quantidade: qtdSolicitacao,
-        solicitado_por: profile.id,
-      });
+      for (const s of validas) {
+        await supabase.from('solicitacoes_almoxarifado').insert({
+          pedido_id: pedido.id,
+          pedido_item_id: s.itemId,
+          descricao: s.descricao,
+          quantidade: s.quantidade,
+          solicitado_por: profile.id,
+        });
+      }
 
       if (pedido.status_atual === 'LOJA_VERIFICANDO') {
         await definirCaminhoLoja(pedido.id, profile.id, 'C_FIVELAS', 'AGUARDANDO_ALMOXARIFADO');
       }
 
-      toast.success('Solicitação enviada ao almoxarifado!');
+      toast.success(`${validas.length} solicitação(ões) enviada(s) ao almoxarifado!`);
       setAlmoxDialogOpen(false);
-      setDescricaoSolicitacao('');
-      setQtdSolicitacao(1);
+      setSolicitacoesAlmox([]);
       fetchData();
     } catch { toast.error('Erro ao enviar solicitação.'); }
     setActionLoading(false);
@@ -598,22 +608,36 @@ export default function VerificacaoLoja() {
 
       {/* Almoxarifado dialog */}
       <Dialog open={almoxDialogOpen} onOpenChange={setAlmoxDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Solicitar ao Almoxarifado</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-2">
-              <Label>Descrição do item *</Label>
-              <Textarea value={descricaoSolicitacao} onChange={e => setDescricaoSolicitacao(e.target.value)} placeholder="Descreva o que precisa..." rows={3} />
-            </div>
-            <div className="space-y-2">
-              <Label>Quantidade</Label>
-              <Input type="number" min={1} value={qtdSolicitacao} onChange={(e: any) => setQtdSolicitacao(parseInt(e.target.value) || 1)} />
-            </div>
+          <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
+            {solicitacoesAlmox.map((s, idx) => (
+              <div key={idx} className="rounded-lg border p-3 space-y-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Item {idx + 1}</Label>
+                  <Input
+                    value={s.descricao}
+                    onChange={e => setSolicitacoesAlmox(prev => prev.map((item, i) => i === idx ? { ...item, descricao: e.target.value } : item))}
+                    placeholder="Descrição do item..."
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground whitespace-nowrap">Qtd:</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="w-24"
+                    value={s.quantidade}
+                    onChange={(e: any) => setSolicitacoesAlmox(prev => prev.map((item, i) => i === idx ? { ...item, quantidade: parseInt(e.target.value) || 1 } : item))}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAlmoxDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleEnviarSolicitacaoAlmox} disabled={actionLoading}>
-              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar Solicitação'}
+              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : `Enviar ${solicitacoesAlmox.filter(s => s.descricao.trim()).length} Solicitação(ões)`}
             </Button>
           </DialogFooter>
         </DialogContent>
