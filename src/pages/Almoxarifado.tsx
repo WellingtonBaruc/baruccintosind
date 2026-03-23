@@ -268,18 +268,19 @@ export default function AlmoxarifadoPage() {
               {filtered.map(v => {
                 const urg = getCardUrgencia(v);
                 return (
-                <Card key={v.pedido_id} className={`shadow-sm overflow-hidden ${!v.fivelas_separadas && urg.bg ? urg.bg : 'border-border/60'}`}>
-                  <CardHeader className="pb-2">
+                <Card key={v.pedido_id} className="shadow-sm overflow-hidden border-border/60">
+                  {/* Cabeçalho colorido */}
+                  <div className={`${!v.fivelas_separadas && urg.bg ? urg.bg : 'bg-muted'} px-4 py-3`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg font-bold">{v.api_venda_id}</CardTitle>
                       {v.fivelas_separadas ? (
-                        <Badge className="bg-background/80 text-foreground text-xs">
+                        <Badge className="bg-white/20 text-inherit border-0 text-xs">
                           <CheckCircle2 className="h-3 w-3 mr-1" /> Separado
                         </Badge>
                       ) : urg.text ? (
-                        <Badge className="bg-background/20 text-inherit border-0 text-xs font-bold">{urg.text}</Badge>
+                        <Badge className="bg-white/20 text-inherit border-0 text-xs font-bold">{urg.text}</Badge>
                       ) : (
-                        <Badge variant="outline" className="text-xs">Pendente</Badge>
+                        <Badge className="bg-white/20 text-inherit border-0 text-xs">Pendente</Badge>
                       )}
                     </div>
                     <p className="text-sm opacity-80">{v.cliente_nome}</p>
@@ -291,24 +292,28 @@ export default function AlmoxarifadoPage() {
                       )}
                       {origemBadge(v.origem)}
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
+                  </div>
+                  {/* Corpo branco */}
+                  <CardContent className="bg-card p-4 space-y-3">
                     <div className="space-y-1.5">
                       {v.itens.map(item => (
-                        <div key={item.id} className="flex items-center justify-between text-sm py-1 border-t border-current/10">
-                          <span className="font-medium truncate flex-1">{item.descricao_produto}</span>
-                          <span className="font-bold ml-2 shrink-0">{item.quantidade} un</span>
+                        <div key={item.id} className="flex items-center justify-between text-sm py-1 border-b border-border/40 last:border-0">
+                          <span className="font-medium truncate flex-1 text-foreground">{item.descricao_produto}</span>
+                          <span className="font-bold ml-2 shrink-0 text-foreground">{item.quantidade} un</span>
                         </div>
                       ))}
                     </div>
 
                     {!v.fivelas_separadas && (
-                      <Button variant="secondary" className="w-full min-h-[48px] bg-background/20 hover:bg-background/30 text-inherit font-bold" onClick={() => handleConfirmarSeparacao(v)}>
+                      <Button className="w-full min-h-[48px]" onClick={() => handleConfirmarSeparacao(v)}>
                         <Package className="h-4 w-4 mr-2" /> Confirmar separação
                       </Button>
                     )}
                   </CardContent>
                 </Card>
+                );
+              })}
+            </div>
                 );
               })}
             </div>
