@@ -803,11 +803,6 @@ export default function KanbanProducao() {
                     <div className="space-y-2 min-h-[80px]">
                       {colCards.map((card, index) => {
                         const inConcluido = col === 'Concluído';
-                        const fivelaWithSintetico = isFivelaInConcluido(card, col) && card.has_sintetico_order;
-                        const fivelaSolo = isFivelaInConcluido(card, col) && !card.has_sintetico_order;
-                        const isTecidoConcluido = inConcluido && card.tipo_produto === 'TECIDO' && isConcluido(card);
-                        const tecidoAlreadyTransferred = isTecidoConcluido && card.tecido_transferred;
-                        const tecidoNeedsTransfer = isTecidoConcluido && !card.tecido_transferred;
                         const cardInPrep = isInPreparacao(card);
 
                         return (
