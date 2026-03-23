@@ -608,22 +608,36 @@ export default function VerificacaoLoja() {
 
       {/* Almoxarifado dialog */}
       <Dialog open={almoxDialogOpen} onOpenChange={setAlmoxDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Solicitar ao Almoxarifado</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-2">
-              <Label>Descrição do item *</Label>
-              <Textarea value={descricaoSolicitacao} onChange={e => setDescricaoSolicitacao(e.target.value)} placeholder="Descreva o que precisa..." rows={3} />
-            </div>
-            <div className="space-y-2">
-              <Label>Quantidade</Label>
-              <Input type="number" min={1} value={qtdSolicitacao} onChange={(e: any) => setQtdSolicitacao(parseInt(e.target.value) || 1)} />
-            </div>
+          <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
+            {solicitacoesAlmox.map((s, idx) => (
+              <div key={idx} className="rounded-lg border p-3 space-y-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Item {idx + 1}</Label>
+                  <Input
+                    value={s.descricao}
+                    onChange={e => setSolicitacoesAlmox(prev => prev.map((item, i) => i === idx ? { ...item, descricao: e.target.value } : item))}
+                    placeholder="Descrição do item..."
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground whitespace-nowrap">Qtd:</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="w-24"
+                    value={s.quantidade}
+                    onChange={(e: any) => setSolicitacoesAlmox(prev => prev.map((item, i) => i === idx ? { ...item, quantidade: parseInt(e.target.value) || 1 } : item))}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAlmoxDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleEnviarSolicitacaoAlmox} disabled={actionLoading}>
-              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar Solicitação'}
+              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : `Enviar ${solicitacoesAlmox.filter(s => s.descricao.trim()).length} Solicitação(ões)`}
             </Button>
           </DialogFooter>
         </DialogContent>
