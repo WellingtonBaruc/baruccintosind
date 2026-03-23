@@ -1071,7 +1071,7 @@ export default function KanbanProducao() {
       </Dialog>
 
       {/* Detail Sheet */}
-      <Sheet open={detailSheet.open} onOpenChange={(open) => setDetailSheet(prev => ({ ...prev, open }))}>
+      <Sheet open={detailSheet.open} onOpenChange={(open) => setDetailSheet(prev => ({ ...prev, open }))} modal={false}>
         <SheetContent className="w-[420px] sm:w-[480px] p-0">
           <SheetHeader className="px-6 pt-6 pb-4 border-b">
             <SheetTitle className="flex items-center gap-2">
