@@ -42,6 +42,9 @@ interface KanbanCard {
   fivelas_separadas: boolean;
   // Track when card moved to financeiro for 5min green badge
   sent_to_financeiro_at: number | null;
+  // OP complementar identification
+  ordem_sequencia_op: number;
+  ordem_observacao: string | null;
 }
 
 const PIPELINE_COLUMNS: Record<string, string[]> = {
