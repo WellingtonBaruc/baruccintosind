@@ -768,15 +768,18 @@ export default function KanbanProducao() {
                                 ref={prov.innerRef}
                                 {...prov.draggableProps}
                                 {...prov.dragHandleProps}
-                                className={`rounded-lg border bg-card p-3 shadow-sm border-l-4 ${prazoClasses[card.status_prazo] || 'border-l-border'} ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''}`}
+                                className={`rounded-lg border bg-white shadow-sm overflow-hidden ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''}`}
                               >
-                                <p className="font-bold text-base leading-tight">
-                                  {card.api_venda_id}
-                                  {card.ordem_sequencia_op > 1 && (
-                                    <span className="text-xs font-medium text-primary ml-1.5">• OP {card.ordem_sequencia_op}</span>
-                                  )}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.cliente_nome}</p>
+                                <div className={`px-3 py-2 ${prazoHeaderClasses[card.status_prazo] || 'bg-muted/30 border-b border-border/40'}`}>
+                                  <p className="font-bold text-base leading-tight">
+                                    {card.api_venda_id}
+                                    {card.ordem_sequencia_op > 1 && (
+                                      <span className="text-xs font-medium text-primary ml-1.5">• OP {card.ordem_sequencia_op}</span>
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.cliente_nome}</p>
+                                </div>
+                                <div className="px-3 py-2">
                                 <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                                   <Badge className={`text-[10px] font-normal ${TIPO_PRODUTO_BADGE[card.tipo_produto] || 'bg-muted text-muted-foreground border-border'}`}>
                                     {TIPO_PRODUTO_LABELS[card.tipo_produto] || card.tipo_produto}
