@@ -957,15 +957,8 @@ export default function KanbanProducao() {
                                   );
                                 })()}
 
-                                {/* Fivela transfer button */}
-                                {fivelaWithSintetico && isSupervisor && (
-                                  <Button size="sm" className="w-full mt-2 h-8 text-xs bg-orange-600 hover:bg-orange-700" onClick={() => setTransferDialog({ open: true, card })}>
-                                    <ArrowRight className="h-3 w-3 mr-1" /> Transferir para Embalagem Sintético
-                                  </Button>
-                                )}
-
                                 {/* Unified "Enviar para o Comercial" button for ALL concluded cards */}
-                                {inConcluido && !fivelaWithSintetico && canSendToComercial(card) && (
+                                {inConcluido && canSendToComercial(card) && (
                                   <Button size="sm" className="w-full mt-2 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => handleEnviarParaComercial(card)}>
                                     <ArrowRight className="h-3 w-3 mr-1" /> Enviar para o Comercial
                                   </Button>
