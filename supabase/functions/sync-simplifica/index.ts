@@ -422,7 +422,7 @@ async function inserirNovoPedido(
   // Classify items by type
   const tiposProduto = new Set<string>();
   for (const item of (Array.isArray(itens) ? itens : [])) {
-    tiposProduto.add(classificarProduto(item.nm_produto || ''));
+    tiposProduto.add(classificarProduto(item.nm_produto || '', item.nm_categoria || ''));
   }
 
   // Calculate max lead time across all types
