@@ -132,6 +132,7 @@ export default function KanbanProducao() {
 
   // Detail sheet
   const [detailSheet, setDetailSheet] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean; pedido: any | null }>({ open: false, card: null, items: [], loading: false, pedido: null });
+  const [showFivelaKpiList, setShowFivelaKpiList] = useState(false);
 
   const openDetailSheet = async (card: KanbanCard) => {
     setDetailSheet({ open: true, card, items: [], loading: true, pedido: null });
