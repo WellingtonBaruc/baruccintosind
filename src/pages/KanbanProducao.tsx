@@ -945,61 +945,6 @@ export default function KanbanProducao() {
         </DialogContent>
       </Dialog>
 
-      {/* Preparação sub-etapas dialog */}
-      <Dialog open={prepDialog.open} onOpenChange={o => !o && setPrepDialog({ open: false, card: null })}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              Sub-etapas da Preparação — #{prepDialog.card?.api_venda_id}
-            </DialogTitle>
-            <DialogDescription>
-              {prepDialog.card?.tipo_produto === 'TECIDO' ? 'Tecido' : prepDialog.card?.tipo_produto === 'SINTETICO' ? 'Sintético' : prepDialog.card?.tipo_produto}
-              {' • '}{prepDialog.card?.cliente_nome}
-            </DialogDescription>
-          </DialogHeader>
-          {loadingSubEtapas ? (
-            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
-          ) : (
-            <div className="space-y-3">
-              {subEtapas.map(sub => (
-                <div key={sub.id} className="flex items-center gap-3 group">
-                  <Checkbox
-                    checked={sub.concluida}
-                    onCheckedChange={(checked) => toggleSubEtapa(sub.id, !!checked)}
-                  />
-                  <span className={`flex-1 text-sm ${sub.concluida ? 'line-through text-muted-foreground' : ''}`}>{sub.nome}</span>
-                  {isSupervisor && (
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100" onClick={() => removeSubEtapa(sub.id)}>
-                      <X className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-
-              {/* Add custom sub-etapa */}
-              <div className="flex items-center gap-2 pt-2 border-t border-border">
-                <Input
-                  placeholder="Adicionar outra sub-etapa..."
-                  value={newSubEtapa}
-                  onChange={e => setNewSubEtapa(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addCustomSubEtapa()}
-                  className="h-8 text-sm"
-                />
-                <Button size="sm" variant="outline" className="h-8 px-2" onClick={addCustomSubEtapa} disabled={!newSubEtapa.trim()}>
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </div>
-
-              <div className="text-xs text-muted-foreground pt-1">
-                {subEtapas.filter(s => s.concluida).length}/{subEtapas.length} concluídas
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPrepDialog({ open: false, card: null })}>Fechar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Loss registration dialog */}
       <Dialog open={lossDialog.open} onOpenChange={o => !o && setLossDialog({ open: false, card: null })}>
