@@ -571,6 +571,7 @@ export type Database = {
           pedido_id: string
           produto_api_id: string | null
           quantidade: number
+          quantidade_faltante: number | null
           referencia_produto: string | null
           unidade_medida: string | null
           valor_total: number
@@ -589,6 +590,7 @@ export type Database = {
           pedido_id: string
           produto_api_id?: string | null
           quantidade?: number
+          quantidade_faltante?: number | null
           referencia_produto?: string | null
           unidade_medida?: string | null
           valor_total?: number
@@ -607,6 +609,7 @@ export type Database = {
           pedido_id?: string
           produto_api_id?: string | null
           quantidade?: number
+          quantidade_faltante?: number | null
           referencia_produto?: string | null
           unidade_medida?: string | null
           valor_total?: number
