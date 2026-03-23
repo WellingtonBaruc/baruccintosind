@@ -257,6 +257,11 @@ export default function FilaMestre() {
 
   const fmt = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const fmtDate = (d: string | null) => d ? format(new Date(d + 'T00:00:00'), 'dd/MM/yy') : '—';
+  const fmtDateTime = (d: string | null) => {
+    if (!d) return '—';
+    const date = new Date(d);
+    return format(date, 'dd/MM/yy HH:mm');
+  };
 
   const canEdit = profile && ['admin', 'gestor', 'supervisor_producao'].includes(profile.perfil);
 
