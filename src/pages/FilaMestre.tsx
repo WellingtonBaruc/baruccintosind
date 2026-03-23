@@ -260,7 +260,7 @@ export default function FilaMestre() {
   const fmtDateTime = (d: string | null) => {
     if (!d) return '—';
     const date = new Date(d);
-    return format(date, 'dd/MM/yy HH:mm');
+    return date.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
   };
 
   const canEdit = profile && ['admin', 'gestor', 'supervisor_producao'].includes(profile.perfil);
