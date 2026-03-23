@@ -39,12 +39,22 @@ interface ABCRow {
   produtos?: ABCRow[];
 }
 
-function extrairNomeFivela(descricao: string): string {
+const FIVELA_BASES = [
+  { keyword: 'MATRIZ', label: 'MATRIZ' },
+  { keyword: 'TICI', label: 'TICI' },
+  { keyword: 'ERICA', label: 'ERICA' },
+  { keyword: 'JADE', label: 'JADE' },
+  { keyword: 'LIZ', label: 'LIZ' },
+  { keyword: 'ROSY', label: 'ROSY' },
+  { keyword: 'SEM FIVELA', label: 'SEM FIVELA' },
+];
+
+function extrairFivelaBase(descricao: string): string {
   const upper = (descricao || '').toUpperCase();
-  // Match "FIVELA COBERTA <MODEL>" or just "FIVELA <MODEL>"
-  const match = upper.match(/FIVELA\s+(?:COBERTA\s+)?([A-ZÁÉÍÓÚÂÊÔÃÕÇ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ]+)?)/);
-  if (match) return match[1].trim();
-  return '';
+  for (const { keyword, label } of FIVELA_BASES) {
+    if (upper.includes(keyword)) return label;
+  }
+  return 'OUTROS';
 }
 
 function classificarTipoProduto(nome: string): string {
@@ -143,7 +153,7 @@ export default function CurvaABC() {
       const key = nivel === 'categoria'
         ? (item.categoria_produto || 'Sem Categoria')
         : nivel === 'fivela'
-          ? (extrairNomeFivela(item.descricao_produto) || 'Sem Fivela')
+          ? extrairFivelaBase(item.descricao_produto)
           : item.descricao_produto;
       const mesKey = item.data_venda ? format(new Date(item.data_venda + 'T12:00:00'), 'yyyy-MM') : 'sem-data';
 
