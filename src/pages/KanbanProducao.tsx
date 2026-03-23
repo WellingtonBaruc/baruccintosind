@@ -338,11 +338,128 @@ export default function KanbanProducao() {
   const handleCrossPipelineConfirm = async () => {
     const { card, type } = confirmDialog;
     if (!card || !profile) return;
-    await advanceCard(card, type === 'TECIDO_CONCLUIDO'
-      ? `Tecido concluído — encaminhado para Preparação do Sintético. Confirmado por ${profile.nome}`
-      : `Concluído. Confirmado por ${profile.nome}`
-    );
     setConfirmDialog({ open: false, type: '', card: null });
+
+    try {
+      // 1. Conclude the Tecido etapa/order
+      await advanceCard(card, `Tecido concluído — encaminhado para Preparação do Sintético. Confirmado por ${profile.nome}`);
+
+      // 2. Create or advance Sintético order for this pedido
+      await transferTecidoToSintetico(card.pedido_id, card.api_venda_id);
+    } catch (err) {
+      console.error('Erro na transferência Tecido→Sintético:', err);
+      toast.error('Erro ao transferir para Sintético');
+    }
+  };
+
+  const transferTecidoToSintetico = async (pedidoId: string, apiVendaId: string) => {
+    if (!profile) return;
+
+    const SINTETICO_PIPELINE_ID = '00000000-0000-0000-0000-000000000001';
+    const PREPARACAO_ETAPA_ID = '0f627d1d-2e10-4625-a66a-8e11524de4af'; // Preparação = ordem 2
+
+    // Check if Sintético order already exists
+    const { data: existingOrdens } = await supabase
+      .from('ordens_producao')
+      .select('id, status')
+      .eq('pedido_id', pedidoId)
+      .eq('tipo_produto', 'SINTETICO');
+
+    if (existingOrdens && existingOrdens.length > 0) {
+      // Sintético order exists — advance to Preparação if still in Aguardando/Corte
+      const ordem = existingOrdens[0];
+      if (ordem.status === 'AGUARDANDO') {
+        // Start the order and skip Corte, go to Preparação
+        await supabase.from('ordens_producao').update({
+          status: 'EM_ANDAMENTO',
+          data_inicio_pcp: new Date().toISOString(),
+        }).eq('id', ordem.id);
+
+        // Mark Corte as CONCLUIDA (skipped)
+        await supabase.from('op_etapas').update({
+          status: 'CONCLUIDA',
+          concluido_em: new Date().toISOString(),
+          observacao: 'Etapa de Corte pulada — tecido já preparado.',
+        }).eq('ordem_id', ordem.id).eq('nome_etapa', 'Corte');
+
+        // Start Preparação
+        await supabase.from('op_etapas').update({
+          status: 'EM_ANDAMENTO',
+          iniciado_em: new Date().toISOString(),
+        }).eq('ordem_id', ordem.id).eq('nome_etapa', 'Preparação');
+      }
+      toast.success(`Tecido transferido para Preparação Sintético (#${apiVendaId})`);
+    } else {
+      // No Sintético order — create one starting at Preparação
+      const { data: etapas } = await supabase
+        .from('pipeline_etapas')
+        .select('id, nome, ordem')
+        .eq('pipeline_id', SINTETICO_PIPELINE_ID)
+        .order('ordem');
+
+      if (!etapas) return;
+
+      // Get current max sequencia for this pedido
+      const { data: maxSeq } = await supabase
+        .from('ordens_producao')
+        .select('sequencia')
+        .eq('pedido_id', pedidoId)
+        .order('sequencia', { ascending: false })
+        .limit(1);
+
+      const nextSeq = (maxSeq && maxSeq[0] ? maxSeq[0].sequencia : 0) + 1;
+
+      const { data: novaOrdem, error: ordemErr } = await supabase
+        .from('ordens_producao')
+        .insert({
+          pedido_id: pedidoId,
+          pipeline_id: SINTETICO_PIPELINE_ID,
+          sequencia: nextSeq,
+          status: 'EM_ANDAMENTO',
+          tipo_produto: 'SINTETICO',
+          data_inicio_pcp: new Date().toISOString(),
+          observacao: 'Criada automaticamente a partir do Tecido concluído.',
+        })
+        .select()
+        .single();
+
+      if (ordemErr || !novaOrdem) { toast.error('Erro ao criar ordem Sintético'); return; }
+
+      // Create etapas — Corte as CONCLUIDA (skipped), Preparação as EM_ANDAMENTO, rest as PENDENTE
+      const opEtapas = etapas.map(e => ({
+        ordem_id: novaOrdem.id,
+        pipeline_etapa_id: e.id,
+        nome_etapa: e.nome,
+        ordem_sequencia: e.ordem,
+        status: e.nome === 'Corte' ? 'CONCLUIDA' as const
+          : e.nome === 'Preparação' ? 'EM_ANDAMENTO' as const
+          : 'PENDENTE' as const,
+        ...(e.nome === 'Corte' ? { concluido_em: new Date().toISOString(), observacao: 'Etapa de Corte pulada — tecido já preparado.' } : {}),
+        ...(e.nome === 'Preparação' ? { iniciado_em: new Date().toISOString() } : {}),
+      }));
+
+      await supabase.from('op_etapas').insert(opEtapas as any);
+      toast.success(`Ordem Sintética criada na Preparação (#${apiVendaId})`);
+    }
+
+    // Register history
+    await supabase.from('pedido_historico').insert({
+      pedido_id: pedidoId,
+      usuario_id: profile.id,
+      tipo_acao: 'TRANSICAO',
+      observacao: `Tecido concluído — ordem transferida para Preparação Sintético. Confirmado por ${profile.nome}`,
+    });
+
+    fetchCards();
+  };
+
+  const handleManualTecidoTransfer = async (card: KanbanCard) => {
+    if (!profile) return;
+    try {
+      await transferTecidoToSintetico(card.pedido_id, card.api_venda_id);
+    } catch {
+      toast.error('Erro ao transferir para Sintético');
+    }
   };
 
   const handleFivelaTransfer = async () => {
