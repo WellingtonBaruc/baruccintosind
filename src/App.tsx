@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import DashboardGestao from "./pages/DashboardGestao";
 import FilaMestre from "./pages/FilaMestre";
 import KanbanProducao from "./pages/KanbanProducao";
+import KanbanVenda from "./pages/KanbanVenda";
 import PainelDia from "./pages/PainelDia";
 import Usuarios from "./pages/Usuarios";
 import Pipelines from "./pages/Pipelines";
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/dashboard" element={<DashboardGestao />} />
               <Route path="/producao" element={<FilaMestre />} />
               <Route path="/kanban" element={<KanbanProducao />} />
+              <Route path="/kanban-venda" element={<KanbanVenda />} />
               <Route path="/painel-dia" element={<PainelDia />} />
 
               {/* Config / Admin */}

@@ -1,4 +1,4 @@
-import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, Columns3, ShoppingBag, BarChart3, Package } from 'lucide-react';
+import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, Columns3, ShoppingBag, BarChart3, Package, LayoutGrid } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {
@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, perfis: ['admin', 'gestor', 'supervisor_producao'] },
   { title: 'Fila Mestre', url: '/producao', icon: ClipboardList, perfis: ['admin', 'gestor', 'supervisor_producao'] },
   { title: 'Kanban Produção', url: '/kanban', icon: Columns3, perfis: ['admin', 'gestor', 'supervisor_producao', 'operador_producao'] },
+  { title: 'Kanban Venda', url: '/kanban-venda', icon: LayoutGrid, perfis: ['admin', 'gestor', 'supervisor_producao', 'comercial', 'financeiro', 'logistica'] },
 
   // Operador — only kanban (above)
 
