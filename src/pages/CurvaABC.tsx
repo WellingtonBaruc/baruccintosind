@@ -39,6 +39,14 @@ interface ABCRow {
   produtos?: ABCRow[];
 }
 
+function extrairNomeFivela(descricao: string): string {
+  const upper = (descricao || '').toUpperCase();
+  // Match "FIVELA COBERTA <MODEL>" or just "FIVELA <MODEL>"
+  const match = upper.match(/FIVELA\s+(?:COBERTA\s+)?([A-ZÁÉÍÓÚÂÊÔÃÕÇ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ]+)?)/);
+  if (match) return match[1].trim();
+  return '';
+}
+
 function classificarTipoProduto(nome: string): string {
   const upper = (nome || '').toUpperCase();
   if (upper.includes('FIVELA COBERTA')) return 'fivela';
