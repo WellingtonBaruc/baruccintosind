@@ -992,8 +992,8 @@ export default function KanbanProducao() {
       </Dialog>
 
       {/* Fivela coberta question modal */}
-      <Dialog open={fivelaModal.open} onOpenChange={o => !o && setFivelaModal({ open: false, card: null })}>
-        <DialogContent>
+      <Dialog open={fivelaModal.open} onOpenChange={o => !o && setFivelaModal({ open: false, card: null })} modal={false}>
+        <DialogContent className="shadow-xl border">
           <DialogHeader><DialogTitle>Fivela Coberta</DialogTitle></DialogHeader>
           <DialogDescription>Essa venda possui fivela coberta?</DialogDescription>
           <DialogFooter>
@@ -1004,8 +1004,8 @@ export default function KanbanProducao() {
       </Dialog>
 
       {/* Fivela coberta status modal */}
-      <Dialog open={fivelaStatusModal.open} onOpenChange={o => !o && setFivelaStatusModal({ open: false, card: null })}>
-        <DialogContent>
+      <Dialog open={fivelaStatusModal.open} onOpenChange={o => !o && setFivelaStatusModal({ open: false, card: null })} modal={false}>
+        <DialogContent className="shadow-xl border">
           <DialogHeader><DialogTitle>Status da Fivela Coberta — #{fivelaStatusModal.card?.api_venda_id}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             {['AGUARDANDO', 'EM_ANDAMENTO', 'CONCLUIDO'].map(status => {
