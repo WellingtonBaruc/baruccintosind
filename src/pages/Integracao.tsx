@@ -665,6 +665,18 @@ export default function Integracao() {
                 {reclassifying ? 'Reclassificando...' : 'Reclassificar ordens por tipo de produto'}
               </Button>
             </div>
+
+            {/* Reset all orders */}
+            <div className="pt-4 border-t border-border/60">
+              <h4 className="text-sm font-medium mb-2">Resetar Ordens de Produção</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Move todas as ordens ativas de volta para "Aguardando Início". O supervisor deverá reorganizar manualmente.
+              </p>
+              <Button onClick={() => setResetConfirmOpen(true)} disabled={resetting} variant="destructive" size="sm">
+                {resetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+                {resetting ? 'Resetando...' : 'Resetar todas as ordens para Aguardando Início'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
