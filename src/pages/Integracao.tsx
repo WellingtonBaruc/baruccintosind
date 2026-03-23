@@ -325,8 +325,9 @@ export default function Integracao() {
       // Get ALL ordens that are NOT concluded/cancelled — no filters on type or pipeline
       const { data: ordens } = await supabase
         .from('ordens_producao')
-        .select('id, pedido_id, tipo_produto, status, pedidos(status_atual)')
-        .not('status', 'in', '("CONCLUIDA","CANCELADA")');
+        .select('id, pedido_id, tipo_produto, status, pedidos!inner(status_atual)')
+        .not('status', 'in', '("CONCLUIDA","CANCELADA")')
+        .not('pedidos.status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")');
 
       if (!ordens || ordens.length === 0) {
         toast.info('Nenhuma ordem ativa para resetar.');
@@ -340,11 +341,6 @@ export default function Integracao() {
       for (const ordem of ordens) {
         // Reset ordem status to AGUARDANDO
         await supabase.from('ordens_producao').update({ status: 'AGUARDANDO' as any }).eq('id', ordem.id);
-
-        const pedidoStatusAtual = (ordem as any).pedidos?.status_atual;
-        if (pedidoStatusAtual && ['FINALIZADO_SIMPLIFICA', 'HISTORICO', 'CANCELADO'].includes(pedidoStatusAtual)) {
-          await supabase.from('pedidos').update({ status_atual: 'EM_PRODUCAO' as any }).eq('id', ordem.pedido_id);
-        }
 
         // Reset all etapas
         const { data: etapas } = await supabase
