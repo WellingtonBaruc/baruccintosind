@@ -142,7 +142,7 @@ export default function KanbanVenda() {
   }
 
   const fetchCards = async () => {
-    const allStatuses = COLUMNS.flatMap(c => c.statuses);
+    const allStatuses = COLUMNS.flatMap(c => c.statuses) as any[];
     const { data } = await supabase
       .from('pedidos')
       .select('id, numero_pedido, api_venda_id, cliente_nome, valor_liquido, status_atual, status_prazo, data_previsao_entrega, data_venda_api, criado_em, atualizado_em, forma_pagamento, forma_envio, cliente_endereco, observacao_comercial, observacao_financeiro, observacao_logistica, codigo_rastreio')
