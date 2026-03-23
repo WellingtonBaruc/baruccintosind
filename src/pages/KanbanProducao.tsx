@@ -83,7 +83,18 @@ export default function KanbanProducao() {
   // Recently sent to financeiro — store card IDs with timestamp
   const [recentFinanceiro, setRecentFinanceiro] = useState<Map<string, number>>(new Map());
 
-  useEffect(() => { fetchCards(); }, []);
+  useEffect(() => {
+    fetchCards();
+
+    // Realtime: refresh when ordens_producao or op_etapas change
+    const channel = supabase
+      .channel('kanban-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordens_producao' }, () => fetchCards())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'op_etapas' }, () => fetchCards())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   // Cleanup timer for 5-min green badges
   useEffect(() => {
