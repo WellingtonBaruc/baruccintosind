@@ -40,6 +40,7 @@ interface VendaRow {
   data_fim_pcp: string | null;
   is_piloto: boolean;
   status_piloto: string | null;
+  fivelas_separadas: boolean;
 }
 
 interface PedidoDetail {
