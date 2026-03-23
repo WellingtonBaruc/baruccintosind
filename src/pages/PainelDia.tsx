@@ -17,6 +17,17 @@ interface PainelRow {
   data_previsao_entrega: string | null;
 }
 
+const ATENCAO_DIAS = 3;
+const calcStatusPrazo = (dataPrevisao: string | null): string => {
+  if (!dataPrevisao) return 'NO_PRAZO';
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const previsao = new Date(dataPrevisao + 'T00:00:00');
+  const diffDias = Math.ceil((previsao.getTime() - hoje.getTime()) / 86400000);
+  if (diffDias < 0) return 'ATRASADO';
+  return diffDias <= ATENCAO_DIAS ? 'ATENCAO' : 'NO_PRAZO';
+};
+
 export default function PainelDia() {
   const [entregarHoje, setEntregarHoje] = useState<PainelRow[]>([]);
   const [iniciarHoje, setIniciarHoje] = useState<PainelRow[]>([]);
@@ -54,8 +65,15 @@ export default function PainelDia() {
       .select('*', { count: 'exact', head: true })
       .eq('programado_para_hoje', true).eq('data_programacao', today).eq('status', 'CONCLUIDA');
 
-    setEntregarHoje((entrega || []).map(p => ({ ...p, tipo_produto: null })));
-    setIniciarHoje(iniciar);
+    setEntregarHoje((entrega || []).map(p => ({
+      ...p,
+      tipo_produto: null,
+      status_prazo: calcStatusPrazo(p.data_previsao_entrega),
+    })));
+    setIniciarHoje(iniciar.map(p => ({
+      ...p,
+      status_prazo: calcStatusPrazo(p.data_previsao_entrega),
+    })));
     setTotalMeta(metaCount || 0);
     setTotalConcluido(concluidoCount || 0);
     setLoading(false);
