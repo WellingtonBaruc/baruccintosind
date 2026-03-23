@@ -900,9 +900,16 @@ export default function KanbanProducao() {
                                   </Button>
                                 )}
 
-                                {fivelaSolo && isSupervisor && (
-                                  <Button size="sm" variant="outline" className="w-full mt-2 h-8 text-xs" onClick={() => handleFivelaSoloComplete(card)}>
-                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Encaminhar para Comercial
+                                {fivelaSolo && isSupervisor && card.pedido_status !== 'AGUARDANDO_COMERCIAL' && (
+                                  <Button size="sm" variant="outline" className="w-full mt-2 h-8 text-xs" onClick={() => handleEnviarParaComercial(card)}>
+                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Enviar para o Comercial
+                                  </Button>
+                                )}
+
+                                {/* General "Enviar para o Comercial" button for non-fivela cards */}
+                                {inConcluido && !fivelaWithSintetico && !fivelaSolo && canSendToComercial(card) && (
+                                  <Button size="sm" className="w-full mt-2 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => handleEnviarParaComercial(card)}>
+                                    <ArrowRight className="h-3 w-3 mr-1" /> Enviar para o Comercial
                                   </Button>
                                 )}
 
