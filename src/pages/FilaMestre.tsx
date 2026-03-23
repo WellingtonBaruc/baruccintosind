@@ -89,13 +89,14 @@ export default function FilaMestre() {
       .select('id, pedido_id, tipo_produto, data_inicio_pcp, data_fim_pcp')
       .in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']);
 
-    // Fetch active etapas
+    // Fetch active etapas (EM_ANDAMENTO first, fallback to first PENDENTE)
     const ordemIds = (ordens || []).map(o => o.id);
     const { data: etapas } = await supabase
       .from('op_etapas')
-      .select('ordem_id, nome_etapa, operador_id, status, usuarios(nome)')
-      .eq('status', 'EM_ANDAMENTO')
-      .in('ordem_id', ordemIds.length > 0 ? ordemIds : ['none']);
+      .select('ordem_id, nome_etapa, operador_id, status, ordem_sequencia, usuarios(nome)')
+      .in('status', ['EM_ANDAMENTO', 'PENDENTE'])
+      .in('ordem_id', ordemIds.length > 0 ? ordemIds : ['none'])
+      .order('ordem_sequencia', { ascending: true });
 
     const vendas: VendaRow[] = pedidos.map(p => {
       const ordem = (ordens || []).find(o => o.pedido_id === p.id);
