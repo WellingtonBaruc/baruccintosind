@@ -192,6 +192,16 @@ export default function AlmoxarifadoPage() {
     return <Navigate to="/dashboard" replace />;
   }
 
+  const getCardUrgencia = (v: AlmoxVenda) => {
+    if (!v.data_previsao_entrega) return { order: 3, bg: '', text: '' };
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const entrega = new Date(v.data_previsao_entrega + 'T00:00:00');
+    const dias = Math.ceil((entrega.getTime() - hoje.getTime()) / 86400000);
+    if (dias < 0) return { order: 0, bg: 'bg-destructive text-destructive-foreground', text: `${Math.abs(dias)}d atrasado` };
+    if (dias <= 3) return { order: 1, bg: 'bg-[hsl(var(--warning))] text-white', text: dias === 0 ? 'Hoje' : `${dias}d restantes` };
+    return { order: 2, bg: 'bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]', text: `${dias}d restantes` };
+  };
+
   const filtered = vendas.filter(v => {
     if (filter === 'PENDENTE' && v.fivelas_separadas) return false;
     if (filter === 'SEPARADO' && !v.fivelas_separadas) return false;
@@ -200,13 +210,14 @@ export default function AlmoxarifadoPage() {
       if (!v.api_venda_id.toLowerCase().includes(q) && !v.cliente_nome.toLowerCase().includes(q)) return false;
     }
     return true;
+  }).sort((a, b) => {
+    const uA = getCardUrgencia(a);
+    const uB = getCardUrgencia(b);
+    if (uA.order !== uB.order) return uA.order - uB.order;
+    const dA = a.data_previsao_entrega || '9999-12-31';
+    const dB = b.data_previsao_entrega || '9999-12-31';
+    return dA.localeCompare(dB);
   });
-
-  const prazoBadge: Record<string, { label: string; cls: string }> = {
-    ATRASADO: { label: 'Atrasado', cls: 'bg-destructive/15 text-destructive border-destructive/30' },
-    ATENCAO: { label: 'Atenção', cls: 'bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30' },
-    NO_PRAZO: { label: 'No prazo', cls: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30' },
-  };
 
   const origemBadge = (origem: string) => {
     if (origem === 'solicitacao') return <Badge variant="outline" className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30"><Store className="h-3 w-3 mr-1" />Solicitação Loja</Badge>;
