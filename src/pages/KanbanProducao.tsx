@@ -118,8 +118,23 @@ export default function KanbanProducao() {
 
     // Filter: keep cards where pedido is NOT yet at AGUARDANDO_FINANCEIRO or beyond
     const HIDDEN_STATUSES = ['AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO'];
+    // Statuses where the pedido is in the Loja flow — hide all orders from Kanban
+    const LOJA_HIDE_ALL = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO'];
+    // Statuses where only the OP complementar (sequencia > 1) should be visible
+    const LOJA_SHOW_ONLY_OP = ['AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO'];
+
     const visibleEtapas = (etapas as any[]).filter(e => {
       const pedidoStatus = e.ordens_producao.pedidos.status_atual;
+      const ordemSequencia = e.ordens_producao.sequencia || 1;
+
+      // Hide all orders when pedido is waiting for loja
+      if (LOJA_HIDE_ALL.includes(pedidoStatus)) return false;
+
+      // When waiting for OP complementar, only show OP complementar (sequencia > 1)
+      if (LOJA_SHOW_ONLY_OP.includes(pedidoStatus)) {
+        return ordemSequencia > 1;
+      }
+
       // Show for 5 min after going to financeiro
       if (pedidoStatus === 'AGUARDANDO_FINANCEIRO') {
         const cardKey = e.ordem_id;
