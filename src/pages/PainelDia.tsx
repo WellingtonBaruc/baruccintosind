@@ -130,17 +130,34 @@ export default function PainelDia() {
             <p className="text-sm text-muted-foreground">Atrasados</p>
           </CardContent>
         </Card>
-        </Card>
-        <Card className="border-border/60">
-          <CardContent className="p-5">
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-muted-foreground">Progresso</span>
-              <span className="font-semibold">{pct}%</span>
+      </div>
+
+      {/* Atrasados */}
+      {atrasados.length > 0 && (
+        <Card className="border-destructive/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base text-destructive">⚠️ Atrasados ({atrasados.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {atrasados.map((p, i) => (
+                <div key={i} className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                  <div>
+                    <span className="font-medium text-sm">{p.api_venda_id || p.numero_pedido}</span>
+                    <span className="text-sm text-muted-foreground ml-2">{p.cliente_nome}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="destructive" className="text-xs font-normal">
+                      Prev: {p.data_previsao_entrega ? format(new Date(p.data_previsao_entrega + 'T00:00:00'), 'dd/MM') : '—'}
+                    </Badge>
+                    <span className="text-sm">{STATUS_PRAZO_CONFIG['ATRASADO']?.icon}</span>
+                  </div>
+                </div>
+              ))}
             </div>
-            <Progress value={pct} className="h-3" />
           </CardContent>
         </Card>
-      </div>
+      )}
 
       {/* Entregar hoje */}
       <Card className="border-border/60">
