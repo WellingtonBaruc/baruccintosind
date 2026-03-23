@@ -289,7 +289,7 @@ export default function AlmoxarifadoPage() {
 }
 
 function ItemCard({ item }: { item: AlmoxItem }) {
-  const { parsed } = item;
+  const parsed = item.parsed || parseItemAttributes(item.descricao_produto);
   const tipoLabel = TIPO_PRODUTO_ALMOX_LABELS[parsed.tipo_produto] || parsed.tipo_produto;
   const tipoColor = TIPO_PRODUTO_ALMOX_COLORS[parsed.tipo_produto] || TIPO_PRODUTO_ALMOX_COLORS.OUTROS;
 
