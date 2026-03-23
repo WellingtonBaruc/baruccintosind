@@ -21,6 +21,7 @@ const STATUS_LOJA = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPL
 interface PedidoLoja {
   id: string;
   numero_pedido: string;
+  api_venda_id: string | null;
   cliente_nome: string;
   status_atual: string;
   tipo_fluxo: string | null;
