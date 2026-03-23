@@ -171,8 +171,7 @@ export default function FilaMestre() {
     const ordemIds = (ordens || []).map(o => o.id);
     const { data: etapas } = await supabase
       .from('op_etapas')
-      .select('ordem_id, nome_etapa, operador_id, status, ordem_sequencia, usuarios(nome)')
-      .in('status', ['EM_ANDAMENTO', 'PENDENTE'])
+      .select('id, ordem_id, nome_etapa, operador_id, status, ordem_sequencia, usuarios(nome)')
       .in('ordem_id', ordemIds.length > 0 ? ordemIds : ['none'])
       .order('ordem_sequencia', { ascending: true });
 
