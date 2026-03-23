@@ -283,11 +283,32 @@ export default function KanbanProducao() {
     try {
       if (card.ordem_status === 'AGUARDANDO') {
         // Transition: AGUARDANDO → EM_ANDAMENTO (start first etapa, don't conclude)
-        await supabase.from('ordens_producao').update({ status: 'EM_ANDAMENTO' }).eq('id', card.ordem_id);
+        // Record data_inicio_pcp when leaving "Aguardando Início"
+        const now = new Date().toISOString();
+        await supabase.from('ordens_producao').update({
+          status: 'EM_ANDAMENTO',
+          data_inicio_pcp: now,
+        }).eq('id', card.ordem_id);
         await iniciarEtapa(card.id, profile!.id, card.pedido_id);
         toast.success('Ordem iniciada com sucesso');
       } else {
+        // Check if this advance will complete the order (last etapa)
+        const { data: allEtapas } = await supabase
+          .from('op_etapas')
+          .select('id, ordem_sequencia')
+          .eq('ordem_id', card.ordem_id)
+          .order('ordem_sequencia');
+        const isLastEtapa = allEtapas && allEtapas[allEtapas.length - 1]?.id === card.id;
+
         await concluirEtapa(card.id, card.ordem_id, card.pedido_id, profile!.id, obs || `Avançado via kanban por ${profile!.nome}`);
+
+        // Record data_fim_pcp when Sintético order reaches "Concluído"
+        if (isLastEtapa && activeTab === 'SINTETICO') {
+          await supabase.from('ordens_producao').update({
+            data_fim_pcp: new Date().toISOString(),
+          }).eq('id', card.ordem_id);
+        }
+
         toast.success('Etapa avançada com sucesso');
       }
       fetchCards();
