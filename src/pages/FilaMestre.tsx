@@ -427,7 +427,7 @@ export default function FilaMestre() {
       ) : sorted.length === 0 ? (
         <p className="text-center py-12 text-muted-foreground text-sm">Nenhum pedido encontrado.</p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="flex flex-col gap-3">
           {sorted.map(r => {
             const prazoCfg = STATUS_PRAZO_CONFIG[r.status_prazo || 'NO_PRAZO'];
             const tipoBadge = TIPO_PRODUTO_BADGE[r.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border';
