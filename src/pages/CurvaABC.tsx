@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { parseItemAttributes } from '@/lib/almoxarifado';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,7 @@ interface PedidoItem {
 }
 
 type Criterio = 'receita' | 'volume' | 'frequencia';
-type Nivel = 'categoria' | 'produto';
+type Nivel = 'categoria' | 'produto' | 'fivela';
 type TipoFiltro = 'todos' | 'sintetico' | 'tecido' | 'fivela';
 
 interface ABCRow {
@@ -131,7 +132,11 @@ export default function CurvaABC() {
     const groups = new Map<string, { total: number; unidades: number; pedidoIds: Set<string>; meses: Record<string, number>; produtos: Map<string, { total: number; unidades: number; pedidoIds: Set<string>; meses: Record<string, number> }> }>();
 
     for (const item of filtered) {
-      const key = nivel === 'categoria' ? (item.categoria_produto || 'Sem Categoria') : item.descricao_produto;
+      const key = nivel === 'categoria'
+        ? (item.categoria_produto || 'Sem Categoria')
+        : nivel === 'fivela'
+          ? (parseItemAttributes(item.descricao_produto, item.categoria_produto).modelo_fivela || 'Sem Fivela')
+          : item.descricao_produto;
       const mesKey = item.data_venda ? format(new Date(item.data_venda + 'T12:00:00'), 'yyyy-MM') : 'sem-data';
 
       let val: number;
@@ -151,7 +156,7 @@ export default function CurvaABC() {
       g.meses[mesKey] = (g.meses[mesKey] || 0) + val;
 
       // If grouping by category, track products inside
-      if (nivel === 'categoria') {
+      if (nivel === 'categoria' || nivel === 'fivela') {
         const prodKey = item.descricao_produto;
         if (!g.produtos.has(prodKey)) {
           g.produtos.set(prodKey, { total: 0, unidades: 0, pedidoIds: new Set(), meses: {} });
@@ -178,7 +183,7 @@ export default function CurvaABC() {
       acumulado += pct;
       const classe: 'A' | 'B' | 'C' = acumulado <= 80 ? 'A' : acumulado <= 95 ? 'B' : 'C';
 
-      const produtos = nivel === 'categoria'
+      const produtos = (nivel === 'categoria' || nivel === 'fivela')
         ? Array.from(g.produtos.entries())
             .map(([pNome, p]) => ({
               nome: pNome,
@@ -336,10 +341,11 @@ export default function CurvaABC() {
         </div>
 
         <Select value={nivel} onValueChange={(v) => setNivel(v as Nivel)}>
-          <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="categoria">Categoria</SelectItem>
             <SelectItem value="produto">Produto</SelectItem>
+            <SelectItem value="fivela">Fivela</SelectItem>
           </SelectContent>
         </Select>
 
@@ -378,7 +384,7 @@ export default function CurvaABC() {
                   <div className="flex items-center gap-2">
                     {classeBadge(c)}
                   </div>
-                  <p className="text-2xl font-bold mt-2">{classeStats[c].count} <span className="text-sm font-normal text-muted-foreground">{nivel === 'categoria' ? 'categorias' : 'produtos'}</span></p>
+                  <p className="text-2xl font-bold mt-2">{classeStats[c].count} <span className="text-sm font-normal text-muted-foreground">{nivel === 'categoria' ? 'categorias' : nivel === 'fivela' ? 'fivelas' : 'produtos'}</span></p>
                   <p className="text-sm text-muted-foreground">{classeStats[c].pct.toFixed(1)}% do total</p>
                 </CardContent>
               </Card>
@@ -393,7 +399,7 @@ export default function CurvaABC() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[60px]">Classe</TableHead>
-                      <TableHead>{nivel === 'categoria' ? 'Categoria' : 'Produto'}</TableHead>
+                      <TableHead>{nivel === 'categoria' ? 'Categoria' : nivel === 'fivela' ? 'Fivela' : 'Produto'}</TableHead>
                       {mesesColunas.map(m => (
                         <TableHead key={m} className="text-right">{format(new Date(m + '-15'), 'MMM', { locale: ptBR })}</TableHead>
                       ))}
