@@ -113,8 +113,20 @@ export default function VerificacaoLoja() {
   };
 
   const handleToggleDisponivel = async (itemId: string, disponivel: boolean) => {
-    await supabase.from('pedido_itens').update({ disponivel } as any).eq('id', itemId);
-    setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel } : i));
+    const item = itens.find(i => i.id === itemId);
+    const updates: any = { disponivel };
+    if (!disponivel && item) {
+      updates.quantidade_faltante = item.quantidade;
+    } else {
+      updates.quantidade_faltante = null;
+    }
+    await supabase.from('pedido_itens').update(updates).eq('id', itemId);
+    setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel, quantidade_faltante: updates.quantidade_faltante } : i));
+  };
+
+  const handleQtdFaltanteChange = async (itemId: string, qtd: number) => {
+    await supabase.from('pedido_itens').update({ quantidade_faltante: qtd } as any).eq('id', itemId);
+    setItens(prev => prev.map(i => i.id === itemId ? { ...i, quantidade_faltante: qtd } : i));
   };
 
   const handleMarcarFaltanteTipo = async (itemId: string, tipo: string) => {
