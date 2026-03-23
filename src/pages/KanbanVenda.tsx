@@ -51,7 +51,7 @@ const COLUMNS: ColumnDef[] = [
     key: 'comercial',
     label: 'Comercial',
     icon: ShoppingBag,
-    statuses: ['PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL'],
+    statuses: ['PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL', 'LOJA_OK'],
     color: 'text-blue-700',
     bgColor: 'bg-blue-50 border-blue-200',
   },
@@ -101,6 +101,7 @@ const COLUMNS: ColumnDef[] = [
 const NEXT_STATUS: Record<string, string> = {
   PRODUCAO_CONCLUIDA: 'VALIDADO_COMERCIAL',
   AGUARDANDO_COMERCIAL: 'VALIDADO_COMERCIAL',
+  LOJA_OK: 'VALIDADO_COMERCIAL',
   VALIDADO_COMERCIAL: 'AGUARDANDO_FINANCEIRO',
   AGUARDANDO_FINANCEIRO: 'VALIDADO_FINANCEIRO',
   VALIDADO_FINANCEIRO: 'LIBERADO_LOGISTICA',
