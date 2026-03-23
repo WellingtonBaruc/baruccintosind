@@ -54,8 +54,7 @@ export default function VerificacaoLoja() {
   const [caminhoSelecionado, setCaminhoSelecionado] = useState('');
   const [opDialogOpen, setOpDialogOpen] = useState(false);
   const [almoxDialogOpen, setAlmoxDialogOpen] = useState(false);
-  const [descricaoSolicitacao, setDescricaoSolicitacao] = useState('');
-  const [qtdSolicitacao, setQtdSolicitacao] = useState(1);
+  const [solicitacoesAlmox, setSolicitacoesAlmox] = useState<{ itemId: string | null; descricao: string; quantidade: number }[]>([]);
 
   const [opComplementarDone, setOpComplementarDone] = useState(false);
 
