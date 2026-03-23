@@ -253,6 +253,7 @@ export default function KanbanProducao() {
         has_sintetico_order: hasSintetico,
         sintetico_ordem_id: hasSintetico ? sinteticoMap.get(pedidoId)! : null,
         transferred: false,
+        tecido_transferred: tipoProduto === 'TECIDO' && sinteticoExistsForPedido.has(pedidoId),
         pedido_status: e.ordens_producao.pedidos.status_atual,
         perdas_pendentes: perdasCount.get(e.ordem_id) || 0,
         is_piloto: e.ordens_producao.pedidos.is_piloto || false,
