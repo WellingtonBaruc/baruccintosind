@@ -83,7 +83,18 @@ export default function FilaMestre() {
   const [editingPcp, setEditingPcp] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    fetchAll();
+
+    // Realtime: refresh when ordens_producao or op_etapas change
+    const channel = supabase
+      .channel('filamestre-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordens_producao' }, () => fetchAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'op_etapas' }, () => fetchAll())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const fetchCalendarData = async () => {
     const [configRes, feriadosRes, pausasRes, ltRes] = await Promise.all([
