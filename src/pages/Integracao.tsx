@@ -149,14 +149,43 @@ export default function Integracao() {
     setFixing(false);
   };
 
-  const classifyProduct = (name: string, categoria?: string, referencia?: string): string => {
-    const upper = (name || '').toUpperCase();
-    const catUpper = (categoria || '').toUpperCase();
-    const refUpper = (referencia || '').toUpperCase();
-    if (upper.includes('FIVELA COBERTA') || upper.includes('FIVELA MATRIZ') || catUpper === 'FIVELA COBERTA' || catUpper === 'FIVELA_COBERTA' || refUpper.startsWith('FVC')) return 'FIVELA_COBERTA';
-    if (upper.includes('CINTO SINTETICO') || upper.includes('TIRA SINTETICO')) return 'SINTETICO';
-    if (upper.includes('CINTO TECIDO') || upper.includes('TIRA TECIDO')) return 'TECIDO';
-    return 'OUTROS';
+  const detectOrderTypes = (itens: Array<{ descricao_produto?: string | null; categoria_produto?: string | null; referencia_produto?: string | null }>) => {
+    const tipos = new Set<string>();
+
+    for (const item of itens) {
+      const upper = (item.descricao_produto || '').toUpperCase();
+      const catUpper = (item.categoria_produto || '').toUpperCase();
+      const refUpper = (item.referencia_produto || '').toUpperCase();
+
+      const isSintetico =
+        upper.includes('CINTO SINTETICO') ||
+        upper.includes('TIRA SINTETICO') ||
+        catUpper.includes('CINTO SINTETICO') ||
+        catUpper.includes('TIRA SINTETICO');
+
+      const isTecido =
+        upper.includes('CINTO TECIDO') ||
+        upper.includes('TIRA TECIDO') ||
+        catUpper.includes('CINTO TECIDO') ||
+        catUpper.includes('TIRA TECIDO');
+
+      const isFivela =
+        upper.includes('FIVELA COBERTA') ||
+        upper.includes('FIVELA MATRIZ') ||
+        upper.includes('FIVELA') ||
+        upper.includes('PASSANTE') ||
+        catUpper === 'FIVELA COBERTA' ||
+        catUpper === 'FIVELA_COBERTA' ||
+        catUpper.includes('FIVELA') ||
+        catUpper.includes('AVIAMENTO') ||
+        refUpper.startsWith('FVC');
+
+      if (isSintetico) tipos.add('SINTETICO');
+      if (isTecido) tipos.add('TECIDO');
+      if (isFivela) tipos.add('FIVELA_COBERTA');
+    }
+
+    return tipos;
   };
 
   const handleReclassify = async () => {
@@ -208,11 +237,7 @@ export default function Integracao() {
 
         if (!itens || itens.length === 0) continue;
 
-        const tiposPresentes = new Set<string>();
-        for (const item of itens) {
-          tiposPresentes.add(classifyProduct(item.descricao_produto, item.categoria_produto || '', item.referencia_produto || ''));
-        }
-        tiposPresentes.delete('OUTROS');
+        const tiposPresentes = detectOrderTypes(itens);
         if (tiposPresentes.size === 0) continue;
 
         const pedidoOrdens = ordensByPedido.get(pedidoId) || [];
@@ -300,7 +325,7 @@ export default function Integracao() {
       // Get ALL ordens that are NOT concluded/cancelled — no filters on type or pipeline
       const { data: ordens } = await supabase
         .from('ordens_producao')
-        .select('id, pedido_id, tipo_produto, status')
+        .select('id, pedido_id, tipo_produto, status, pedidos(status_atual)')
         .not('status', 'in', '("CONCLUIDA","CANCELADA")');
 
       if (!ordens || ordens.length === 0) {
@@ -315,6 +340,11 @@ export default function Integracao() {
       for (const ordem of ordens) {
         // Reset ordem status to AGUARDANDO
         await supabase.from('ordens_producao').update({ status: 'AGUARDANDO' as any }).eq('id', ordem.id);
+
+        const pedidoStatusAtual = (ordem as any).pedidos?.status_atual;
+        if (pedidoStatusAtual && ['FINALIZADO_SIMPLIFICA', 'HISTORICO', 'CANCELADO'].includes(pedidoStatusAtual)) {
+          await supabase.from('pedidos').update({ status_atual: 'EM_PRODUCAO' as any }).eq('id', ordem.pedido_id);
+        }
 
         // Reset all etapas
         const { data: etapas } = await supabase
