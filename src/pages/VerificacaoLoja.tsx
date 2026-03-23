@@ -37,6 +37,7 @@ interface PedidoItem {
   conferido: boolean;
   disponivel: boolean | null;
   item_faltante_tipo: string | null;
+  quantidade_faltante: number | null;
 }
 
 export default function VerificacaoLoja() {
@@ -112,8 +113,20 @@ export default function VerificacaoLoja() {
   };
 
   const handleToggleDisponivel = async (itemId: string, disponivel: boolean) => {
-    await supabase.from('pedido_itens').update({ disponivel } as any).eq('id', itemId);
-    setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel } : i));
+    const item = itens.find(i => i.id === itemId);
+    const updates: any = { disponivel };
+    if (!disponivel && item) {
+      updates.quantidade_faltante = item.quantidade;
+    } else {
+      updates.quantidade_faltante = null;
+    }
+    await supabase.from('pedido_itens').update(updates).eq('id', itemId);
+    setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel, quantidade_faltante: updates.quantidade_faltante } : i));
+  };
+
+  const handleQtdFaltanteChange = async (itemId: string, qtd: number) => {
+    await supabase.from('pedido_itens').update({ quantidade_faltante: qtd } as any).eq('id', itemId);
+    setItens(prev => prev.map(i => i.id === itemId ? { ...i, quantidade_faltante: qtd } : i));
   };
 
   const handleMarcarFaltanteTipo = async (itemId: string, tipo: string) => {
@@ -148,7 +161,7 @@ export default function VerificacaoLoja() {
         sequencia: 2,
         status: 'EM_ANDAMENTO',
         tipo_produto: 'OP_COMPLEMENTAR',
-        observacao: `Itens faltantes: ${itensFaltantes.map(i => i.descricao_produto).join(', ')}`,
+        observacao: `Itens faltantes: ${itensFaltantes.map(i => `${i.descricao_produto} (${i.quantidade_faltante ?? i.quantidade} un)`).join(', ')}`,
       }).select().single();
 
       if (ordem) {
@@ -232,7 +245,7 @@ export default function VerificacaoLoja() {
             sequencia: 2,
             status: 'EM_ANDAMENTO',
             tipo_produto: 'OP_COMPLEMENTAR',
-            observacao: `Itens faltantes (produção): ${faltantesProd.map(i => i.descricao_produto).join(', ')}`,
+            observacao: `Itens faltantes (produção): ${faltantesProd.map(i => `${i.descricao_produto} (${i.quantidade_faltante ?? i.quantidade} un)`).join(', ')}`,
           }).select().single();
 
           if (ordem) {
@@ -258,7 +271,7 @@ export default function VerificacaoLoja() {
             pedido_id: pedido.id,
             pedido_item_id: item.id,
             descricao: item.descricao_produto,
-            quantidade: item.quantidade,
+            quantidade: item.quantidade_faltante ?? item.quantidade,
             solicitado_por: profile.id,
           });
         }
@@ -419,7 +432,25 @@ export default function VerificacaoLoja() {
                 )}
               </div>
 
-              {/* For path D: classify missing items */}
+              {/* Quantidade faltante input */}
+              {isVerificando && item.disponivel === false && (
+                <div className="flex items-center gap-2 pt-1">
+                  <Label className="text-xs text-muted-foreground whitespace-nowrap">Qtd faltante:</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={item.quantidade}
+                    value={item.quantidade_faltante ?? item.quantidade}
+                    onChange={e => {
+                      const val = Math.max(1, Math.min(item.quantidade, parseInt(e.target.value) || 1));
+                      handleQtdFaltanteChange(item.id, val);
+                    }}
+                    className="h-7 w-20 text-xs"
+                  />
+                  <span className="text-xs text-muted-foreground">/ {item.quantidade}</span>
+                </div>
+              )}
+
               {isVerificando && item.disponivel === false && caminhoSelecionado === 'D_MISTO' && (
                 <div className="flex items-center gap-2 pt-1">
                   <Label className="text-xs text-muted-foreground">Tipo:</Label>
