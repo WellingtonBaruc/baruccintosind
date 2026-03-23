@@ -38,6 +38,8 @@ interface KanbanCard {
   perdas_pendentes: number;
   is_piloto: boolean;
   status_piloto: string | null;
+  fivelas_recebidas: boolean;
+  fivelas_separadas: boolean;
   // Track when card moved to financeiro for 5min green badge
   sent_to_financeiro_at: number | null;
 }
