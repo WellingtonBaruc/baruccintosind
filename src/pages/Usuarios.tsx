@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Loader2, Pencil } from 'lucide-react';
+import { Plus, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
 const PERFIS: PerfilUsuario[] = ['admin', 'gestor', 'supervisor_producao', 'operador_producao', 'comercial', 'financeiro', 'logistica', 'loja', 'almoxarifado'];
@@ -45,6 +46,7 @@ export default function Usuarios() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<UsuarioRow | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UsuarioRow | null>(null);
 
   // Form state
   const [nome, setNome] = useState('');
@@ -83,7 +85,7 @@ export default function Usuarios() {
     setSaving(true);
     try {
       if (editing) {
-        const { error } = await supabase.from('usuarios').update({ nome, perfil, setor: setor || null }).eq('id', editing.id);
+        const { error } = await supabase.from('usuarios').update({ nome, email, perfil, setor: setor || null }).eq('id', editing.id);
         if (error) throw error;
         toast.success('Usuário atualizado.');
       } else {
@@ -170,9 +172,12 @@ export default function Usuarios() {
                     <TableCell>
                       <Switch checked={u.ativo} onCheckedChange={() => toggleAtivo(u)} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(u)}>
                         <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(u)}>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -202,7 +207,7 @@ export default function Usuarios() {
             </div>
             <div className="space-y-2">
               <Label>Email</Label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@empresa.com" disabled={!!editing} />
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@empresa.com" disabled={false} />
             </div>
             {!editing && (
               <div className="space-y-2">
@@ -236,6 +241,27 @@ export default function Usuarios() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o usuário <strong>{deleteTarget?.nome}</strong>? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
+              if (!deleteTarget) return;
+              const { error } = await supabase.from('usuarios').delete().eq('id', deleteTarget.id);
+              if (error) { toast.error('Erro ao excluir usuário.'); return; }
+              toast.success('Usuário excluído.');
+              setDeleteTarget(null);
+              fetchUsuarios();
+            }}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
