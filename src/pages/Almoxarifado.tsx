@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Search, CheckCircle2, Package, Store, Ruler, Tag } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Loader2, Search, CheckCircle2, Package, Store, Ruler, Tag, LayoutGrid, ListOrdered } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -18,6 +19,7 @@ import {
   TIPO_PRODUTO_ALMOX_COLORS,
   type ParsedItemAttributes,
 } from '@/lib/almoxarifado';
+import AlmoxProducaoMode from '@/components/almoxarifado/AlmoxProducaoMode';
 
 interface AlmoxItem {
   id: string;
