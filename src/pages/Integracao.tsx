@@ -295,6 +295,63 @@ export default function Integracao() {
     setReclassifying(false);
   };
 
+  const handleResetOrdens = async () => {
+    setResetting(true);
+    setResetConfirmOpen(false);
+    try {
+      // Get all active ordens
+      const { data: ordens } = await supabase
+        .from('ordens_producao')
+        .select('id, pedido_id')
+        .not('status', 'in', '("CONCLUIDA","CANCELADA")');
+
+      if (!ordens || ordens.length === 0) {
+        toast.info('Nenhuma ordem ativa para resetar.');
+        setResetting(false);
+        return;
+      }
+
+      let resetCount = 0;
+      for (const ordem of ordens) {
+        // Reset ordem status to AGUARDANDO
+        await supabase.from('ordens_producao').update({ status: 'AGUARDANDO' as any }).eq('id', ordem.id);
+
+        // Reset all etapas: first to EM_ANDAMENTO, rest to PENDENTE
+        const { data: etapas } = await supabase
+          .from('op_etapas')
+          .select('id, ordem_sequencia')
+          .eq('ordem_id', ordem.id)
+          .order('ordem_sequencia');
+
+        if (etapas && etapas.length > 0) {
+          for (let i = 0; i < etapas.length; i++) {
+            await supabase.from('op_etapas').update({
+              status: (i === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as any,
+              operador_id: null,
+              concluido_em: null,
+              ...(i === 0 ? { iniciado_em: new Date().toISOString() } : { iniciado_em: null }),
+            }).eq('id', etapas[i].id);
+          }
+        }
+
+        await supabase.from('pedido_historico').insert({
+          pedido_id: ordem.pedido_id,
+          usuario_id: profile!.id,
+          tipo_acao: 'TRANSICAO' as any,
+          observacao: 'Ordem resetada para Aguardando Início — ação administrativa',
+        });
+
+        resetCount++;
+      }
+
+      toast.success(`${resetCount} ordens resetadas para Aguardando Início.`);
+      fetchData();
+    } catch (err: any) {
+      toast.error(`Erro ao resetar: ${err.message}`);
+    }
+    setResetting(false);
+  };
+
   if (!profile || (profile.perfil !== 'admin' && profile.perfil !== 'gestor')) {
     return <Navigate to="/dashboard" replace />;
   }
