@@ -672,6 +672,9 @@ export default function KanbanProducao() {
                                 const inConcluido = col === 'Concluído';
                                 const fivelaWithSintetico = isFivelaInConcluido(card, col) && card.has_sintetico_order;
                                 const fivelaSolo = isFivelaInConcluido(card, col) && !card.has_sintetico_order;
+                                const isTecidoConcluido = inConcluido && card.tipo_produto === 'TECIDO' && isConcluido(card);
+                                const tecidoAlreadyTransferred = isTecidoConcluido && card.tecido_transferred;
+                                const tecidoNeedsTransfer = isTecidoConcluido && !card.tecido_transferred;
 
                                 return (
                                   <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={!isSupervisor || inConcluido}>
