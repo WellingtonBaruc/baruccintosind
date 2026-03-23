@@ -607,7 +607,7 @@ export default function Integracao() {
             {lastDailyLog && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" />
-                Última execução: {format(new Date(lastDailyLog.executado_em.endsWith('Z') ? lastDailyLog.executado_em : lastDailyLog.executado_em + 'Z'), "dd/MM 'às' HH:mm", { locale: ptBR })} — {lastDailyLog.total_inseridos} vendas adicionadas
+                Última execução: {format(new Date(lastDailyLog.executado_em), "dd/MM 'às' HH:mm", { locale: ptBR })} — {lastDailyLog.total_inseridos} vendas adicionadas
               </div>
             )}
           </CardContent>
@@ -745,7 +745,7 @@ export default function Integracao() {
                     }
                   >
                     <TableCell className="text-sm">
-                      {format(new Date(log.executado_em.endsWith('Z') ? log.executado_em : log.executado_em + 'Z'), 'dd/MM/yy HH:mm')}
+                      {format(new Date(log.executado_em), 'dd/MM/yy HH:mm')}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs">{log.tipo}</Badge>
