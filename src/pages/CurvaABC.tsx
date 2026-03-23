@@ -183,7 +183,7 @@ export default function CurvaABC() {
       acumulado += pct;
       const classe: 'A' | 'B' | 'C' = acumulado <= 80 ? 'A' : acumulado <= 95 ? 'B' : 'C';
 
-      const produtos = nivel === 'categoria'
+      const produtos = (nivel === 'categoria' || nivel === 'fivela')
         ? Array.from(g.produtos.entries())
             .map(([pNome, p]) => ({
               nome: pNome,
