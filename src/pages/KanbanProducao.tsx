@@ -1019,17 +1019,39 @@ export default function KanbanProducao() {
         </DialogContent>
       </Dialog>
 
-      {/* Fivela transfer dialog */}
-      <Dialog open={transferDialog.open} onOpenChange={o => !o && setTransferDialog({ open: false, card: null })}>
+      {/* Fivela coberta question modal */}
+      <Dialog open={fivelaModal.open} onOpenChange={o => !o && setFivelaModal({ open: false, card: null })}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Confirmar entrega das fivelas para Embalagem</DialogTitle></DialogHeader>
-          <DialogDescription>Confirmar entrega das fivelas para o setor de Embalagem do pedido #{transferDialog.card?.api_venda_id}?</DialogDescription>
+          <DialogHeader><DialogTitle>Fivela Coberta</DialogTitle></DialogHeader>
+          <DialogDescription>Essa venda possui fivela coberta?</DialogDescription>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTransferDialog({ open: false, card: null })}>Cancelar</Button>
-            <Button className="bg-orange-600 hover:bg-orange-700" onClick={handleFivelaTransfer}>
-              <ArrowRight className="h-4 w-4 mr-1" /> Confirmar Transferência
-            </Button>
+            <Button variant="outline" onClick={() => setFivelaModal({ open: false, card: null })}>Não</Button>
+            <Button onClick={() => handleFivelaModalResponse(true)}>Sim, possui</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fivela coberta status modal */}
+      <Dialog open={fivelaStatusModal.open} onOpenChange={o => !o && setFivelaStatusModal({ open: false, card: null })}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Status da Fivela Coberta — #{fivelaStatusModal.card?.api_venda_id}</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            {['AGUARDANDO', 'EM_ANDAMENTO', 'CONCLUIDO'].map(status => {
+              const labels: Record<string, string> = { AGUARDANDO: 'Aguardando', EM_ANDAMENTO: 'Em Andamento', CONCLUIDO: 'Concluído' };
+              const isActive = fivelaStatusModal.card?.fivela_coberta_status === status;
+              return (
+                <Button
+                  key={status}
+                  variant={isActive ? 'default' : 'outline'}
+                  className="w-full justify-start h-10"
+                  onClick={() => fivelaStatusModal.card && updateFivelaCobertaStatus(fivelaStatusModal.card, status)}
+                >
+                  <CheckCircle2 className={`h-4 w-4 mr-2 ${isActive ? '' : 'text-muted-foreground'}`} />
+                  {labels[status]}
+                </Button>
+              );
+            })}
+          </div>
         </DialogContent>
       </Dialog>
 
