@@ -202,7 +202,7 @@ export default function Usuarios() {
             </div>
             <div className="space-y-2">
               <Label>Email</Label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@empresa.com" disabled={!!editing} />
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@empresa.com" disabled={false} />
             </div>
             {!editing && (
               <div className="space-y-2">
