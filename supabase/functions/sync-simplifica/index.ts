@@ -507,7 +507,7 @@ async function inserirNovoPedido(
     // Group items by type and create one order per type
     const itensByTipo: Record<string, any[]> = {};
     for (const item of (Array.isArray(itens) ? itens : [])) {
-      const tipo = classificarProduto(item.nm_produto || '', item.nm_categoria || '');
+      const tipo = classificarProduto(item.nm_produto || '', item.nm_categoria || '', item.nm_referencia || '');
       if (!itensByTipo[tipo]) itensByTipo[tipo] = [];
       itensByTipo[tipo].push(item);
     }
