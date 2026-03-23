@@ -257,6 +257,11 @@ export default function FilaMestre() {
 
   const fmt = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const fmtDate = (d: string | null) => d ? format(new Date(d + 'T00:00:00'), 'dd/MM/yy') : '—';
+  const fmtDateTime = (d: string | null) => {
+    if (!d) return '—';
+    const date = new Date(d);
+    return format(date, 'dd/MM/yy HH:mm');
+  };
 
   const canEdit = profile && ['admin', 'gestor', 'supervisor_producao'].includes(profile.perfil);
 
@@ -397,25 +402,11 @@ export default function FilaMestre() {
                             <span className="text-xs text-muted-foreground tabular-nums">{r.atrasoDias}d</span>
                           )}
                         </TableCell>
-                        <TableCell onClick={e => e.stopPropagation()}>
-                          {editingPcp?.id === r.ordem_id && editingPcp?.field === 'data_inicio_pcp' ? (
-                            <Input type="date" className="h-7 w-[120px] text-xs" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={() => r.ordem_id && savePcpDate(r.ordem_id, 'data_inicio_pcp', editValue)} autoFocus />
-                          ) : (
-                            <span className={`text-xs ${canEdit ? 'cursor-pointer hover:text-primary' : ''} text-muted-foreground`}
-                              onClick={() => { if (canEdit && r.ordem_id) { setEditingPcp({ id: r.ordem_id, field: 'data_inicio_pcp' }); setEditValue(r.data_inicio_pcp || ''); } }}>
-                              {fmtDate(r.data_inicio_pcp)}
-                            </span>
-                          )}
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground">{fmtDateTime(r.data_inicio_pcp)}</span>
                         </TableCell>
-                        <TableCell onClick={e => e.stopPropagation()}>
-                          {editingPcp?.id === r.ordem_id && editingPcp?.field === 'data_fim_pcp' ? (
-                            <Input type="date" className="h-7 w-[120px] text-xs" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={() => r.ordem_id && savePcpDate(r.ordem_id, 'data_fim_pcp', editValue)} autoFocus />
-                          ) : (
-                            <span className={`text-xs ${canEdit ? 'cursor-pointer hover:text-primary' : ''} text-muted-foreground`}
-                              onClick={() => { if (canEdit && r.ordem_id) { setEditingPcp({ id: r.ordem_id, field: 'data_fim_pcp' }); setEditValue(r.data_fim_pcp || ''); } }}>
-                              {fmtDate(r.data_fim_pcp)}
-                            </span>
-                          )}
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground">{fmtDateTime(r.data_fim_pcp)}</span>
                         </TableCell>
                         <TableCell className="text-sm">{r.etapa_atual}</TableCell>
                         <TableCell>
