@@ -129,12 +129,13 @@ export default function FilaMestre() {
       .eq('status_api', 'Em Produção')
       .order('criado_em', { ascending: false });
 
-    // 2) Fetch all ordens_producao to find OPs from Loja (complementary)
+    // 2) Fetch active ordens_producao (not completed/cancelled) to find complementary OPs from Loja
     const { data: todasOrdens } = await supabase
       .from('ordens_producao')
-      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp');
+      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp')
+      .not('status', 'in', '("CONCLUIDA","CANCELADA")');
 
-    // 3) Find pedido_ids that have OPs but are NOT in the first query (e.g. Pedido Enviado with complementary OPs)
+    // 3) Find pedido_ids that have active OPs but are NOT in the first query (e.g. complementary OPs from Loja)
     const emProducaoIds = new Set((pedidosEmProducao || []).map(p => p.id));
     const opPedidoIds = [...new Set((todasOrdens || []).map(o => o.pedido_id))].filter(id => !emProducaoIds.has(id));
 
@@ -143,7 +144,8 @@ export default function FilaMestre() {
       const { data } = await supabase
         .from('pedidos')
         .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
-        .in('id', opPedidoIds);
+        .in('id', opPedidoIds)
+        .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")');
       pedidosComOp = data || [];
     }
 
