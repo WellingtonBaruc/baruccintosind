@@ -399,7 +399,7 @@ export default function CurvaABC() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[60px]">Classe</TableHead>
-                      <TableHead>{nivel === 'categoria' ? 'Categoria' : 'Produto'}</TableHead>
+                      <TableHead>{nivel === 'categoria' ? 'Categoria' : nivel === 'fivela' ? 'Fivela' : 'Produto'}</TableHead>
                       {mesesColunas.map(m => (
                         <TableHead key={m} className="text-right">{format(new Date(m + '-15'), 'MMM', { locale: ptBR })}</TableHead>
                       ))}
