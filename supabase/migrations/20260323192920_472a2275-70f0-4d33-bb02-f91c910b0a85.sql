@@ -1,0 +1,2 @@
+ALTER TABLE public.ordens_producao ADD COLUMN IF NOT EXISTS tem_fivela_coberta boolean DEFAULT false;
+ALTER TABLE public.ordens_producao ADD COLUMN IF NOT EXISTS fivela_coberta_status text DEFAULT null;
