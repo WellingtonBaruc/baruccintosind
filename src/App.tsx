@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import DashboardGestao from "./pages/DashboardGestao";
 import FilaMestre from "./pages/FilaMestre";
 import KanbanProducao from "./pages/KanbanProducao";
+import KanbanVenda from "./pages/KanbanVenda";
 import PainelDia from "./pages/PainelDia";
 import Usuarios from "./pages/Usuarios";
 import Pipelines from "./pages/Pipelines";
