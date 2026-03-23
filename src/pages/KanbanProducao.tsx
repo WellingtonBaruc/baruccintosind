@@ -428,9 +428,9 @@ export default function KanbanProducao() {
       });
 
   const prazoClasses: Record<string, string> = {
-    ATRASADO: 'border-l-destructive bg-destructive/5',
-    ATENCAO: 'border-l-[hsl(var(--warning))] bg-[hsl(var(--warning))]/5',
-    NO_PRAZO: 'border-l-[hsl(var(--success))]',
+    ATRASADO: 'border-l-destructive bg-destructive/10',
+    ATENCAO: 'border-l-[hsl(var(--warning))] bg-[hsl(var(--warning))]/10',
+    NO_PRAZO: 'border-l-[hsl(var(--success))] bg-[hsl(var(--success))]/10',
   };
 
   const prazoBadge: Record<string, { label: string; cls: string }> = {
