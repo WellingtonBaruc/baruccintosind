@@ -29,6 +29,7 @@ const calcStatusPrazo = (dataPrevisao: string | null): string => {
 };
 
 export default function PainelDia() {
+  const [atrasados, setAtrasados] = useState<PainelRow[]>([]);
   const [entregarHoje, setEntregarHoje] = useState<PainelRow[]>([]);
   const [iniciarHoje, setIniciarHoje] = useState<PainelRow[]>([]);
   const [totalMeta, setTotalMeta] = useState(0);
@@ -37,6 +38,17 @@ export default function PainelDia() {
 
   const fetchData = async () => {
     const today = new Date().toISOString().slice(0, 10);
+
+    const statusFinais = ['ENVIADO', 'ENTREGUE', 'FINALIZADO_SIMPLIFICA', 'CANCELADO', 'HISTORICO'];
+
+    // Atrasados: data_previsao_entrega < hoje e não finalizados
+    const { data: atrasadosData } = await supabase
+      .from('pedidos')
+      .select('numero_pedido, api_venda_id, cliente_nome, status_prazo, status_atual, data_previsao_entrega')
+      .lt('data_previsao_entrega', today)
+      .not('status_api', 'eq', 'Finalizado')
+      .not('status_atual', 'in', `(${statusFinais.join(',')})`)
+      .order('data_previsao_entrega', { ascending: true });
 
     // Entregar hoje
     const { data: entrega } = await supabase
@@ -65,6 +77,11 @@ export default function PainelDia() {
       .select('*', { count: 'exact', head: true })
       .eq('programado_para_hoje', true).eq('data_programacao', today).eq('status', 'CONCLUIDA');
 
+    setAtrasados((atrasadosData || []).map(p => ({
+      ...p,
+      tipo_produto: null,
+      status_prazo: 'ATRASADO',
+    })));
     setEntregarHoje((entrega || []).map(p => ({
       ...p,
       tipo_produto: null,
