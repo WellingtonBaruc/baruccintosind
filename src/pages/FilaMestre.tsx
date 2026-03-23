@@ -386,7 +386,7 @@ export default function FilaMestre() {
                         <TableCell className="text-right text-sm tabular-nums">{fmt(r.valor_liquido)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_venda_api)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{fmtDate(r.data_previsao_entrega)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{fmtDate(r.dataPcpCalculada)}</TableCell>
+                        
                         <TableCell className="text-xs text-muted-foreground">{fmtDate(r.dataInicioIdeal)}</TableCell>
                         <TableCell>
                           {r.atrasoDias < 0 ? (
