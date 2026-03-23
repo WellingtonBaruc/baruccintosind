@@ -156,7 +156,7 @@ export default function CurvaABC() {
       g.meses[mesKey] = (g.meses[mesKey] || 0) + val;
 
       // If grouping by category, track products inside
-      if (nivel === 'categoria') {
+      if (nivel === 'categoria' || nivel === 'fivela') {
         const prodKey = item.descricao_produto;
         if (!g.produtos.has(prodKey)) {
           g.produtos.set(prodKey, { total: 0, unidades: 0, pedidoIds: new Set(), meses: {} });
