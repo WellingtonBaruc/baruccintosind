@@ -299,11 +299,11 @@ export default function Integracao() {
     setResetting(true);
     setResetConfirmOpen(false);
     try {
-      // Get all active ordens
+      // Get all active ordens (all types: SINTETICO, TECIDO, FIVELA_COBERTA)
       const { data: ordens } = await supabase
         .from('ordens_producao')
-        .select('id, pedido_id')
-        .not('status', 'in', '("CONCLUIDA","CANCELADA")');
+        .select('id, pedido_id, tipo_produto')
+        .in('status', ['AGUARDANDO', 'EM_ANDAMENTO']);
 
       if (!ordens || ordens.length === 0) {
         toast.info('Nenhuma ordem ativa para resetar.');
