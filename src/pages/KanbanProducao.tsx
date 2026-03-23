@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { concluirEtapa, iniciarEtapa } from '@/lib/producao';
 import { TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
+import { calcularPrazoPcp, PcpCalendarData } from '@/lib/pcpCalendario';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -101,18 +102,36 @@ export default function KanbanProducao() {
   }, []);
 
   const fetchCards = async () => {
-    // Fetch all orders that are NOT past financeiro
-    const { data: etapas } = await supabase
-      .from('op_etapas')
-      .select(`
-        id, ordem_id, nome_etapa, ordem_sequencia, operador_id, status,
-        usuarios(nome),
-        ordens_producao!inner(
-          id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao,
-          pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas)
-        )
-      `)
-      .in('status', ['EM_ANDAMENTO', 'CONCLUIDA', 'PENDENTE']);
+    // Fetch PCP calendar data and lead times in parallel with etapas
+    const [etapasRes, semanaRes, feriadosRes, pausasRes, leadTimesRes] = await Promise.all([
+      supabase
+        .from('op_etapas')
+        .select(`
+          id, ordem_id, nome_etapa, ordem_sequencia, operador_id, status,
+          usuarios(nome),
+          ordens_producao!inner(
+            id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao,
+            pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas)
+          )
+        `)
+        .in('status', ['EM_ANDAMENTO', 'CONCLUIDA', 'PENDENTE']),
+      supabase.from('pcp_config_semana').select('*').limit(1).maybeSingle(),
+      supabase.from('pcp_feriados').select('data'),
+      supabase.from('pcp_pausas').select('data_inicio, data_fim'),
+      supabase.from('pcp_lead_times').select('tipo, lead_time_dias').eq('ativo', true),
+    ]);
+
+    const etapas = etapasRes.data;
+    const cal: PcpCalendarData = {
+      sabadoAtivo: semanaRes.data?.sabado_ativo ?? false,
+      domingoAtivo: semanaRes.data?.domingo_ativo ?? false,
+      feriados: (feriadosRes.data || []).map((f: any) => f.data),
+      pausas: (pausasRes.data || []).map((p: any) => ({ inicio: p.data_inicio, fim: p.data_fim })),
+    };
+    const leadTimeMap = new Map<string, number>();
+    for (const lt of (leadTimesRes.data || [])) {
+      leadTimeMap.set(lt.tipo, lt.lead_time_dias);
+    }
 
     if (!etapas) { setLoading(false); return; }
 
@@ -193,6 +212,11 @@ export default function KanbanProducao() {
       const tipoProduto = e.ordens_producao.tipo_produto || 'OUTROS';
       const hasSintetico = tipoProduto === 'FIVELA_COBERTA' && sinteticoMap.has(pedidoId);
 
+      // Calculate prazo dynamically using PCP engine (same as Fila Mestre)
+      const leadTime = leadTimeMap.get(tipoProduto) || 2;
+      const pcpResult = calcularPrazoPcp(e.ordens_producao.pedidos.data_previsao_entrega, leadTime, cal);
+      const dynamicPrazo = pcpResult.prioridade === 'URGENTE' ? 'ATRASADO' : pcpResult.prioridade === 'ATENCAO' ? 'ATENCAO' : 'NO_PRAZO';
+
       return {
         id: e.id,
         ordem_id: e.ordem_id,
@@ -206,7 +230,7 @@ export default function KanbanProducao() {
         cliente_nome: e.ordens_producao.pedidos.cliente_nome,
         tipo_produto: tipoProduto,
         quantidade: qtdMap.get(pedidoId) || 0,
-        status_prazo: e.ordens_producao.pedidos.status_prazo || 'NO_PRAZO',
+        status_prazo: dynamicPrazo,
         data_previsao_entrega: e.ordens_producao.pedidos.data_previsao_entrega,
         ordem_status: e.ordens_producao.status,
         has_sintetico_order: hasSintetico,
@@ -404,9 +428,9 @@ export default function KanbanProducao() {
       });
 
   const prazoClasses: Record<string, string> = {
-    ATRASADO: 'border-l-destructive bg-destructive/5',
-    ATENCAO: 'border-l-[hsl(var(--warning))] bg-[hsl(var(--warning))]/5',
-    NO_PRAZO: 'border-l-[hsl(var(--success))]',
+    ATRASADO: 'border-l-destructive bg-destructive/10',
+    ATENCAO: 'border-l-[hsl(var(--warning))] bg-[hsl(var(--warning))]/10',
+    NO_PRAZO: 'border-l-[hsl(var(--success))] bg-[hsl(var(--success))]/10',
   };
 
   const prazoBadge: Record<string, { label: string; cls: string }> = {
