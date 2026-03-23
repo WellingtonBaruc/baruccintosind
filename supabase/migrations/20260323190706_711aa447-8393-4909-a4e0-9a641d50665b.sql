@@ -1,0 +1,1 @@
+UPDATE pedidos SET status_atual = 'EM_PRODUCAO' WHERE status_atual = 'AGUARDANDO_COMERCIAL';
