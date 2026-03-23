@@ -270,6 +270,8 @@ export default function KanbanProducao() {
         sent_to_financeiro_at: recentFinanceiro.get(e.ordem_id) || null,
         ordem_sequencia_op: e.ordens_producao.sequencia || 1,
         ordem_observacao: e.ordens_producao.observacao || null,
+        tem_fivela_coberta: e.ordens_producao.tem_fivela_coberta || false,
+        fivela_coberta_status: e.ordens_producao.fivela_coberta_status || null,
       };
     });
 
