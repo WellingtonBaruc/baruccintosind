@@ -48,6 +48,8 @@ interface KanbanCard {
   sent_to_financeiro_at: number | null;
   ordem_sequencia_op: number;
   ordem_observacao: string | null;
+  tem_fivela_coberta: boolean;
+  fivela_coberta_status: string | null;
 }
 
 // Unified columns
