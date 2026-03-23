@@ -195,9 +195,9 @@ export default function AlmoxarifadoPage() {
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
     const entrega = new Date(v.data_previsao_entrega + 'T00:00:00');
     const dias = Math.ceil((entrega.getTime() - hoje.getTime()) / 86400000);
-    if (dias < 0) return { order: 0, bg: 'bg-destructive text-destructive-foreground', text: `${Math.abs(dias)}d atrasado` };
-    if (dias <= 3) return { order: 1, bg: 'bg-[hsl(var(--warning))] text-white', text: dias === 0 ? 'Hoje' : `${dias}d restantes` };
-    return { order: 2, bg: 'bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]', text: `${dias}d restantes` };
+    if (dias < 0) return { order: 0, bg: 'bg-[#d32f2f] text-white', text: `${Math.abs(dias)}d atrasado` };
+    if (dias <= 3) return { order: 1, bg: 'bg-[#e65100] text-white', text: dias === 0 ? 'Hoje' : `${dias}d restantes` };
+    return { order: 2, bg: 'bg-[#2e7d32] text-white', text: `${dias}d restantes` };
   };
 
   const filtered = vendas.filter(v => {
