@@ -694,6 +694,8 @@ export type Database = {
           data_pagamento_confirmado: string | null
           data_previsao_entrega: string | null
           data_venda_api: string | null
+          fivelas_separadas: boolean | null
+          fivelas_separadas_em: string | null
           forma_envio: string | null
           forma_pagamento: string | null
           id: string
@@ -743,6 +745,8 @@ export type Database = {
           data_pagamento_confirmado?: string | null
           data_previsao_entrega?: string | null
           data_venda_api?: string | null
+          fivelas_separadas?: boolean | null
+          fivelas_separadas_em?: string | null
           forma_envio?: string | null
           forma_pagamento?: string | null
           id?: string
@@ -792,6 +796,8 @@ export type Database = {
           data_pagamento_confirmado?: string | null
           data_previsao_entrega?: string | null
           data_venda_api?: string | null
+          fivelas_separadas?: boolean | null
+          fivelas_separadas_em?: string | null
           forma_envio?: string | null
           forma_pagamento?: string | null
           id?: string
@@ -1016,6 +1022,7 @@ export type Database = {
         | "financeiro"
         | "logistica"
         | "loja"
+        | "almoxarifado"
       status_op_etapa: "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDA" | "REJEITADA"
       status_ordem:
         | "AGUARDANDO"
@@ -1187,6 +1194,7 @@ export const Constants = {
         "financeiro",
         "logistica",
         "loja",
+        "almoxarifado",
       ],
       status_op_etapa: ["PENDENTE", "EM_ANDAMENTO", "CONCLUIDA", "REJEITADA"],
       status_ordem: [
