@@ -384,7 +384,7 @@ export default function CurvaABC() {
                   <div className="flex items-center gap-2">
                     {classeBadge(c)}
                   </div>
-                  <p className="text-2xl font-bold mt-2">{classeStats[c].count} <span className="text-sm font-normal text-muted-foreground">{nivel === 'categoria' ? 'categorias' : 'produtos'}</span></p>
+                  <p className="text-2xl font-bold mt-2">{classeStats[c].count} <span className="text-sm font-normal text-muted-foreground">{nivel === 'categoria' ? 'categorias' : nivel === 'fivela' ? 'fivelas' : 'produtos'}</span></p>
                   <p className="text-sm text-muted-foreground">{classeStats[c].pct.toFixed(1)}% do total</p>
                 </CardContent>
               </Card>
