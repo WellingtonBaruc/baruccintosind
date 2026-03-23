@@ -992,8 +992,8 @@ export default function KanbanProducao() {
       </Dialog>
 
       {/* Fivela coberta question modal */}
-      <Dialog open={fivelaModal.open} onOpenChange={o => !o && setFivelaModal({ open: false, card: null })}>
-        <DialogContent>
+      <Dialog open={fivelaModal.open} onOpenChange={o => !o && setFivelaModal({ open: false, card: null })} modal={false}>
+        <DialogContent className="shadow-xl border">
           <DialogHeader><DialogTitle>Fivela Coberta</DialogTitle></DialogHeader>
           <DialogDescription>Essa venda possui fivela coberta?</DialogDescription>
           <DialogFooter>
