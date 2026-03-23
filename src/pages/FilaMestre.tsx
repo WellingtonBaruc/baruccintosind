@@ -153,7 +153,11 @@ export default function FilaMestre() {
     if (pedidos.length === 0) { setRows([]); setLoading(false); return; }
 
     const pedidoIds = pedidos.map(p => p.id);
-    const ordens = (todasOrdens || []).filter(o => pedidoIds.includes(o.pedido_id));
+    // Re-fetch all ordens for these pedidos (including completed ones for display)
+    const { data: ordens } = await supabase
+      .from('ordens_producao')
+      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp')
+      .in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']);
 
     const ordemIds = (ordens || []).map(o => o.id);
     const { data: etapas } = await supabase
