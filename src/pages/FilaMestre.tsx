@@ -100,13 +100,30 @@ export default function FilaMestre() {
 
     const vendas: VendaRow[] = pedidos.map(p => {
       const ordem = (ordens || []).find(o => o.pedido_id === p.id);
-      const etapa = ordem ? (etapas || []).find(e => e.ordem_id === ordem.id) : null;
+      // Prioritize EM_ANDAMENTO etapa, fallback to first PENDENTE
+      const ordemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
+      const etapaAtiva = ordemEtapas.find(e => e.status === 'EM_ANDAMENTO') || ordemEtapas[0] || null;
+      
+      // Determine display name for etapa
+      let etapaDisplay = '—';
+      if (ordem) {
+        if (etapaAtiva) {
+          etapaDisplay = etapaAtiva.nome_etapa;
+        } else if (ordem.status === 'AGUARDANDO') {
+          etapaDisplay = 'Aguardando Início';
+        } else if (ordem.status === 'CONCLUIDA') {
+          etapaDisplay = 'Concluída';
+        } else {
+          etapaDisplay = ordem.status;
+        }
+      }
+      
       return {
         ...p,
         ordem_id: ordem?.id || null,
         tipo_produto: ordem?.tipo_produto || null,
-        etapa_atual: etapa?.nome_etapa || '—',
-        operador_atual: (etapa?.usuarios as any)?.nome || '—',
+        etapa_atual: etapaDisplay,
+        operador_atual: (etapaAtiva?.usuarios as any)?.nome || '—',
         data_inicio_pcp: (ordem as any)?.data_inicio_pcp || null,
         data_fim_pcp: (ordem as any)?.data_fim_pcp || null,
         is_piloto: (p as any).is_piloto || false,
