@@ -51,7 +51,7 @@ const COLUMNS: ColumnDef[] = [
     key: 'comercial',
     label: 'Comercial',
     icon: ShoppingBag,
-    statuses: ['PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL'],
+    statuses: ['PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL', 'LOJA_OK'],
     color: 'text-blue-700',
     bgColor: 'bg-blue-50 border-blue-200',
   },
