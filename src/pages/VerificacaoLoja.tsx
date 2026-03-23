@@ -271,7 +271,7 @@ export default function VerificacaoLoja() {
             pedido_id: pedido.id,
             pedido_item_id: item.id,
             descricao: item.descricao_produto,
-            quantidade: item.quantidade,
+            quantidade: item.quantidade_faltante ?? item.quantidade,
             solicitado_por: profile.id,
           });
         }
