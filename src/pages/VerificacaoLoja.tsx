@@ -37,6 +37,7 @@ interface PedidoItem {
   conferido: boolean;
   disponivel: boolean | null;
   item_faltante_tipo: string | null;
+  quantidade_faltante: number | null;
 }
 
 export default function VerificacaoLoja() {
