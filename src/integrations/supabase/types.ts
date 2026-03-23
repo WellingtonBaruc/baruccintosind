@@ -355,6 +355,7 @@ export type Database = {
           data_fim_pcp: string | null
           data_inicio_pcp: string | null
           data_programacao: string | null
+          fivela_coberta_status: string | null
           fivelas_recebidas: boolean | null
           id: string
           observacao: string | null
@@ -365,6 +366,7 @@ export type Database = {
           status: Database["public"]["Enums"]["status_ordem"]
           sugestao_tipo_confirmada: boolean | null
           supervisor_id: string | null
+          tem_fivela_coberta: boolean | null
           tipo_produto: string | null
         }
         Insert: {
@@ -373,6 +375,7 @@ export type Database = {
           data_fim_pcp?: string | null
           data_inicio_pcp?: string | null
           data_programacao?: string | null
+          fivela_coberta_status?: string | null
           fivelas_recebidas?: boolean | null
           id?: string
           observacao?: string | null
@@ -383,6 +386,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["status_ordem"]
           sugestao_tipo_confirmada?: boolean | null
           supervisor_id?: string | null
+          tem_fivela_coberta?: boolean | null
           tipo_produto?: string | null
         }
         Update: {
@@ -391,6 +395,7 @@ export type Database = {
           data_fim_pcp?: string | null
           data_inicio_pcp?: string | null
           data_programacao?: string | null
+          fivela_coberta_status?: string | null
           fivelas_recebidas?: boolean | null
           id?: string
           observacao?: string | null
@@ -401,6 +406,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["status_ordem"]
           sugestao_tipo_confirmada?: boolean | null
           supervisor_id?: string | null
+          tem_fivela_coberta?: boolean | null
           tipo_produto?: string | null
         }
         Relationships: [

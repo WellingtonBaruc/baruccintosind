@@ -48,6 +48,8 @@ interface KanbanCard {
   sent_to_financeiro_at: number | null;
   ordem_sequencia_op: number;
   ordem_observacao: string | null;
+  tem_fivela_coberta: boolean;
+  fivela_coberta_status: string | null;
 }
 
 // Unified columns
@@ -106,7 +108,7 @@ export default function KanbanProducao() {
   const [filterMode, setFilterMode] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; type: string; card: KanbanCard | null }>({ open: false, type: '', card: null });
-  const [transferDialog, setTransferDialog] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
+  
 
   // Loss registration
   const [lossDialog, setLossDialog] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
@@ -122,6 +124,10 @@ export default function KanbanProducao() {
 
   // Recently sent to financeiro
   const [recentFinanceiro, setRecentFinanceiro] = useState<Map<string, number>>(new Map());
+
+  // Fivela coberta modal
+  const [fivelaModal, setFivelaModal] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
+  const [fivelaStatusModal, setFivelaStatusModal] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
 
   // Detail sheet
   const [detailSheet, setDetailSheet] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean; pedido: any | null }>({ open: false, card: null, items: [], loading: false, pedido: null });
@@ -143,7 +149,7 @@ export default function KanbanProducao() {
           id, ordem_id, nome_etapa, ordem_sequencia, operador_id, status,
           usuarios(nome),
           ordens_producao!inner(
-            id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao,
+            id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao, tem_fivela_coberta, fivela_coberta_status,
             pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas)
           )
         `)
@@ -268,6 +274,8 @@ export default function KanbanProducao() {
         sent_to_financeiro_at: recentFinanceiro.get(e.ordem_id) || null,
         ordem_sequencia_op: e.ordens_producao.sequencia || 1,
         ordem_observacao: e.ordens_producao.observacao || null,
+        tem_fivela_coberta: e.ordens_producao.tem_fivela_coberta || false,
+        fivela_coberta_status: e.ordens_producao.fivela_coberta_status || null,
       };
     });
 
@@ -324,7 +332,36 @@ export default function KanbanProducao() {
       return;
     }
 
+    // Moving to Conferência — ask about fivela coberta
+    if (destCol === 'Conferência' && !card.tem_fivela_coberta) {
+      setFivelaModal({ open: true, card });
+      // Continue advancing regardless
+    }
+
     await advanceCard(card);
+  };
+
+  const handleFivelaModalResponse = async (hasFivela: boolean) => {
+    const card = fivelaModal.card;
+    if (!card) return;
+    setFivelaModal({ open: false, card: null });
+    if (hasFivela) {
+      await supabase.from('ordens_producao').update({
+        tem_fivela_coberta: true,
+        fivela_coberta_status: 'AGUARDANDO',
+      } as any).eq('id', card.ordem_id);
+      toast.success('Fivela coberta marcada na venda');
+      fetchCards();
+    }
+  };
+
+  const updateFivelaCobertaStatus = async (card: KanbanCard, newStatus: string) => {
+    await supabase.from('ordens_producao').update({
+      fivela_coberta_status: newStatus,
+    } as any).eq('id', card.ordem_id);
+    toast.success(`Fivela coberta: ${newStatus === 'AGUARDANDO' ? 'Aguardando' : newStatus === 'EM_ANDAMENTO' ? 'Em Andamento' : 'Concluído'}`);
+    setFivelaStatusModal({ open: false, card: null });
+    fetchCards();
   };
 
   const advanceCard = async (card: KanbanCard, obs?: string) => {
@@ -466,34 +503,6 @@ export default function KanbanProducao() {
     }
   };
 
-  const handleFivelaTransfer = async () => {
-    const card = transferDialog.card;
-    if (!card || !profile || !card.sintetico_ordem_id) return;
-    try {
-      await supabase.from('ordens_producao').update({ fivelas_recebidas: true }).eq('id', card.sintetico_ordem_id);
-      await supabase.from('pedido_historico').insert({
-        pedido_id: card.pedido_id, usuario_id: profile.id, tipo_acao: 'TRANSICAO',
-        observacao: `Fivelas transferidas para Embalagem Sintético — confirmado pelo supervisor ${profile.nome}`,
-      });
-      toast.success(`Fivelas transferidas para Embalagem do Sintético (#${card.api_venda_id})`);
-      setTransferDialog({ open: false, card: null });
-      fetchCards();
-    } catch { toast.error('Erro ao transferir fivelas'); }
-  };
-
-  const handleFivelaSoloComplete = async (card: KanbanCard) => {
-    if (!profile) return;
-    try {
-      await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', card.pedido_id);
-      await supabase.from('pedido_historico').insert({
-        pedido_id: card.pedido_id, usuario_id: profile.id, tipo_acao: 'TRANSICAO',
-        status_anterior: 'EM_PRODUCAO', status_novo: 'AGUARDANDO_COMERCIAL',
-        observacao: `Produção de fivelas concluída (sem sintético). Encaminhado para comercial por ${profile.nome}`,
-      });
-      toast.success('Pedido encaminhado para comercial');
-      fetchCards();
-    } catch { toast.error('Erro ao avançar pedido'); }
-  };
 
   // --- Preparação Sub-etapas (inline expandable) ---
   const togglePrepExpand = async (card: KanbanCard) => {
@@ -643,8 +652,6 @@ export default function KanbanProducao() {
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
   const isConcluido = (card: KanbanCard) => card.ordem_status === 'CONCLUIDA';
-  const isFivelaInConcluido = (card: KanbanCard, col: string) =>
-    col === 'Concluído' && card.tipo_produto === 'FIVELA_COBERTA' && isConcluido(card);
 
   const getConcluidoBadge = (card: KanbanCard) => {
     if (card.pedido_status === 'AGUARDANDO_FINANCEIRO') {
@@ -703,7 +710,6 @@ export default function KanbanProducao() {
     { key: 'all', label: 'Todos' },
     { key: 'SINTETICO', label: 'Sintético' },
     { key: 'TECIDO', label: 'Tecido' },
-    { key: 'FIVELA_COBERTA', label: 'Fivela Coberta' },
   ];
 
   const isInPreparacao = (card: KanbanCard) =>
@@ -769,11 +775,6 @@ export default function KanbanProducao() {
                     <div className="space-y-2 min-h-[80px]">
                       {colCards.map((card, index) => {
                         const inConcluido = col === 'Concluído';
-                        const fivelaWithSintetico = isFivelaInConcluido(card, col) && card.has_sintetico_order;
-                        const fivelaSolo = isFivelaInConcluido(card, col) && !card.has_sintetico_order;
-                        const isTecidoConcluido = inConcluido && card.tipo_produto === 'TECIDO' && isConcluido(card);
-                        const tecidoAlreadyTransferred = isTecidoConcluido && card.tecido_transferred;
-                        const tecidoNeedsTransfer = isTecidoConcluido && !card.tecido_transferred;
                         const cardInPrep = isInPreparacao(card);
 
                         return (
@@ -835,15 +836,27 @@ export default function KanbanProducao() {
                                 )}
 
                                 {/* Concluído lifecycle badges */}
-                                {inConcluido && !fivelaWithSintetico && (() => {
+                                {inConcluido && (() => {
                                   const badge = getConcluidoBadge(card);
                                   return <Badge className={`mt-2 text-[10px] ${badge.cls}`}>{badge.label}</Badge>;
                                 })()}
 
-                                {inConcluido && fivelaWithSintetico && (
-                                  <Badge className="mt-2 text-[10px] bg-orange-500/15 text-orange-600 border-orange-500/30">
-                                    Aguardando transferência
-                                  </Badge>
+                                {/* Fivela coberta badge/button */}
+                                {card.tem_fivela_coberta && (
+                                  card.fivela_coberta_status === 'CONCLUIDO' ? (
+                                    <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                                      Fivela coberta pronta ✓
+                                    </Badge>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className={`w-full mt-1.5 h-7 text-[10px] ${card.fivela_coberta_status === 'EM_ANDAMENTO' ? 'border-[hsl(var(--warning))] text-[hsl(var(--warning))]' : 'border-orange-400 text-orange-600'}`}
+                                      onClick={(e) => { e.stopPropagation(); setFivelaStatusModal({ open: true, card }); }}
+                                    >
+                                      Fivela Coberta: {card.fivela_coberta_status === 'EM_ANDAMENTO' ? 'Em Andamento' : 'Aguardando'}
+                                    </Button>
+                                  )
                                 )}
 
                                 {card.data_previsao_entrega && (
@@ -916,15 +929,8 @@ export default function KanbanProducao() {
                                   );
                                 })()}
 
-                                {/* Fivela transfer button */}
-                                {fivelaWithSintetico && isSupervisor && (
-                                  <Button size="sm" className="w-full mt-2 h-8 text-xs bg-orange-600 hover:bg-orange-700" onClick={() => setTransferDialog({ open: true, card })}>
-                                    <ArrowRight className="h-3 w-3 mr-1" /> Transferir para Embalagem Sintético
-                                  </Button>
-                                )}
-
                                 {/* Unified "Enviar para o Comercial" button for ALL concluded cards */}
-                                {inConcluido && !fivelaWithSintetico && canSendToComercial(card) && (
+                                {inConcluido && canSendToComercial(card) && (
                                   <Button size="sm" className="w-full mt-2 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => handleEnviarParaComercial(card)}>
                                     <ArrowRight className="h-3 w-3 mr-1" /> Enviar para o Comercial
                                   </Button>
@@ -985,17 +991,39 @@ export default function KanbanProducao() {
         </DialogContent>
       </Dialog>
 
-      {/* Fivela transfer dialog */}
-      <Dialog open={transferDialog.open} onOpenChange={o => !o && setTransferDialog({ open: false, card: null })}>
+      {/* Fivela coberta question modal */}
+      <Dialog open={fivelaModal.open} onOpenChange={o => !o && setFivelaModal({ open: false, card: null })}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Confirmar entrega das fivelas para Embalagem</DialogTitle></DialogHeader>
-          <DialogDescription>Confirmar entrega das fivelas para o setor de Embalagem do pedido #{transferDialog.card?.api_venda_id}?</DialogDescription>
+          <DialogHeader><DialogTitle>Fivela Coberta</DialogTitle></DialogHeader>
+          <DialogDescription>Essa venda possui fivela coberta?</DialogDescription>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTransferDialog({ open: false, card: null })}>Cancelar</Button>
-            <Button className="bg-orange-600 hover:bg-orange-700" onClick={handleFivelaTransfer}>
-              <ArrowRight className="h-4 w-4 mr-1" /> Confirmar Transferência
-            </Button>
+            <Button variant="outline" onClick={() => setFivelaModal({ open: false, card: null })}>Não</Button>
+            <Button onClick={() => handleFivelaModalResponse(true)}>Sim, possui</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fivela coberta status modal */}
+      <Dialog open={fivelaStatusModal.open} onOpenChange={o => !o && setFivelaStatusModal({ open: false, card: null })}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Status da Fivela Coberta — #{fivelaStatusModal.card?.api_venda_id}</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            {['AGUARDANDO', 'EM_ANDAMENTO', 'CONCLUIDO'].map(status => {
+              const labels: Record<string, string> = { AGUARDANDO: 'Aguardando', EM_ANDAMENTO: 'Em Andamento', CONCLUIDO: 'Concluído' };
+              const isActive = fivelaStatusModal.card?.fivela_coberta_status === status;
+              return (
+                <Button
+                  key={status}
+                  variant={isActive ? 'default' : 'outline'}
+                  className="w-full justify-start h-10"
+                  onClick={() => fivelaStatusModal.card && updateFivelaCobertaStatus(fivelaStatusModal.card, status)}
+                >
+                  <CheckCircle2 className={`h-4 w-4 mr-2 ${isActive ? '' : 'text-muted-foreground'}`} />
+                  {labels[status]}
+                </Button>
+              );
+            })}
+          </div>
         </DialogContent>
       </Dialog>
 
