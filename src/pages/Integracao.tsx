@@ -745,7 +745,7 @@ export default function Integracao() {
                     }
                   >
                     <TableCell className="text-sm">
-                      {format(new Date(log.executado_em.endsWith('Z') ? log.executado_em : log.executado_em + 'Z'), 'dd/MM/yy HH:mm')}
+                      {format(new Date(log.executado_em), 'dd/MM/yy HH:mm')}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs">{log.tipo}</Badge>
