@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Clock, AlertTriangle, Package, Ruler, Tag } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Package } from 'lucide-react';
 import {
   parseItemAttributes,
   TIPO_PRODUTO_ALMOX_LABELS,
   type ParsedItemAttributes,
 } from '@/lib/almoxarifado';
-import { differenceInCalendarDays, differenceInMinutes } from 'date-fns';
+import { differenceInCalendarDays, format } from 'date-fns';
 
 interface AlmoxItem {
   id: string;
@@ -36,7 +35,7 @@ interface Props {
   onConfirmar: (venda: AlmoxVenda) => void;
 }
 
-function calcAtraso(dataEntrega: string | null): number {
+function calcDiasAtraso(dataEntrega: string | null): number {
   if (!dataEntrega) return 0;
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
@@ -44,39 +43,42 @@ function calcAtraso(dataEntrega: string | null): number {
   return differenceInCalendarDays(hoje, entrega);
 }
 
-function tempoEmFila(): string {
-  // We don't have exact entry timestamp, show relative time via a live counter
-  return '';
+function formatTempoDisplay(dias: number): string {
+  if (dias > 0) return `+${dias}d`;
+  if (dias === 0) return 'HOJE';
+  return `${dias}d`;
 }
 
-function getPrioridade(v: AlmoxVenda): { cor: string; label: string; bgClass: string; borderClass: string; order: number } {
-  const atraso = calcAtraso(v.data_previsao_entrega);
-  if (atraso > 0) return {
-    cor: 'destructive',
-    label: `${atraso}d atrasado`,
-    bgClass: 'bg-destructive/10 border-l-destructive',
-    borderClass: 'border-l-4',
-    order: 0,
-  };
-  if (v.status_prazo === 'ATENCAO' || (atraso >= -2 && atraso <= 0)) return {
-    cor: 'warning',
-    label: atraso === 0 ? 'Vence hoje' : `${Math.abs(atraso)}d restantes`,
-    bgClass: 'bg-[hsl(var(--warning))]/10 border-l-[hsl(var(--warning))]',
-    borderClass: 'border-l-4',
-    order: 1,
-  };
-  return {
-    cor: 'success',
-    label: v.data_previsao_entrega ? `${Math.abs(atraso)}d restantes` : 'Sem prazo',
-    bgClass: 'bg-[hsl(var(--success))]/5 border-l-[hsl(var(--success))]',
-    borderClass: 'border-l-4',
-    order: 2,
-  };
+type Urgencia = 'atrasado' | 'atencao' | 'ok';
+
+function getUrgencia(dias: number): Urgencia {
+  if (dias > 0) return 'atrasado';
+  if (dias >= -3) return 'atencao';
+  return 'ok';
 }
+
+const urgenciaStyles: Record<Urgencia, { row: string; tempo: string; bar: string }> = {
+  atrasado: {
+    row: 'bg-destructive/[0.08]',
+    tempo: 'text-destructive font-black',
+    bar: 'bg-destructive',
+  },
+  atencao: {
+    row: 'bg-[hsl(var(--warning))]/[0.08]',
+    tempo: 'text-[hsl(var(--warning))] font-black',
+    bar: 'bg-[hsl(var(--warning))]',
+  },
+  ok: {
+    row: 'bg-[hsl(var(--success))]/[0.04]',
+    tempo: 'text-[hsl(var(--success))] font-bold',
+    bar: 'bg-[hsl(var(--success))]',
+  },
+};
 
 export default function AlmoxProducaoMode({ vendas, onConfirmar }: Props) {
   const [now, setNow] = useState(Date.now());
 
+  // Auto-refresh every 30s
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(interval);
@@ -86,159 +88,169 @@ export default function AlmoxProducaoMode({ vendas, onConfirmar }: Props) {
 
   const sorted = useMemo(() => {
     return [...pendentes].sort((a, b) => {
-      const atrasoA = calcAtraso(a.data_previsao_entrega);
-      const atrasoB = calcAtraso(b.data_previsao_entrega);
-      // 1. Maior atraso primeiro
-      if (atrasoA !== atrasoB) return atrasoB - atrasoA;
-      // 2. Entrega mais próxima
+      const aA = calcDiasAtraso(a.data_previsao_entrega);
+      const aB = calcDiasAtraso(b.data_previsao_entrega);
+      if (aA !== aB) return aB - aA; // maior atraso primeiro
       const dA = a.data_previsao_entrega || '9999-12-31';
       const dB = b.data_previsao_entrega || '9999-12-31';
       return dA.localeCompare(dB);
     });
   }, [pendentes, now]);
 
-  // Gargalo — tipo com mais pedidos
+  // Gargalo: tipo com mais itens atrasados/pendentes
   const gargalo = useMemo(() => {
-    const contagem: Record<string, number> = {};
+    const contagem: Record<string, { total: number; atrasados: number }> = {};
     for (const v of pendentes) {
+      const dias = calcDiasAtraso(v.data_previsao_entrega);
       for (const item of v.itens) {
-        const parsed = item.parsed || parseItemAttributes(item.descricao_produto);
-        const tipo = TIPO_PRODUTO_ALMOX_LABELS[parsed.tipo_produto] || parsed.tipo_produto;
-        contagem[tipo] = (contagem[tipo] || 0) + 1;
+        const p = item.parsed || parseItemAttributes(item.descricao_produto);
+        const tipo = TIPO_PRODUTO_ALMOX_LABELS[p.tipo_produto] || p.tipo_produto;
+        if (!contagem[tipo]) contagem[tipo] = { total: 0, atrasados: 0 };
+        contagem[tipo].total++;
+        if (dias > 0) contagem[tipo].atrasados++;
       }
     }
-    let max = 0;
-    let maxTipo = '';
-    for (const [tipo, count] of Object.entries(contagem)) {
-      if (count > max) { max = count; maxTipo = tipo; }
+    let best = '';
+    let bestScore = -1;
+    for (const [tipo, c] of Object.entries(contagem)) {
+      const score = c.atrasados * 1000 + c.total;
+      if (score > bestScore) { bestScore = score; best = tipo; }
     }
-    return maxTipo ? { tipo: maxTipo, count: max } : null;
+    return best ? { tipo: best, ...contagem[best] } : null;
   }, [pendentes]);
+
+  const totalUnidades = useMemo(
+    () => pendentes.reduce((s, v) => s + v.itens.reduce((si, i) => si + i.quantidade, 0), 0),
+    [pendentes]
+  );
 
   if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-        <CheckCircle2 className="h-12 w-12 mb-3 text-[hsl(var(--success))]" />
-        <p className="text-lg font-medium">Tudo separado!</p>
-        <p className="text-sm">Nenhum pedido pendente no momento.</p>
+        <CheckCircle2 className="h-16 w-16 mb-4 text-[hsl(var(--success))]" />
+        <p className="text-xl font-bold">FILA LIMPA</p>
+        <p className="text-sm">Nenhum pedido pendente.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {/* Barra de gargalo */}
-      {gargalo && (
-        <div className="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-2.5">
-          <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
-          <span className="text-sm font-semibold text-destructive">
-            Gargalo atual: {gargalo.tipo} ({gargalo.count} {gargalo.count === 1 ? 'item' : 'itens'})
+    <div className="space-y-0">
+      {/* ── Top bar ── */}
+      <div className="flex items-center justify-between bg-foreground/[0.03] border-b border-border px-4 py-2">
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-bold uppercase tracking-wide text-foreground">
+            {sorted.length} pedidos
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {totalUnidades} un
           </span>
         </div>
-      )}
-
-      {/* Contadores */}
-      <div className="flex gap-3 text-xs text-muted-foreground">
-        <span>{sorted.length} pedidos pendentes</span>
-        <span>•</span>
-        <span>{sorted.reduce((sum, v) => sum + v.itens.reduce((s, i) => s + i.quantidade, 0), 0)} unidades</span>
+        {gargalo && (
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <span className="text-xs font-bold text-destructive uppercase">
+              Gargalo: {gargalo.tipo} ({gargalo.atrasados > 0 ? `${gargalo.atrasados} atrasados / ` : ''}{gargalo.total} itens)
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Lista de blocos */}
-      <div className="space-y-2">
+      {/* ── Table header ── */}
+      <div className="grid grid-cols-[80px_1fr_140px_120px_100px_80px_120px_130px] gap-0 border-b border-border bg-muted/50 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+        <span>Tempo</span>
+        <span>Pedido / Cliente</span>
+        <span>Tipo</span>
+        <span>Modelo</span>
+        <span>Largura</span>
+        <span>Qtd</span>
+        <span>Entrega</span>
+        <span></span>
+      </div>
+
+      {/* ── Rows ── */}
+      <div className="divide-y divide-border">
         {sorted.map((v, idx) => {
-          const prioridade = getPrioridade(v);
+          const dias = calcDiasAtraso(v.data_previsao_entrega);
+          const urgencia = getUrgencia(dias);
+          const styles = urgenciaStyles[urgencia];
           const totalQty = v.itens.reduce((s, i) => s + i.quantidade, 0);
 
-          // Aggregate tipos
+          // Aggregate attributes
           const tipos = new Set<string>();
           const modelos = new Set<string>();
-          const larguras = new Set<number>();
+          const larguras = new Set<string>();
           for (const item of v.itens) {
             const p = item.parsed || parseItemAttributes(item.descricao_produto);
             tipos.add(TIPO_PRODUTO_ALMOX_LABELS[p.tipo_produto] || p.tipo_produto);
             if (p.modelo_fivela) modelos.add(p.modelo_fivela);
-            if (p.largura_mm) larguras.add(p.largura_mm);
+            if (p.largura_mm) larguras.add(`${p.largura_mm}mm`);
           }
 
           return (
             <div
               key={v.pedido_id}
-              className={`rounded-lg border ${prioridade.borderClass} ${prioridade.bgClass} p-4 transition-all`}
+              className={`grid grid-cols-[80px_1fr_140px_120px_100px_80px_120px_130px] gap-0 items-center px-4 py-3 ${styles.row} transition-colors relative`}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-xs font-bold text-muted-foreground tabular-nums">#{idx + 1}</span>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-lg leading-none">{v.api_venda_id}</span>
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] shrink-0 ${
-                          prioridade.cor === 'destructive'
-                            ? 'bg-destructive/15 text-destructive border-destructive/30'
-                            : prioridade.cor === 'warning'
-                            ? 'bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30'
-                            : 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30'
-                        }`}
-                      >
-                        <Clock className="h-3 w-3 mr-0.5" />
-                        {prioridade.label}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">{v.cliente_nome}</p>
-                  </div>
-                </div>
+              {/* Barra lateral de urgência */}
+              <div className={`absolute left-0 top-0 bottom-0 w-1 ${styles.bar}`} />
 
+              {/* Tempo */}
+              <div className={`text-xl tabular-nums leading-none ${styles.tempo}`}>
+                {formatTempoDisplay(dias)}
+              </div>
+
+              {/* Pedido / Cliente */}
+              <div className="min-w-0 pr-3">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm">{v.api_venda_id}</span>
+                  {v.origem !== 'fivela' && (
+                    <span className="text-[9px] font-bold uppercase px-1 py-0.5 rounded bg-purple-500/15 text-purple-600">
+                      Loja
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground truncate">{v.cliente_nome}</p>
+              </div>
+
+              {/* Tipo */}
+              <div className="text-xs font-medium">
+                {[...tipos].join(', ')}
+              </div>
+
+              {/* Modelo */}
+              <div className="text-xs text-muted-foreground">
+                {[...modelos].join(', ') || '—'}
+              </div>
+
+              {/* Largura */}
+              <div className="text-xs text-muted-foreground">
+                {[...larguras].join(', ') || '—'}
+              </div>
+
+              {/* Qtd */}
+              <div className="text-sm font-bold tabular-nums">
+                {totalQty}
+              </div>
+
+              {/* Entrega */}
+              <div className="text-xs text-muted-foreground tabular-nums">
+                {v.data_previsao_entrega
+                  ? format(new Date(v.data_previsao_entrega + 'T00:00:00'), 'dd/MM/yy')
+                  : '—'}
+              </div>
+
+              {/* Ação */}
+              <div>
                 <Button
                   size="sm"
-                  className="shrink-0 min-h-[40px] px-4"
+                  className="w-full h-9 text-xs font-bold"
                   onClick={() => onConfirmar(v)}
                 >
-                  <Package className="h-4 w-4 mr-1.5" />
-                  Confirmar
+                  <Package className="h-3.5 w-3.5 mr-1" />
+                  SEPARAR
                 </Button>
               </div>
-
-              {/* Attributes row */}
-              <div className="flex items-center gap-2 mt-3 flex-wrap">
-                {[...tipos].map(t => (
-                  <Badge key={t} variant="outline" className="text-[10px] bg-card/60">
-                    <Tag className="h-2.5 w-2.5 mr-0.5" />
-                    {t}
-                  </Badge>
-                ))}
-                {[...modelos].map(m => (
-                  <Badge key={m} variant="outline" className="text-[10px] bg-card/60">
-                    {m}
-                  </Badge>
-                ))}
-                {[...larguras].map(l => (
-                  <Badge key={l} variant="outline" className="text-[10px] bg-card/60">
-                    <Ruler className="h-2.5 w-2.5 mr-0.5" />
-                    {l}mm
-                  </Badge>
-                ))}
-                <Badge variant="outline" className="text-[10px] font-bold bg-card/60">
-                  {totalQty} un
-                </Badge>
-              </div>
-
-              {/* Itens detail (collapsed for KDS readability) */}
-              {v.itens.length > 1 && (
-                <div className="mt-2 text-xs text-muted-foreground">
-                  {v.itens.map(i => (
-                    <div key={i.id} className="flex items-center gap-2 py-0.5">
-                      <span className="font-medium">{i.quantidade}×</span>
-                      <span className="truncate">{i.descricao_produto}</span>
-                      {i.origem === 'solicitacao' && (
-                        <Badge variant="outline" className="text-[8px] bg-purple-500/10 text-purple-600 border-purple-500/20">Loja</Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           );
         })}
