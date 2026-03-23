@@ -741,6 +741,25 @@ export default function Integracao() {
           )}
         </CardContent>
       </Card>
+
+      {/* Reset confirmation dialog */}
+      <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resetar todas as ordens?</DialogTitle>
+            <DialogDescription>
+              Esta ação move todas as ordens ativas para a coluna "Aguardando Início". O responsável deverá reorganizar manualmente. Confirmar?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetConfirmOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleResetOrdens} disabled={resetting}>
+              {resetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirmar reset
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
