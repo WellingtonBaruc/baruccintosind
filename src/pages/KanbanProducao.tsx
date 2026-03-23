@@ -38,6 +38,8 @@ interface KanbanCard {
   perdas_pendentes: number;
   is_piloto: boolean;
   status_piloto: string | null;
+  fivelas_recebidas: boolean;
+  fivelas_separadas: boolean;
   // Track when card moved to financeiro for 5min green badge
   sent_to_financeiro_at: number | null;
 }
@@ -103,8 +105,8 @@ export default function KanbanProducao() {
         id, ordem_id, nome_etapa, ordem_sequencia, operador_id, status,
         usuarios(nome),
         ordens_producao!inner(
-          id, pedido_id, tipo_produto, status,
-          pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto)
+          id, pedido_id, tipo_produto, status, fivelas_recebidas,
+          pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas)
         )
       `)
       .in('status', ['EM_ANDAMENTO', 'CONCLUIDA', 'PENDENTE']);
@@ -190,6 +192,8 @@ export default function KanbanProducao() {
         perdas_pendentes: perdasCount.get(e.ordem_id) || 0,
         is_piloto: e.ordens_producao.pedidos.is_piloto || false,
         status_piloto: e.ordens_producao.pedidos.status_piloto || null,
+        fivelas_recebidas: e.ordens_producao.fivelas_recebidas || false,
+        fivelas_separadas: e.ordens_producao.pedidos.fivelas_separadas || false,
         sent_to_financeiro_at: recentFinanceiro.get(e.ordem_id) || null,
       };
     });
@@ -471,7 +475,20 @@ export default function KanbanProducao() {
                                           </Badge>
                                         )}
 
-                                        {/* Pending losses badge */}
+                                        {/* Fivela pronta badge — on Sintético cards when fivelas_recebidas */}
+                                        {card.tipo_produto === 'SINTETICO' && card.fivelas_recebidas && (
+                                          <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                                            Fivela pronta ✓
+                                          </Badge>
+                                        )}
+
+                                        {/* Fivelas separadas badge — on Sintético cards when almoxarifado confirmed */}
+                                        {card.tipo_produto === 'SINTETICO' && card.fivelas_separadas && (
+                                          <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                                            Fivelas separadas ✓
+                                          </Badge>
+                                        )}
+
                                         {card.perdas_pendentes > 0 && (
                                           <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30">
                                             <AlertTriangle className="h-3 w-3 mr-0.5" />

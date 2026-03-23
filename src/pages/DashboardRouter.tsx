@@ -1,4 +1,5 @@
 import { useAuth } from '@/hooks/useAuth';
+import { Navigate } from 'react-router-dom';
 import Dashboard from './Dashboard';
 import DashboardSupervisor from './DashboardSupervisor';
 import DashboardOperador from './DashboardOperador';
@@ -22,6 +23,8 @@ export default function DashboardRouter() {
       return <DashboardComercial />;
     case 'financeiro':
       return <DashboardFinanceiro />;
+    case 'almoxarifado':
+      return <Navigate to="/almoxarifado" replace />;
     default:
       // admin, gestor
       return <Dashboard />;

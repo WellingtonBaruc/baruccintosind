@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertTriangle, Wifi, Layers } from 'lucide-react';
+import { RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertTriangle, Wifi, Layers, RotateCcw } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -55,6 +56,8 @@ export default function Integracao() {
   const [historicProgress, setHistoricProgress] = useState<string | null>(null);
   const [historicDone, setHistoricDone] = useState<{ date: string; count: number } | null>(null);
   const [lastDailyLog, setLastDailyLog] = useState<LogEntry | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -148,9 +151,9 @@ export default function Integracao() {
 
   const classifyProduct = (name: string): string => {
     const upper = (name || '').toUpperCase();
+    if (upper.includes('FIVELA COBERTA') || upper.includes('FIVELA MATRIZ')) return 'FIVELA_COBERTA';
     if (upper.includes('CINTO SINTETICO') || upper.includes('TIRA SINTETICO')) return 'SINTETICO';
     if (upper.includes('CINTO TECIDO') || upper.includes('TIRA TECIDO')) return 'TECIDO';
-    if (upper.includes('FIVELA COBERTA')) return 'FIVELA_COBERTA';
     return 'OUTROS';
   };
 
@@ -290,6 +293,63 @@ export default function Integracao() {
       toast.error(`Erro na reclassificação: ${err.message}`);
     }
     setReclassifying(false);
+  };
+
+  const handleResetOrdens = async () => {
+    setResetting(true);
+    setResetConfirmOpen(false);
+    try {
+      // Get all active ordens
+      const { data: ordens } = await supabase
+        .from('ordens_producao')
+        .select('id, pedido_id')
+        .not('status', 'in', '("CONCLUIDA","CANCELADA")');
+
+      if (!ordens || ordens.length === 0) {
+        toast.info('Nenhuma ordem ativa para resetar.');
+        setResetting(false);
+        return;
+      }
+
+      let resetCount = 0;
+      for (const ordem of ordens) {
+        // Reset ordem status to AGUARDANDO
+        await supabase.from('ordens_producao').update({ status: 'AGUARDANDO' as any }).eq('id', ordem.id);
+
+        // Reset all etapas: first to EM_ANDAMENTO, rest to PENDENTE
+        const { data: etapas } = await supabase
+          .from('op_etapas')
+          .select('id, ordem_sequencia')
+          .eq('ordem_id', ordem.id)
+          .order('ordem_sequencia');
+
+        if (etapas && etapas.length > 0) {
+          for (let i = 0; i < etapas.length; i++) {
+            await supabase.from('op_etapas').update({
+              status: (i === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as any,
+              operador_id: null,
+              concluido_em: null,
+              ...(i === 0 ? { iniciado_em: new Date().toISOString() } : { iniciado_em: null }),
+            }).eq('id', etapas[i].id);
+          }
+        }
+
+        await supabase.from('pedido_historico').insert({
+          pedido_id: ordem.pedido_id,
+          usuario_id: profile!.id,
+          tipo_acao: 'TRANSICAO' as any,
+          observacao: 'Ordem resetada para Aguardando Início — ação administrativa',
+        });
+
+        resetCount++;
+      }
+
+      toast.success(`${resetCount} ordens resetadas para Aguardando Início.`);
+      fetchData();
+    } catch (err: any) {
+      toast.error(`Erro ao resetar: ${err.message}`);
+    }
+    setResetting(false);
   };
 
   if (!profile || (profile.perfil !== 'admin' && profile.perfil !== 'gestor')) {
@@ -605,6 +665,18 @@ export default function Integracao() {
                 {reclassifying ? 'Reclassificando...' : 'Reclassificar ordens por tipo de produto'}
               </Button>
             </div>
+
+            {/* Reset all orders */}
+            <div className="pt-4 border-t border-border/60">
+              <h4 className="text-sm font-medium mb-2">Resetar Ordens de Produção</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Move todas as ordens ativas de volta para "Aguardando Início". O supervisor deverá reorganizar manualmente.
+              </p>
+              <Button onClick={() => setResetConfirmOpen(true)} disabled={resetting} variant="destructive" size="sm">
+                {resetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+                {resetting ? 'Resetando...' : 'Resetar todas as ordens para Aguardando Início'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -669,6 +741,25 @@ export default function Integracao() {
           )}
         </CardContent>
       </Card>
+
+      {/* Reset confirmation dialog */}
+      <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resetar todas as ordens?</DialogTitle>
+            <DialogDescription>
+              Esta ação move todas as ordens ativas para a coluna "Aguardando Início". O responsável deverá reorganizar manualmente. Confirmar?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetConfirmOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleResetOrdens} disabled={resetting}>
+              {resetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirmar reset
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

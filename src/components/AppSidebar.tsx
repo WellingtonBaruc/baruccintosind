@@ -1,4 +1,4 @@
-import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, Columns3, ShoppingBag, BarChart3 } from 'lucide-react';
+import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, Columns3, ShoppingBag, BarChart3, Package } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {
@@ -40,12 +40,15 @@ const navItems: NavItem[] = [
   // Loja
   { title: 'Verificar Pedidos', url: '/loja', icon: Store, perfis: ['loja'] },
 
+  // Almoxarifado
+  { title: 'Separação Fivelas', url: '/almoxarifado', icon: Package, perfis: ['almoxarifado'] },
+
   // Admin extras — under Configurações group
   { title: 'Loja', url: '/loja', icon: Store, perfis: ['admin', 'gestor'], group: 'setores' },
   { title: 'Comercial', url: '/comercial', icon: ShoppingBag, perfis: ['admin', 'gestor'], group: 'setores' },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign, perfis: ['admin', 'gestor'], group: 'setores' },
   { title: 'Logística', url: '/logistica', icon: Truck, perfis: ['admin', 'gestor'], group: 'setores' },
-
+  { title: 'Almoxarifado', url: '/almoxarifado', icon: Package, perfis: ['admin', 'gestor'], group: 'setores' },
   // Config
   { title: 'Relatórios', url: '/relatorios/abc', icon: BarChart3, perfis: ['admin', 'gestor'], group: 'config' },
   { title: 'PCP', url: '/pcp', icon: Calendar, perfis: ['admin', 'gestor', 'supervisor_producao'], group: 'config' },

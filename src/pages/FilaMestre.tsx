@@ -40,6 +40,7 @@ interface VendaRow {
   data_fim_pcp: string | null;
   is_piloto: boolean;
   status_piloto: string | null;
+  fivelas_separadas: boolean;
 }
 
 interface PedidoDetail {
@@ -75,7 +76,7 @@ export default function FilaMestre() {
     // Fetch pedidos that are not finalized
     const { data: pedidos } = await supabase
       .from('pedidos')
-      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em, is_piloto, status_piloto')
+      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
       .not('status_api', 'eq', 'Finalizado')
       .order('criado_em', { ascending: false });
 
@@ -109,6 +110,7 @@ export default function FilaMestre() {
         data_fim_pcp: (ordem as any)?.data_fim_pcp || null,
         is_piloto: (p as any).is_piloto || false,
         status_piloto: (p as any).status_piloto || null,
+        fivelas_separadas: (p as any).fivelas_separadas || false,
       };
     });
 
@@ -297,6 +299,11 @@ export default function FilaMestre() {
                             {r.is_piloto && (
                               <Badge className={`text-[10px] ${r.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
                                 {r.status_piloto === 'REPROVADO' ? 'PILOTO ✗' : 'PILOTO'}
+                              </Badge>
+                            )}
+                            {r.fivelas_separadas && (
+                              <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                                Fivelas separadas ✓
                               </Badge>
                             )}
                           </div>

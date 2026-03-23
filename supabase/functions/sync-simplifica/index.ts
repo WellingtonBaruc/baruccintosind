@@ -35,10 +35,11 @@ function fmtBRL(v: number): string {
   return `R$ ${v.toFixed(2).replace('.', ',')}`;
 }
 
-// Classify product type from name
-function classificarProduto(nomeProduto: string): string {
+// Classify product type from name and category
+function classificarProduto(nomeProduto: string, categoriaProduto?: string): string {
   const upper = (nomeProduto || '').toUpperCase();
-  if (upper.includes('FIVELA COBERTA')) return 'FIVELA_COBERTA';
+  const catUpper = (categoriaProduto || '').toUpperCase();
+  if (upper.includes('FIVELA COBERTA') || upper.includes('FIVELA MATRIZ') || catUpper === 'FIVELA COBERTA') return 'FIVELA_COBERTA';
   if (upper.includes('CINTO SINTETICO') || upper.includes('TIRA SINTETICO') || upper.includes('CINTO SINTÉTICO') || upper.includes('TIRA SINTÉTICO')) return 'SINTETICO';
   if (upper.includes('CINTO TECIDO') || upper.includes('TIRA TECIDO')) return 'TECIDO';
   return 'OUTROS';
@@ -421,7 +422,7 @@ async function inserirNovoPedido(
   // Classify items by type
   const tiposProduto = new Set<string>();
   for (const item of (Array.isArray(itens) ? itens : [])) {
-    tiposProduto.add(classificarProduto(item.nm_produto || ''));
+    tiposProduto.add(classificarProduto(item.nm_produto || '', item.nm_categoria || ''));
   }
 
   // Calculate max lead time across all types
@@ -505,7 +506,7 @@ async function inserirNovoPedido(
     // Group items by type and create one order per type
     const itensByTipo: Record<string, any[]> = {};
     for (const item of (Array.isArray(itens) ? itens : [])) {
-      const tipo = classificarProduto(item.nm_produto || '');
+      const tipo = classificarProduto(item.nm_produto || '', item.nm_categoria || '');
       if (!itensByTipo[tipo]) itensByTipo[tipo] = [];
       itensByTipo[tipo].push(item);
     }
