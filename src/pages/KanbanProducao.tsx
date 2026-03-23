@@ -102,18 +102,36 @@ export default function KanbanProducao() {
   }, []);
 
   const fetchCards = async () => {
-    // Fetch all orders that are NOT past financeiro
-    const { data: etapas } = await supabase
-      .from('op_etapas')
-      .select(`
-        id, ordem_id, nome_etapa, ordem_sequencia, operador_id, status,
-        usuarios(nome),
-        ordens_producao!inner(
-          id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao,
-          pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas)
-        )
-      `)
-      .in('status', ['EM_ANDAMENTO', 'CONCLUIDA', 'PENDENTE']);
+    // Fetch PCP calendar data and lead times in parallel with etapas
+    const [etapasRes, semanaRes, feriadosRes, pausasRes, leadTimesRes] = await Promise.all([
+      supabase
+        .from('op_etapas')
+        .select(`
+          id, ordem_id, nome_etapa, ordem_sequencia, operador_id, status,
+          usuarios(nome),
+          ordens_producao!inner(
+            id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao,
+            pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas)
+          )
+        `)
+        .in('status', ['EM_ANDAMENTO', 'CONCLUIDA', 'PENDENTE']),
+      supabase.from('pcp_config_semana').select('*').limit(1).maybeSingle(),
+      supabase.from('pcp_feriados').select('data'),
+      supabase.from('pcp_pausas').select('data_inicio, data_fim'),
+      supabase.from('pcp_lead_times').select('tipo, lead_time_dias').eq('ativo', true),
+    ]);
+
+    const etapas = etapasRes.data;
+    const cal: PcpCalendarData = {
+      sabadoAtivo: semanaRes.data?.sabado_ativo ?? false,
+      domingoAtivo: semanaRes.data?.domingo_ativo ?? false,
+      feriados: (feriadosRes.data || []).map((f: any) => f.data),
+      pausas: (pausasRes.data || []).map((p: any) => ({ inicio: p.data_inicio, fim: p.data_fim })),
+    };
+    const leadTimeMap = new Map<string, number>();
+    for (const lt of (leadTimesRes.data || [])) {
+      leadTimeMap.set(lt.tipo, lt.lead_time_dias);
+    }
 
     if (!etapas) { setLoading(false); return; }
 
