@@ -85,6 +85,23 @@ function extrairFivelaBase(descricao: string): string {
   return 'OUTROS';
 }
 
+function extrairAbertura(descricao: string): string {
+  const match = (descricao || '').toUpperCase().match(/(\d+)\s*MM/);
+  return match ? `${match[1]}MM` : 'S/ MEDIDA';
+}
+
+function extrairBanho(descricao: string): string {
+  const upper = (descricao || '').toUpperCase();
+  if (upper.includes('LAT') && upper.includes('MET')) return 'LAT MET';
+  if (upper.includes('LATONADA') || upper.match(/\bLAT\b/)) return 'LAT';
+  if (upper.includes('NIQUELADA') || upper.match(/\bNIQ\b/)) return 'NIQ';
+  if (upper.includes('OURO')) return 'OURO';
+  if (upper.includes('ROSE')) return 'ROSÊ';
+  if (upper.includes('ONIX') || upper.includes('ÔNIX')) return 'ÔNIX';
+  if (upper.includes('GRAFITE')) return 'GRAFITE';
+  return 'S/ BANHO';
+}
+
 function classificarTipoProduto(nome: string): string {
   const upper = (nome || '').toUpperCase();
   if (upper.includes('FIVELA COBERTA')) return 'fivela';
