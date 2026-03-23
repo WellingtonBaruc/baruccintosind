@@ -245,7 +245,7 @@ export default function VerificacaoLoja() {
             sequencia: 2,
             status: 'EM_ANDAMENTO',
             tipo_produto: 'OP_COMPLEMENTAR',
-            observacao: `Itens faltantes (produção): ${faltantesProd.map(i => i.descricao_produto).join(', ')}`,
+            observacao: `Itens faltantes (produção): ${faltantesProd.map(i => `${i.descricao_produto} (${i.quantidade_faltante ?? i.quantidade} un)`).join(', ')}`,
           }).select().single();
 
           if (ordem) {
