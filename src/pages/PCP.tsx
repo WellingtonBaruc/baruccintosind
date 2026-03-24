@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Scissors, AlertTriangle } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Loader2, Scissors, AlertTriangle, ChevronRight } from 'lucide-react';
 import { agruparParaCorte, CutGroupItem, STATUS_PRAZO_CONFIG, TIPO_PRODUTO_LABELS } from '@/lib/pcp';
 
 const PERFIS_PCP = ['supervisor_producao', 'gestor', 'admin'];
@@ -195,29 +196,35 @@ export default function PCP() {
                     <TableCell className="text-sm">{group.cor}</TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">{group.quantidadeTotal}</TableCell>
                     <TableCell>
-                      <div className="space-y-1">
-                        {group.itens.map(item => (
-                          <div key={item.id} className="text-xs flex items-baseline gap-2 flex-wrap">
-                            <span className="text-muted-foreground">{item.descricao}</span>
-                            <span className="font-medium">×{item.quantidade}</span>
-                            {item.numero_venda && (
-                              <span className="text-primary/80 font-mono text-[10px]">#{item.numero_venda}</span>
-                            )}
-                            {item.data_venda && (
-                              <span className="text-muted-foreground/70 text-[10px]">{format(parseISO(item.data_venda), 'dd/MM')}</span>
-                            )}
-                            {item.lead_time_dias != null && (
-                              <span className="text-muted-foreground/70 text-[10px]">{item.lead_time_dias}d</span>
-                            )}
-                            {item.referencia && <span className="text-muted-foreground/70 text-[10px]">({item.referencia})</span>}
-                            {item.observacao_producao && (
-                              <div className="mt-0.5 bg-warning/10 border border-warning/20 rounded px-1.5 py-0.5 text-warning text-[10px]">
-                                {item.observacao_producao}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                      <Collapsible>
+                        <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group">
+                          <ChevronRight className="h-3 w-3 transition-transform group-data-[state=open]:rotate-90" />
+                          <span>{group.itens.length} {group.itens.length === 1 ? 'item' : 'itens'}</span>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-1.5 space-y-1 pl-4.5">
+                          {group.itens.map(item => (
+                            <div key={item.id} className="text-xs flex items-baseline gap-2 flex-wrap">
+                              <span className="text-muted-foreground">{item.descricao}</span>
+                              <span className="font-medium">×{item.quantidade}</span>
+                              {item.numero_venda && (
+                                <span className="text-primary/80 font-mono text-[10px]">#{item.numero_venda}</span>
+                              )}
+                              {item.data_venda && (
+                                <span className="text-muted-foreground/70 text-[10px]">{format(parseISO(item.data_venda), 'dd/MM')}</span>
+                              )}
+                              {item.lead_time_dias != null && (
+                                <span className="text-muted-foreground/70 text-[10px]">{item.lead_time_dias}d</span>
+                              )}
+                              {item.referencia && <span className="text-muted-foreground/70 text-[10px]">({item.referencia})</span>}
+                              {item.observacao_producao && (
+                                <div className="mt-0.5 bg-warning/10 border border-warning/20 rounded px-1.5 py-0.5 text-warning text-[10px]">
+                                  {item.observacao_producao}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
                     </TableCell>
                   </TableRow>
                 ))}
