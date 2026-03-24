@@ -111,10 +111,6 @@ type FilterTipo = 'all' | 'SINTETICO' | 'TECIDO' | 'FIVELA_COBERTA';
 export default function KanbanProducao() {
   const { profile } = useAuth();
 
-  if (profile && !profile.kanban_producao_acesso) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterTipo, setFilterTipo] = useState<FilterTipo>('all');
