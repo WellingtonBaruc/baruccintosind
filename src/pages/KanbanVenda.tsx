@@ -7,13 +7,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, ShoppingBag, DollarSign, Truck, ArrowRight, Package } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Search, Loader2, ShoppingBag, DollarSign, Truck, ArrowRight, Package, CheckCircle2, Eye } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import ValidarComercialDialog from '@/components/kanban-venda/ValidarComercialDialog';
 
 interface VendaCard {
   id: string;
@@ -75,7 +75,7 @@ const COLUMNS: ColumnDef[] = [
     key: 'validado_financeiro',
     label: 'Validado Financeiro',
     icon: DollarSign,
-    statuses: ['VALIDADO_FINANCEIRO'],
+    statuses: ['VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA'],
     color: 'text-emerald-700',
     bgColor: 'bg-emerald-50 border-emerald-200',
   },
@@ -83,7 +83,7 @@ const COLUMNS: ColumnDef[] = [
     key: 'logistica',
     label: 'Logística',
     icon: Truck,
-    statuses: ['LIBERADO_LOGISTICA', 'EM_SEPARACAO'],
+    statuses: ['EM_SEPARACAO'],
     color: 'text-purple-700',
     bgColor: 'bg-purple-50 border-purple-200',
   },
@@ -95,16 +95,25 @@ const COLUMNS: ColumnDef[] = [
     color: 'text-green-700',
     bgColor: 'bg-green-50 border-green-200',
   },
+  {
+    key: 'vendas_entregues',
+    label: 'Vendas Entregues',
+    icon: Eye,
+    statuses: ['ENTREGUE', 'AGUARDANDO_CIENCIA_COMERCIAL'],
+    color: 'text-sky-700',
+    bgColor: 'bg-sky-50 border-sky-200',
+  },
 ];
 
-// Defines which status a card can be moved to from a given column
+// Next status map — only for statuses that can be advanced with 1 click
+// Financeiro is NOT here — must go through /financeiro/validar/:id
 const NEXT_STATUS: Record<string, string> = {
   PRODUCAO_CONCLUIDA: 'VALIDADO_COMERCIAL',
   AGUARDANDO_COMERCIAL: 'VALIDADO_COMERCIAL',
   LOJA_OK: 'VALIDADO_COMERCIAL',
   VALIDADO_COMERCIAL: 'AGUARDANDO_FINANCEIRO',
-  AGUARDANDO_FINANCEIRO: 'VALIDADO_FINANCEIRO',
-  VALIDADO_FINANCEIRO: 'LIBERADO_LOGISTICA',
+  // AGUARDANDO_FINANCEIRO → blocked, must use ValidacaoFinanceira
+  // VALIDADO_FINANCEIRO → blocked, handled by ValidacaoFinanceira
   LIBERADO_LOGISTICA: 'EM_SEPARACAO',
   EM_SEPARACAO: 'ENVIADO',
 };
@@ -112,20 +121,26 @@ const NEXT_STATUS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   VALIDADO_COMERCIAL: 'Validar Comercial',
   AGUARDANDO_FINANCEIRO: 'Enviar p/ Financeiro',
-  VALIDADO_FINANCEIRO: 'Validar Financeiro',
-  LIBERADO_LOGISTICA: 'Liberar Logística',
   EM_SEPARACAO: 'Iniciar Separação',
   ENVIADO: 'Marcar Enviado',
+  HISTORICO: 'Ciente',
 };
+
+// Statuses that need the Validar Comercial modal
+const NEEDS_COMERCIAL_MODAL = ['PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL', 'LOJA_OK'];
 
 export default function KanbanVenda() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [cards, setCards] = useState<VendaCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // Validar Comercial dialog state
+  const [validarDialog, setValidarDialog] = useState<{ open: boolean; card: VendaCard | null }>({ open: false, card: null });
 
   const allowedPerfis = ['admin', 'gestor', 'supervisor_producao', 'comercial', 'financeiro', 'logistica'];
 
@@ -184,6 +199,43 @@ export default function KanbanVenda() {
     fetchCards();
   };
 
+  const handleValidarComercial = async (formaPagamento: string, formaEnvio: string) => {
+    const card = validarDialog.card;
+    if (!card) return;
+
+    await supabase.from('pedidos').update({
+      status_atual: 'VALIDADO_COMERCIAL',
+      forma_pagamento: formaPagamento,
+      forma_envio: formaEnvio,
+    } as any).eq('id', card.id);
+
+    await supabase.from('pedido_historico').insert({
+      pedido_id: card.id,
+      usuario_id: profile!.id,
+      tipo_acao: 'TRANSICAO',
+      status_anterior: card.status_atual,
+      status_novo: 'VALIDADO_COMERCIAL',
+      observacao: `Validação comercial por ${profile!.nome}. Pagamento: ${formaPagamento}. Envio: ${formaEnvio}.`,
+    });
+
+    toast.success(`Pedido ${card.api_venda_id || card.numero_pedido} validado pelo Comercial!`);
+    fetchCards();
+  };
+
+  const handleCiente = async (card: VendaCard) => {
+    await supabase.from('pedidos').update({ status_atual: 'HISTORICO' } as any).eq('id', card.id);
+    await supabase.from('pedido_historico').insert({
+      pedido_id: card.id,
+      usuario_id: profile!.id,
+      tipo_acao: 'TRANSICAO',
+      status_anterior: card.status_atual,
+      status_novo: 'HISTORICO',
+      observacao: `Comercial confirmou ciência da entrega. Pedido arquivado por ${profile!.nome}.`,
+    });
+    toast.success(`Pedido ${card.api_venda_id || card.numero_pedido} arquivado!`);
+    fetchCards();
+  };
+
   const openDetail = async (pedidoId: string) => {
     setSelectedId(pedidoId);
     setDetailLoading(true);
@@ -202,7 +254,7 @@ export default function KanbanVenda() {
   const isAdmin = profile && ['admin', 'gestor'].includes(profile.perfil);
   const canAdvance = (colKey: string) => {
     if (isAdmin) return true;
-    if (profile?.perfil === 'comercial' && (colKey === 'comercial')) return true;
+    if (profile?.perfil === 'comercial' && (colKey === 'comercial' || colKey === 'vendas_entregues')) return true;
     if (profile?.perfil === 'financeiro' && (colKey === 'financeiro' || colKey === 'validado_comercial')) return true;
     if (profile?.perfil === 'logistica' && (colKey === 'validado_financeiro' || colKey === 'logistica')) return true;
     return false;
@@ -213,6 +265,47 @@ export default function KanbanVenda() {
     const s = search.toLowerCase();
     return c.cliente_nome.toLowerCase().includes(s) || c.numero_pedido.toLowerCase().includes(s) || (c.api_venda_id || '').toLowerCase().includes(s);
   });
+
+  const getCardAction = (card: VendaCard, colKey: string) => {
+    // Comercial column → opens modal
+    if (NEEDS_COMERCIAL_MODAL.includes(card.status_atual)) {
+      return {
+        label: 'Validar Comercial',
+        action: () => setValidarDialog({ open: true, card }),
+        icon: CheckCircle2,
+      };
+    }
+
+    // Financeiro column → redirect to validation page
+    if (card.status_atual === 'AGUARDANDO_FINANCEIRO') {
+      return {
+        label: 'Validar Financeiro',
+        action: () => navigate(`/financeiro/validar/${card.id}`),
+        icon: ArrowRight,
+      };
+    }
+
+    // Vendas Entregues → Ciente button
+    if (card.status_atual === 'ENTREGUE' || card.status_atual === 'AGUARDANDO_CIENCIA_COMERCIAL') {
+      return {
+        label: 'Ciente',
+        action: () => handleCiente(card),
+        icon: CheckCircle2,
+      };
+    }
+
+    // Default advance
+    const nextStatus = NEXT_STATUS[card.status_atual];
+    if (nextStatus) {
+      return {
+        label: STATUS_LABELS[nextStatus] || 'Avançar',
+        action: () => handleAdvance(card),
+        icon: ArrowRight,
+      };
+    }
+
+    return null;
+  };
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -262,10 +355,11 @@ export default function KanbanVenda() {
                     <p className="text-xs text-muted-foreground text-center py-6">Nenhum pedido</p>
                   ) : colCards.map(card => {
                     const prazoCfg = STATUS_PRAZO_CONFIG[card.status_prazo || 'NO_PRAZO'];
-                    const nextStatus = NEXT_STATUS[card.status_atual];
                     const headerBg = card.status_prazo === 'ATRASADO' ? 'bg-red-100 border-red-200'
                       : card.status_prazo === 'ATENCAO' ? 'bg-yellow-100 border-yellow-200'
                       : 'bg-green-50 border-green-200';
+
+                    const cardAction = canMove ? getCardAction(card, col.key) : null;
 
                     return (
                       <Card key={card.id} className="shadow-sm border-border/60 overflow-hidden">
@@ -308,15 +402,15 @@ export default function KanbanVenda() {
                             Atualizado {formatDistanceToNow(new Date(card.atualizado_em), { locale: ptBR, addSuffix: true })}
                           </div>
 
-                          {/* Advance button */}
-                          {canMove && nextStatus && (
+                          {/* Action button */}
+                          {cardAction && (
                             <Button
                               size="sm"
                               className="w-full mt-1 h-7 text-xs"
-                              onClick={(e) => { e.stopPropagation(); handleAdvance(card); }}
+                              onClick={(e) => { e.stopPropagation(); cardAction.action(); }}
                             >
-                              <ArrowRight className="h-3 w-3 mr-1" />
-                              {STATUS_LABELS[nextStatus] || 'Avançar'}
+                              <cardAction.icon className="h-3 w-3 mr-1" />
+                              {cardAction.label}
                             </Button>
                           )}
                         </CardContent>
@@ -328,6 +422,19 @@ export default function KanbanVenda() {
             );
           })}
         </div>
+      )}
+
+      {/* Validar Comercial Modal */}
+      {validarDialog.card && (
+        <ValidarComercialDialog
+          open={validarDialog.open}
+          onOpenChange={(open) => setValidarDialog({ open, card: open ? validarDialog.card : null })}
+          pedidoId={validarDialog.card.id}
+          vendaId={validarDialog.card.api_venda_id || validarDialog.card.numero_pedido}
+          currentPagamento={validarDialog.card.forma_pagamento}
+          currentEnvio={validarDialog.card.forma_envio}
+          onConfirm={handleValidarComercial}
+        />
       )}
 
       {/* Detail Sheet */}

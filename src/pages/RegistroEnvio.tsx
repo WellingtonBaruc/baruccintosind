@@ -112,17 +112,17 @@ export default function RegistroEnvio() {
       }).eq('pedido_id', pedido.id);
 
       await supabase.from('pedidos').update({
-        status_atual: 'ENTREGUE',
+        status_atual: 'AGUARDANDO_CIENCIA_COMERCIAL',
         data_entrega: new Date().toISOString().slice(0, 10),
       }).eq('id', pedido.id);
 
       await supabase.from('pedido_historico').insert({
         pedido_id: pedido.id, usuario_id: profile!.id, tipo_acao: 'TRANSICAO',
-        status_anterior: 'ENVIADO', status_novo: 'ENTREGUE',
-        observacao: 'Entrega confirmada.',
+        status_anterior: 'ENVIADO', status_novo: 'AGUARDANDO_CIENCIA_COMERCIAL',
+        observacao: 'Entrega confirmada. Aguardando ciência do comercial.',
       });
 
-      toast.success('Entrega confirmada. Pedido encerrado.');
+      toast.success('Entrega confirmada. Aguardando ciência do comercial.');
       navigate('/logistica');
     } catch (err: any) { toast.error(err.message); }
     setSaving(false);
