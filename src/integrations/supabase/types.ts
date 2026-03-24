@@ -433,6 +433,63 @@ export type Database = {
           },
         ]
       }
+      pcp_capacidade_diaria: {
+        Row: {
+          atualizado_em: string
+          capacidade_sintetico: number
+          capacidade_tecido: number
+          capacidade_total: number
+          criado_em: string
+          data: string
+          id: string
+          observacao: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          capacidade_sintetico?: number
+          capacidade_tecido?: number
+          capacidade_total?: number
+          criado_em?: string
+          data: string
+          id?: string
+          observacao?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          capacidade_sintetico?: number
+          capacidade_tecido?: number
+          capacidade_total?: number
+          criado_em?: string
+          data?: string
+          id?: string
+          observacao?: string | null
+        }
+        Relationships: []
+      }
+      pcp_capacidade_padrao: {
+        Row: {
+          atualizado_em: string
+          capacidade_sintetico: number
+          capacidade_tecido: number
+          capacidade_total: number
+          id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          capacidade_sintetico?: number
+          capacidade_tecido?: number
+          capacidade_total?: number
+          id?: string
+        }
+        Update: {
+          atualizado_em?: string
+          capacidade_sintetico?: number
+          capacidade_tecido?: number
+          capacidade_total?: number
+          id?: string
+        }
+        Relationships: []
+      }
       pcp_config_semana: {
         Row: {
           atualizado_em: string
