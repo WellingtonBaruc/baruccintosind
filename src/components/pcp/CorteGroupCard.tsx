@@ -418,12 +418,22 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Largura</TableHead>
-                  <TableHead>Material</TableHead>
-                  <TableHead>Tamanho</TableHead>
-                  <TableHead>Cor</TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('largura')}>
+                    <span className="flex items-center gap-1">Largura <SortIcon col="largura" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('material')}>
+                    <span className="flex items-center gap-1">Material <SortIcon col="material" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('tamanho')}>
+                    <span className="flex items-center gap-1">Tamanho <SortIcon col="tamanho" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('cor')}>
+                    <span className="flex items-center gap-1">Cor <SortIcon col="cor" /></span>
+                  </TableHead>
                   {isDateMode && <TableHead>Faixa Data</TableHead>}
-                  <TableHead className="text-right">Qtd Total</TableHead>
+                  <TableHead className="text-right cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('qtd')}>
+                    <span className="flex items-center gap-1 justify-end">Qtd Total <SortIcon col="qtd" /></span>
+                  </TableHead>
                   <TableHead>Operador</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Itens</TableHead>
