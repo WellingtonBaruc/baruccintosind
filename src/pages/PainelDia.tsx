@@ -81,6 +81,8 @@ export default function PainelDia() {
 
     const capHoje = capacidadesDiarias.get(hoje) || capPadrao;
     setCapacidadeHoje(capHoje);
+    setCalData(cal);
+    setCapPadrao(capPadrao);
 
     // Load active orders with pedidos — filter final statuses server-side to avoid 1000-row limit
     const { data: ordensRaw } = await supabase
