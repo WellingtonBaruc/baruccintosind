@@ -75,9 +75,8 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
 
   const fetchOperadores = async () => {
     const { data } = await supabase
-      .from('usuarios')
+      .from('pcp_operadores_corte')
       .select('id, nome')
-      .in('perfil', ['operador_producao', 'supervisor_producao'])
       .eq('ativo', true)
       .order('nome');
     setOperadores(data || []);
