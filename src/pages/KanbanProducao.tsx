@@ -54,6 +54,8 @@ interface KanbanCard {
   programado_inicio_data: string | null;
   programado_conclusao_data: string | null;
   corte_ok: boolean;
+  corte_total: number;
+  corte_concluidos: number;
 }
 
 // Unified columns
@@ -307,10 +309,27 @@ export default function KanbanProducao() {
         corte_ok: (() => {
           const items = pedidoTipoItems.get(`${pedidoId}|${tipoProduto}`) || [];
           if (items.length === 0) return false;
-          return items.every(desc => {
+          const uniqueKeys = new Set(items.map(desc => {
             const attrs = extrairAtributosProduto(desc);
-            return corteConcluidoKeys.has(`${tipoProduto}|${attrs.largura}|${attrs.material}|${attrs.tamanho}|${attrs.cor}`);
-          });
+            return `${tipoProduto}|${attrs.largura}|${attrs.material}|${attrs.tamanho}|${attrs.cor}`;
+          }));
+          return [...uniqueKeys].every(k => corteConcluidoKeys.has(k));
+        })(),
+        corte_concluidos: (() => {
+          const items = pedidoTipoItems.get(`${pedidoId}|${tipoProduto}`) || [];
+          const uniqueKeys = new Set(items.map(desc => {
+            const attrs = extrairAtributosProduto(desc);
+            return `${tipoProduto}|${attrs.largura}|${attrs.material}|${attrs.tamanho}|${attrs.cor}`;
+          }));
+          return [...uniqueKeys].filter(k => corteConcluidoKeys.has(k)).length;
+        })(),
+        corte_total: (() => {
+          const items = pedidoTipoItems.get(`${pedidoId}|${tipoProduto}`) || [];
+          const uniqueKeys = new Set(items.map(desc => {
+            const attrs = extrairAtributosProduto(desc);
+            return `${tipoProduto}|${attrs.largura}|${attrs.material}|${attrs.tamanho}|${attrs.cor}`;
+          }));
+          return uniqueKeys.size;
         })(),
       };
     });
@@ -1003,7 +1022,12 @@ export default function KanbanProducao() {
 
                                 {card.corte_ok && (
                                   <Badge className="mt-1.5 text-[10px] bg-blue-500 text-white border-blue-600 font-bold">
-                                    Corte OK
+                                    Corte OK ✓
+                                  </Badge>
+                                )}
+                                {!card.corte_ok && card.corte_concluidos > 0 && (
+                                  <Badge className="mt-1.5 text-[10px] bg-blue-400/20 text-blue-600 border-blue-400/40 font-semibold">
+                                    Corte {card.corte_concluidos}/{card.corte_total}
                                   </Badge>
                                 )}
 
