@@ -34,7 +34,6 @@ const navItems: NavItem[] = [
 
   // Comercial
   { title: 'Nova Venda', url: '/comercial/nova-venda', icon: PlusCircle, perfis: ['comercial'] },
-  { title: 'Para Validar', url: '/comercial', icon: ShoppingBag, perfis: ['comercial'] },
 
   // Loja
   { title: 'Verificar Pedidos', url: '/loja', icon: Store, perfis: ['loja'] },
@@ -44,7 +43,6 @@ const navItems: NavItem[] = [
 
   // Admin extras — under Setores group
   { title: 'Loja', url: '/loja', icon: Store, perfis: ['admin', 'gestor'], group: 'setores' },
-  { title: 'Comercial', url: '/comercial', icon: ShoppingBag, perfis: ['admin', 'gestor'], group: 'setores' },
   { title: 'Nova Venda', url: '/comercial/nova-venda', icon: PlusCircle, perfis: ['admin', 'gestor'], group: 'setores' },
   { title: 'Almoxarifado', url: '/almoxarifado', icon: Package, perfis: ['admin', 'gestor'], group: 'setores' },
   // Config
