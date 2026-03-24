@@ -26,9 +26,10 @@ export default function PCP() {
     // Get all SINTETICO orders that have a Corte step in EM_ANDAMENTO or PENDENTE
     const { data: ordens } = await supabase
       .from('ordens_producao')
-      .select('id, pedido_id, tipo_produto, pedidos!inner(numero_pedido, cliente_nome, status_prazo)')
+      .select('id, pedido_id, tipo_produto, pedidos!inner(numero_pedido, cliente_nome, status_prazo, status_atual)')
       .eq('tipo_produto', 'SINTETICO')
-      .in('status', ['EM_ANDAMENTO', 'AGUARDANDO']);
+      .in('status', ['EM_ANDAMENTO', 'AGUARDANDO'])
+      .eq('pedidos.status_atual', 'EM_PRODUCAO');
 
     if (!ordens || ordens.length === 0) {
       setLoading(false);
