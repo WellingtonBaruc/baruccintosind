@@ -645,9 +645,7 @@ export default function KanbanProducao() {
     if (filterTipo !== 'all') {
       filtered = filtered.filter(c => c.tipo_produto === filterTipo);
     }
-    if (profile?.perfil === 'operador_producao') {
-      filtered = filtered.filter(c => !c.operador_id || c.operador_id === profile.id);
-    }
+    // Operadores veem TODOS os cards, sem restrição
     if (filterMode === 'ATRASADO') filtered = filtered.filter(c => c.status_prazo === 'ATRASADO');
     if (filterMode === 'SEM_OPERADOR') filtered = filtered.filter(c => !c.operador_id);
     if (filterMode === 'HOJE') {
