@@ -1,0 +1,1 @@
+UPDATE solicitacoes_almoxarifado SET status = 'ATENDIDA' WHERE status = 'ATENDIDO';
