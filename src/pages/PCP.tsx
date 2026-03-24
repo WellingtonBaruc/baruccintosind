@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Scissors, AlertTriangle, Users, TrendingUp, Calendar, Download, Printer } from 'lucide-react';
+import { Loader2, Scissors, AlertTriangle, Users, TrendingUp, Calendar, Download, Printer, User } from 'lucide-react';
 import { agruparParaCorte, CutGroupItem, CutGroup, extrairAtributosProduto } from '@/lib/pcp';
 import { CorteGroupCard } from '@/components/pcp/CorteGroupCard';
 import { format, subDays, startOfDay, endOfDay, parseISO, differenceInMinutes } from 'date-fns';
@@ -629,6 +629,3 @@ export default function PCP() {
     </div>
   );
 }
-
-// Need to import User for the badge in daily stats
-import { User } from 'lucide-react';
