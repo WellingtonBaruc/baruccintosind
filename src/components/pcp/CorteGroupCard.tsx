@@ -10,7 +10,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays, Package, Layers, Hash, ArrowUp, ArrowDown, ArrowUpDown, EyeOff } from 'lucide-react';
+import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays, Package, Layers, Hash, ArrowUp, ArrowDown, ArrowUpDown, EyeOff, CheckCircle2, CircleDot } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 import { CutGroup, TIPO_PRODUTO_LABELS, ObsCorte } from '@/lib/pcp';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -294,8 +295,12 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   }, [filteredUnsorted, sortCol, sortDir, registros, hideCompleted]);
 
   const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
+  const totalConcluido = filteredGroups.filter(g => getGroupStatus(g) === 'CONCLUIDO').reduce((sum, g) => sum + g.quantidadeTotal, 0);
+  const totalFaltando = totalPecas - totalConcluido;
+  const percentual = totalPecas > 0 ? Math.round((totalConcluido / totalPecas) * 100) : 0;
   const totalItens = filteredGroups.reduce((sum, g) => sum + g.itens.length, 0);
   const totalGrupos = filteredGroups.length;
+  const totalGruposConcluidos = filteredGroups.filter(g => getGroupStatus(g) === 'CONCLUIDO').length;
 
   const toggleSort = (col: string) => {
     if (sortCol === col) {
@@ -423,21 +428,38 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
             </div>
           </div>
           {/* Fase 2: Indicator mini-cards */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-1.5">
-              <Package className="h-3.5 w-3.5 text-primary" />
-              <span className="text-xs text-muted-foreground">Peças</span>
-              <span className="text-sm font-bold tabular-nums text-foreground">{totalPecas}</span>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-1.5">
+                <Package className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs text-muted-foreground">Peças</span>
+                <span className="text-sm font-bold tabular-nums text-foreground">{totalPecas}</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-1.5">
+                <Layers className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs text-muted-foreground">Grupos</span>
+                <span className="text-sm font-bold tabular-nums text-foreground">{totalGrupos}</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 rounded-lg px-3 py-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-[hsl(var(--success))]" />
+                <span className="text-xs text-muted-foreground">Concluído</span>
+                <span className="text-sm font-bold tabular-nums text-[hsl(var(--success))]">{totalConcluido}</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-1.5">
+                <CircleDot className="h-3.5 w-3.5 text-destructive" />
+                <span className="text-xs text-muted-foreground">Faltando</span>
+                <span className="text-sm font-bold tabular-nums text-destructive">{totalFaltando}</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-1.5">
+                <Hash className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs text-muted-foreground">Itens</span>
+                <span className="text-sm font-bold tabular-nums text-foreground">{totalItens}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-1.5">
-              <Layers className="h-3.5 w-3.5 text-primary" />
-              <span className="text-xs text-muted-foreground">Grupos</span>
-              <span className="text-sm font-bold tabular-nums text-foreground">{totalGrupos}</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-1.5">
-              <Hash className="h-3.5 w-3.5 text-primary" />
-              <span className="text-xs text-muted-foreground">Itens</span>
-              <span className="text-sm font-bold tabular-nums text-foreground">{totalItens}</span>
+            <div className="flex items-center gap-3">
+              <Progress value={percentual} className="h-2.5 flex-1 bg-destructive/15 [&>div]:bg-[hsl(var(--success))]" />
+              <span className="text-sm font-bold tabular-nums text-foreground whitespace-nowrap">{percentual}%</span>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">({totalGruposConcluidos}/{totalGrupos} grupos)</span>
             </div>
           </div>
         </CardHeader>
