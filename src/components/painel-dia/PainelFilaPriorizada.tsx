@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TIPO_PRODUTO_BADGE, TIPO_PRODUTO_LABELS } from '@/lib/pcp';
 import { STATUS_PCP_CONFIG, ETIQUETA_CONFIG, type PedidoPainelDia } from '@/lib/pcpPainelDia';
-import { ListOrdered, ArrowUpDown, CalendarPlus, CalendarCheck, X, AlertTriangle } from 'lucide-react';
+import { ListOrdered, ArrowUpDown, CalendarPlus, CalendarCheck, X, AlertTriangle, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
 
