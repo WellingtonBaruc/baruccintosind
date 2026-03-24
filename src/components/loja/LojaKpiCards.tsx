@@ -19,11 +19,11 @@ interface Props {
 
 const kpis = [
   { key: 'total' as const, label: 'Total na Loja', icon: ShoppingBag, colorClass: 'text-foreground', bgClass: 'bg-muted', filterStatus: 'all' },
-  { key: 'aguardandoLoja' as const, label: 'Aguardando Loja', icon: Clock, colorClass: 'text-blue-600', bgClass: 'bg-blue-500/10', filterStatus: 'AGUARDANDO_LOJA' },
+  { key: 'aguardandoLoja' as const, label: 'Aguardando Loja', icon: Clock, colorClass: 'text-red-700 font-bold', bgClass: 'bg-red-500/15', filterStatus: 'AGUARDANDO_LOJA' },
   { key: 'aguardandoOp' as const, label: 'Aguard. OP', icon: Wrench, colorClass: 'text-amber-600', bgClass: 'bg-amber-500/10', filterStatus: 'AGUARDANDO_OP_COMPLEMENTAR' },
   { key: 'aguardandoAlmox' as const, label: 'Aguard. Almox', icon: Box, colorClass: 'text-purple-600', bgClass: 'bg-purple-500/10', filterStatus: 'AGUARDANDO_ALMOXARIFADO' },
   { key: 'pendenteFinalizacao' as const, label: 'Pend. Finalização', icon: AlertTriangle, colorClass: 'text-orange-600', bgClass: 'bg-orange-500/10', filterStatus: 'LOJA_PENDENTE_FINALIZACAO' },
-  { key: 'enviadasComercial' as const, label: 'Enviadas Comercial', icon: Send, colorClass: 'text-slate-500', bgClass: 'bg-slate-500/10', filterStatus: 'AGUARDANDO_COMERCIAL' },
+  { key: 'enviadasComercial' as const, label: 'Enviadas Comercial', icon: Send, colorClass: 'text-red-700 font-bold', bgClass: 'bg-red-500/15', filterStatus: 'AGUARDANDO_COMERCIAL' },
   { key: 'validadasComercial' as const, label: 'Validadas Comercial', icon: CheckCircle2, colorClass: 'text-sky-600', bgClass: 'bg-sky-500/10', filterStatus: 'VALIDADO_COMERCIAL' },
   { key: 'finalizadasHoje' as const, label: 'Finalizadas Hoje', icon: TrendingUp, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-500/10', filterStatus: '' },
 ];
