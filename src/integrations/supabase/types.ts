@@ -549,6 +549,74 @@ export type Database = {
           },
         ]
       }
+      pcp_corte_manual: {
+        Row: {
+          concluido_em: string | null
+          cor: string | null
+          criado_em: string
+          criado_por: string | null
+          data_fim: string | null
+          data_inicio: string | null
+          descricao: string
+          id: string
+          iniciado_em: string | null
+          largura: string | null
+          material: string | null
+          observacao: string | null
+          operador_id: string | null
+          quantidade: number
+          status: string
+          tamanho: string | null
+          tipo_produto: string
+        }
+        Insert: {
+          concluido_em?: string | null
+          cor?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao: string
+          id?: string
+          iniciado_em?: string | null
+          largura?: string | null
+          material?: string | null
+          observacao?: string | null
+          operador_id?: string | null
+          quantidade?: number
+          status?: string
+          tamanho?: string | null
+          tipo_produto: string
+        }
+        Update: {
+          concluido_em?: string | null
+          cor?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao?: string
+          id?: string
+          iniciado_em?: string | null
+          largura?: string | null
+          material?: string | null
+          observacao?: string | null
+          operador_id?: string | null
+          quantidade?: number
+          status?: string
+          tamanho?: string | null
+          tipo_produto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pcp_corte_manual_operador_id_fkey"
+            columns: ["operador_id"]
+            isOneToOne: false
+            referencedRelation: "pcp_operadores_corte"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pcp_corte_registro: {
         Row: {
           concluido_em: string | null
