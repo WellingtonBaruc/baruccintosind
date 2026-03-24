@@ -552,7 +552,7 @@ async function inserirNovoPedido(
     pedido_id: pedido.id,
     tipo_acao: 'TRANSICAO',
     status_anterior: null,
-    status_novo: tipoFluxo === 'PRODUCAO' ? 'EM_PRODUCAO' : statusAtual,
+    status_novo: shouldCreateOPs ? 'EM_PRODUCAO' : statusAtual,
     observacao: `Pedido importado da API Simplifica (${statusApi}). Fluxo: ${tipoFluxo}.${tiposProduto.size > 1 ? ` Tipos: ${[...tiposProduto].join(', ')}.` : ''}`,
   });
 
