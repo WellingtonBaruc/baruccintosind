@@ -560,8 +560,8 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                             </>
                           )}
                           {status === 'CONCLUIDO' && (
-                            <Badge className="text-[10px] bg-blue-500 text-white border-blue-600 font-bold">
-                              Corte OK
+                            <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground border-border font-medium">
+                              ✓ Concluído
                             </Badge>
                           )}
                         </div>
