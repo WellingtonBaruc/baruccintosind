@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 
 const PERFIS_LOJA = ['loja', 'admin', 'gestor'];
 const STATUS_LOJA = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO'] as const;
+const STATUS_POS_LOJA = ['AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL', 'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO'];
 
 interface PedidoLoja {
   id: string;
@@ -49,10 +50,11 @@ export default function FilaLoja() {
   useEffect(() => { fetchPedidos(); }, []);
 
   const fetchPedidos = async () => {
+    // Fetch pedidos in loja statuses OR with status_api 'Pedido Enviado' (not yet past loja)
     const { data } = await supabase
       .from('pedidos')
       .select('*, fivelas_separadas')
-      .in('status_atual', STATUS_LOJA)
+      .or(`status_atual.in.(${STATUS_LOJA.join(',')}),and(status_api.eq.Pedido Enviado,status_atual.not.in.(${STATUS_POS_LOJA.join(',')}))`)
       .order('criado_em', { ascending: true });
 
     if (data) {
