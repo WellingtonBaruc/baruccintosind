@@ -201,11 +201,31 @@ export default function KanbanProducao() {
 
     const pedidoIds = [...new Set(visibleEtapas.map((e: any) => e.ordens_producao.pedido_id))];
 
-    const [itensRes, allOrdensRes, perdasRes] = await Promise.all([
+    const [itensRes, allOrdensRes, perdasRes, corteRegistrosRes] = await Promise.all([
       supabase.from('pedido_itens').select('pedido_id, quantidade, categoria_produto, descricao_produto').in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
       supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status').in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
       supabase.from('ordem_perdas').select('ordem_id, status').eq('status', 'PENDENTE_CONFIRMACAO'),
+      supabase.from('pcp_corte_registro').select('tipo_produto, largura, material, tamanho, cor, status').eq('status', 'CONCLUIDO'),
     ]);
+
+    // Build set of completed corte group keys
+    const corteConcluidoKeys = new Set<string>();
+    for (const r of (corteRegistrosRes.data || [])) {
+      corteConcluidoKeys.add(`${r.tipo_produto}|${r.largura}|${r.material}|${r.tamanho}|${r.cor}`);
+    }
+
+    // Build map: pedido_id+tipo -> list of item descriptions for corte check
+    const pedidoTipoItems = new Map<string, string[]>();
+    for (const item of (itensRes.data || [])) {
+      const desc = item.descricao_produto || '';
+      const tipo = classificarProduto(desc);
+      if (tipo === 'SINTETICO' || tipo === 'TECIDO') {
+        const key = `${item.pedido_id}|${tipo}`;
+        const list = pedidoTipoItems.get(key) || [];
+        list.push(desc);
+        pedidoTipoItems.set(key, list);
+      }
+    }
 
     const sinteticoMap = new Map<string, string>();
     const sinteticoExistsForPedido = new Set<string>();
