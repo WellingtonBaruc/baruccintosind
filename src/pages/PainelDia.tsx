@@ -20,6 +20,7 @@ import PainelTipoAnalytics from '@/components/painel-dia/PainelTipoAnalytics';
 import PainelAgendaDia from '@/components/painel-dia/PainelAgendaDia';
 import PainelCapacidadeCarga from '@/components/painel-dia/PainelCapacidadeCarga';
 import PainelFilaPriorizada from '@/components/painel-dia/PainelFilaPriorizada';
+import ProgramacaoDialog from '@/components/painel-dia/ProgramacaoDialog';
 import CapacidadeDialog from '@/components/painel-dia/CapacidadeDialog';
 
 const STATUS_FINAIS = ['ENVIADO', 'ENTREGUE', 'FINALIZADO_SIMPLIFICA', 'CANCELADO', 'HISTORICO'];
@@ -31,6 +32,9 @@ export default function PainelDia() {
   const [projecao, setProjecao] = useState<CapacidadeDia[]>([]);
   const [capacidadeHoje, setCapacidadeHoje] = useState({ sintetico: 0, tecido: 0, total: 0 });
   const [showCapDialog, setShowCapDialog] = useState(false);
+  const [progDialog, setProgDialog] = useState<{ open: boolean; pedido: PedidoPainelDia | null; tipo: 'inicio' | 'conclusao' }>({ open: false, pedido: null, tipo: 'inicio' });
+  const [calData, setCalData] = useState<PcpCalendarData | null>(null);
+  const [capPadrao, setCapPadrao] = useState({ sintetico: 30, tecido: 20, total: 50 });
 
   const hoje = new Date().toISOString().slice(0, 10);
 
@@ -60,7 +64,7 @@ export default function PainelDia() {
       leadTimes[lt.tipo] = lt.lead_time_dias;
     }
 
-    const capPadrao = {
+    const capPadraoValues = {
       sintetico: capPadraoResult.data?.capacidade_sintetico ?? 30,
       tecido: capPadraoResult.data?.capacidade_tecido ?? 20,
       total: capPadraoResult.data?.capacidade_total ?? 50,
@@ -75,8 +79,10 @@ export default function PainelDia() {
       });
     }
 
-    const capHoje = capacidadesDiarias.get(hoje) || capPadrao;
+    const capHoje = capacidadesDiarias.get(hoje) || capPadraoValues;
     setCapacidadeHoje(capHoje);
+    setCalData(cal);
+    setCapPadrao(capPadraoValues);
 
     // Load active orders with pedidos — filter final statuses server-side to avoid 1000-row limit
     const { data: ordensRaw } = await supabase
@@ -255,7 +261,7 @@ export default function PainelDia() {
 
     // Generate capacity projection
     const proj = gerarProjecaoCapacidade(
-      hojeDate, 8, cal, capPadrao, capacidadesDiarias, cargasPorDia,
+      hojeDate, 8, cal, capPadraoValues, capacidadesDiarias, cargasPorDia,
     );
 
     setPedidos(pedidosDedup);
@@ -289,25 +295,29 @@ export default function PainelDia() {
   const cargaTotal = tipoAnalytics.reduce((s, t) => s + t.carga, 0);
   const saldoTotal = capacidadeHoje.total - cargaProgramada;
 
-  const handleProgramarInicio = async (pedido: PedidoPainelDia) => {
-    const novasCarga = cargaProgramada + pedido.quantidade_itens;
-    if (novasCarga > capacidadeHoje.total) {
-      toast.warning(`Atenção: capacidade excedida! (${novasCarga}/${capacidadeHoje.total})`);
-    }
-    await supabase.from('ordens_producao').update({
-      programado_inicio_data: hoje,
-      programado_para_hoje: true,
-      data_programacao: hoje,
-    } as any).eq('id', pedido.id);
-    toast.success(`${pedido.api_venda_id || pedido.numero_pedido} programado para iniciar hoje`);
-    fetchData();
+  const handleProgramarInicio = (pedido: PedidoPainelDia) => {
+    setProgDialog({ open: true, pedido, tipo: 'inicio' });
   };
 
-  const handleProgramarConclusao = async (pedido: PedidoPainelDia) => {
-    await supabase.from('ordens_producao').update({
-      programado_conclusao_data: hoje,
-    } as any).eq('id', pedido.id);
-    toast.success(`${pedido.api_venda_id || pedido.numero_pedido} programado para concluir hoje`);
+  const handleProgramarConclusao = (pedido: PedidoPainelDia) => {
+    setProgDialog({ open: true, pedido, tipo: 'conclusao' });
+  };
+
+  const handleConfirmProgramacao = async (pedido: PedidoPainelDia, data: string, tipo: 'inicio' | 'conclusao') => {
+    const isHoje = data === hoje;
+    if (tipo === 'inicio') {
+      await supabase.from('ordens_producao').update({
+        programado_inicio_data: data,
+        programado_para_hoje: isHoje,
+        data_programacao: data,
+      } as any).eq('id', pedido.id);
+      toast.success(`${pedido.api_venda_id || pedido.numero_pedido} programado para iniciar em ${data.split('-').reverse().join('/')}`);
+    } else {
+      await supabase.from('ordens_producao').update({
+        programado_conclusao_data: data,
+      } as any).eq('id', pedido.id);
+      toast.success(`${pedido.api_venda_id || pedido.numero_pedido} programado para concluir em ${data.split('-').reverse().join('/')}`);
+    }
     fetchData();
   };
 
@@ -378,6 +388,19 @@ export default function PainelDia() {
         capacidadeTotal={capacidadeHoje.total}
         cargaProgramada={cargaProgramada}
       />
+
+      {/* Scheduling Dialog */}
+      {calData && (
+        <ProgramacaoDialog
+          open={progDialog.open}
+          onClose={() => setProgDialog({ open: false, pedido: null, tipo: 'inicio' })}
+          pedido={progDialog.pedido}
+          tipo={progDialog.tipo}
+          cal={calData}
+          capacidadePadrao={capPadrao}
+          onConfirm={handleConfirmProgramacao}
+        />
+      )}
 
       {/* Capacity Dialog */}
       <CapacidadeDialog open={showCapDialog} onClose={() => { setShowCapDialog(false); fetchData(); }} dataHoje={hoje} />

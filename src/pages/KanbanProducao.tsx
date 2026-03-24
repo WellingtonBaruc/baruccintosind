@@ -109,6 +109,7 @@ export default function KanbanProducao() {
   const [loading, setLoading] = useState(true);
   const [filterTipo, setFilterTipo] = useState<FilterTipo>('all');
   const [filterMode, setFilterMode] = useState(() => profile?.perfil === 'operador_producao' ? 'HOJE' : 'all');
+  const [filterDateStr, setFilterDateStr] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; type: string; card: KanbanCard | null }>({ open: false, type: '', card: null });
   
@@ -650,6 +651,15 @@ export default function KanbanProducao() {
     if (filterMode === 'ATRASADO') filtered = filtered.filter(c => c.status_prazo === 'ATRASADO');
     if (filterMode === 'SEM_OPERADOR') filtered = filtered.filter(c => !c.operador_id);
     if (filterMode === 'HOJE') filtered = filtered.filter(c => c.programado_inicio_data === todayStr || c.programado_conclusao_data === todayStr);
+    if (filterMode === 'AMANHA') {
+      const amanha = new Date();
+      amanha.setDate(amanha.getDate() + 1);
+      const amanhaStr = amanha.toISOString().slice(0, 10);
+      filtered = filtered.filter(c => c.programado_inicio_data === amanhaStr || c.programado_conclusao_data === amanhaStr);
+    }
+    if (filterMode === 'DATA' && filterDateStr) {
+      filtered = filtered.filter(c => c.programado_inicio_data === filterDateStr || c.programado_conclusao_data === filterDateStr);
+    }
     if (filterMode === 'PROXIMOS') filtered = filtered.filter(c => {
       const d = c.programado_inicio_data || c.programado_conclusao_data;
       return d && d > todayStr;
@@ -765,16 +775,26 @@ export default function KanbanProducao() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar venda ou cliente..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 w-[220px]" />
           </div>
-          <Select value={filterMode} onValueChange={setFilterMode}>
-            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <Select value={filterMode} onValueChange={(v) => { setFilterMode(v); if (v !== 'DATA') setFilterDateStr(''); }}>
+            <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="HOJE">🗓️ Programados Hoje</SelectItem>
+              <SelectItem value="AMANHA">🗓️ Amanhã</SelectItem>
+              <SelectItem value="DATA">📅 Escolher Data</SelectItem>
               <SelectItem value="ATRASADO">Atrasados</SelectItem>
               <SelectItem value="PROXIMOS">Próximos</SelectItem>
               <SelectItem value="SEM_OPERADOR">Sem operador</SelectItem>
             </SelectContent>
           </Select>
+          {filterMode === 'DATA' && (
+            <Input
+              type="date"
+              value={filterDateStr}
+              onChange={e => setFilterDateStr(e.target.value)}
+              className="w-[150px]"
+            />
+          )}
         </div>
       </div>
 

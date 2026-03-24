@@ -120,8 +120,8 @@ export default function PainelFilaPriorizada({ pedidos, onProgramarInicio, onPro
               {filtered.slice(0, 50).map((p, i) => {
                 const statusCfg = STATUS_PCP_CONFIG[p.status_pcp];
                 const etiqCfg = ETIQUETA_CONFIG[p.etiqueta];
-                const isProgramadoInicio = hoje && p.programado_inicio_data === hoje;
-                const isProgramadoConclusao = hoje && p.programado_conclusao_data === hoje;
+                const isProgramadoInicio = !!p.programado_inicio_data;
+                const isProgramadoConclusao = !!p.programado_conclusao_data;
                 const isProgramado = isProgramadoInicio || isProgramadoConclusao;
 
                 return (
@@ -154,11 +154,11 @@ export default function PainelFilaPriorizada({ pedidos, onProgramarInicio, onPro
                         {/* Botão Iniciar */}
                         {isProgramadoInicio ? (
                           <Badge className="text-[10px] bg-blue-500/15 text-blue-700 border-blue-300 gap-0.5">
-                            <CheckCircle className="h-3 w-3" /> Início
+                            <CheckCircle className="h-3 w-3" /> {format(new Date(p.programado_inicio_data! + 'T00:00:00'), 'dd/MM')}
                           </Badge>
                         ) : (
                           onProgramarInicio && (
-                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-blue-600 hover:bg-blue-50" onClick={() => onProgramarInicio(p)} title="Programar início hoje">
+                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-blue-600 hover:bg-blue-50" onClick={() => onProgramarInicio(p)} title="Programar início">
                               <CalendarPlus className="h-3 w-3 mr-0.5" /> Início
                             </Button>
                           )
@@ -166,11 +166,11 @@ export default function PainelFilaPriorizada({ pedidos, onProgramarInicio, onPro
                         {/* Botão Concluir */}
                         {isProgramadoConclusao ? (
                           <Badge className="text-[10px] bg-emerald-500/15 text-emerald-700 border-emerald-300 gap-0.5">
-                            <CheckCircle className="h-3 w-3" /> Conclusão
+                            <CheckCircle className="h-3 w-3" /> {format(new Date(p.programado_conclusao_data! + 'T00:00:00'), 'dd/MM')}
                           </Badge>
                         ) : (
                           onProgramarConclusao && (
-                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-emerald-600 hover:bg-emerald-50" onClick={() => onProgramarConclusao(p)} title="Programar conclusão hoje">
+                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-emerald-600 hover:bg-emerald-50" onClick={() => onProgramarConclusao(p)} title="Programar conclusão">
                               <CalendarCheck className="h-3 w-3 mr-0.5" /> Conclusão
                             </Button>
                           )
