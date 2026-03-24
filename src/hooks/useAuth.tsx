@@ -11,6 +11,8 @@ export interface UsuarioProfile {
   perfil: PerfilUsuario;
   setor: string | null;
   ativo: boolean;
+  kanban_producao_acesso: boolean;
+  kanban_venda_acesso: boolean;
 }
 
 interface AuthContextType {

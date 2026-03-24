@@ -48,6 +48,8 @@ interface UsuarioRow {
   setor: string | null;
   ativo: boolean;
   criado_em: string;
+  kanban_producao_acesso: boolean;
+  kanban_venda_acesso: boolean;
 }
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
@@ -67,6 +69,8 @@ export default function Usuarios() {
   const [senha, setSenha] = useState('');
   const [perfil, setPerfil] = useState<PerfilUsuario>('operador_producao');
   const [setor, setSetor] = useState('');
+  const [kanbanProducaoAcesso, setKanbanProducaoAcesso] = useState(true);
+  const [kanbanVendaAcesso, setKanbanVendaAcesso] = useState(true);
 
   const fetchUsuarios = async () => {
     setLoading(true);
@@ -92,6 +96,8 @@ export default function Usuarios() {
     setSenha('');
     setPerfil('operador_producao');
     setSetor('');
+    setKanbanProducaoAcesso(true);
+    setKanbanVendaAcesso(true);
   };
 
   const openCreate = () => {
@@ -107,6 +113,8 @@ export default function Usuarios() {
     setSenha('');
     setPerfil(usuario.perfil);
     setSetor(usuario.setor || '');
+    setKanbanProducaoAcesso(usuario.kanban_producao_acesso);
+    setKanbanVendaAcesso(usuario.kanban_venda_acesso);
     setDialogOpen(true);
   };
 
@@ -145,6 +153,8 @@ export default function Usuarios() {
           email: emailSanitizado,
           perfil,
           setor: setorSanitizado,
+          kanban_producao_acesso: kanbanProducaoAcesso,
+          kanban_venda_acesso: kanbanVendaAcesso,
         });
         toast.success('Usuário atualizado.');
       } else {
@@ -160,6 +170,8 @@ export default function Usuarios() {
           senha,
           perfil,
           setor: setorSanitizado,
+          kanban_producao_acesso: kanbanProducaoAcesso,
+          kanban_venda_acesso: kanbanVendaAcesso,
         });
         toast.success('Usuário criado com sucesso.');
       }
@@ -313,6 +325,17 @@ export default function Usuarios() {
             <div className="space-y-2">
               <Label>Setor</Label>
               <Input value={setor} onChange={(e) => setSetor(e.target.value)} placeholder="Ex: Produção, Comercial..." />
+            </div>
+            <div className="space-y-3 rounded-lg border border-border p-3">
+              <Label className="text-sm font-medium">Acesso aos Kanbans</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm text-muted-foreground">Kanban Produção</Label>
+                <Switch checked={kanbanProducaoAcesso} onCheckedChange={setKanbanProducaoAcesso} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm text-muted-foreground">Kanban Venda</Label>
+                <Switch checked={kanbanVendaAcesso} onCheckedChange={setKanbanVendaAcesso} />
+              </div>
             </div>
           </div>
           <DialogFooter>
