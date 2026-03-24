@@ -639,6 +639,8 @@ export default function KanbanProducao() {
   // Filter logic
   const getFilteredCards = () => {
     let filtered = cards;
+    const todayStr = new Date().toISOString().slice(0, 10);
+
     if (filterTipo !== 'all') {
       filtered = filtered.filter(c => c.tipo_produto === filterTipo);
     }
@@ -647,6 +649,11 @@ export default function KanbanProducao() {
     }
     if (filterMode === 'ATRASADO') filtered = filtered.filter(c => c.status_prazo === 'ATRASADO');
     if (filterMode === 'SEM_OPERADOR') filtered = filtered.filter(c => !c.operador_id);
+    if (filterMode === 'HOJE') filtered = filtered.filter(c => c.programado_inicio_data === todayStr || c.programado_conclusao_data === todayStr);
+    if (filterMode === 'PROXIMOS') filtered = filtered.filter(c => {
+      const d = c.programado_inicio_data || c.programado_conclusao_data;
+      return d && d > todayStr;
+    });
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(c => c.api_venda_id.toLowerCase().includes(q) || c.cliente_nome.toLowerCase().includes(q));
