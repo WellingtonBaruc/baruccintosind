@@ -769,7 +769,9 @@ export default function KanbanProducao() {
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="HOJE">🗓️ Programados Hoje</SelectItem>
               <SelectItem value="ATRASADO">Atrasados</SelectItem>
+              <SelectItem value="PROXIMOS">Próximos</SelectItem>
               <SelectItem value="SEM_OPERADOR">Sem operador</SelectItem>
             </SelectContent>
           </Select>
