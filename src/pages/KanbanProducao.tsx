@@ -898,7 +898,15 @@ export default function KanbanProducao() {
                                   </Badge>
                                 </div>
 
-                                {card.is_piloto && (
+                                {(() => {
+                                  const todayStr = new Date().toISOString().slice(0, 10);
+                                  const isProgInicio = card.programado_inicio_data === todayStr;
+                                  const isProgConclusao = card.programado_conclusao_data === todayStr;
+                                  if (isProgInicio) return <Badge className="mt-1.5 text-[10px] bg-primary/15 text-primary border-primary/30">🗓️ Início programado</Badge>;
+                                  if (isProgConclusao) return <Badge className="mt-1.5 text-[10px] bg-orange-500/15 text-orange-600 border-orange-300">🗓️ Conclusão programada</Badge>;
+                                  return null;
+                                })()}
+
                                   <Badge className={`mt-1.5 text-[10px] ${card.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
                                     {card.status_piloto === 'REPROVADO' ? 'PILOTO REPROVADO' : 'PILOTO'}
                                   </Badge>
