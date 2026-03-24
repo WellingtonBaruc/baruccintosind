@@ -389,6 +389,19 @@ export default function PainelDia() {
         cargaProgramada={cargaProgramada}
       />
 
+      {/* Scheduling Dialog */}
+      {calData && (
+        <ProgramacaoDialog
+          open={progDialog.open}
+          onClose={() => setProgDialog({ open: false, pedido: null, tipo: 'inicio' })}
+          pedido={progDialog.pedido}
+          tipo={progDialog.tipo}
+          cal={calData}
+          capacidadePadrao={capPadrao}
+          onConfirm={handleConfirmProgramacao}
+        />
+      )}
+
       {/* Capacity Dialog */}
       <CapacidadeDialog open={showCapDialog} onClose={() => { setShowCapDialog(false); fetchData(); }} dataHoje={hoje} />
     </div>
