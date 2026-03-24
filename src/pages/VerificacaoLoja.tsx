@@ -507,8 +507,8 @@ export default function VerificacaoLoja() {
                   <span className="text-xs text-muted-foreground ml-2">Qtd: {s.quantidade}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={s.status === 'ATENDIDA' ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'}>
-                    {s.status === 'ATENDIDA' ? 'Atendida' : 'Pendente'}
+                  <Badge className={s.status === 'ATENDIDA' || s.status === 'ATENDIDO' ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'}>
+                    {s.status === 'ATENDIDA' || s.status === 'ATENDIDO' ? 'Atendida' : 'Pendente'}
                   </Badge>
                   {s.status === 'PENDENTE' && ['admin', 'gestor', 'supervisor_producao', 'loja'].includes(profile.perfil) && (
                     <Button size="sm" variant="outline" onClick={() => handleAtenderSolicitacao(s.id)}>
