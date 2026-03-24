@@ -826,6 +826,9 @@ export default function KanbanProducao() {
   const isConcluido = (card: KanbanCard) => card.ordem_status === 'CONCLUIDA';
 
   const getConcluidoBadge = (card: KanbanCard) => {
+    if (card.pedido_status === 'LOJA_PENDENTE_FINALIZACAO') {
+      return { label: '🏪 Enviado à Loja', cls: 'bg-amber-500/15 text-amber-600 border-amber-500/30' };
+    }
     if (card.pedido_status === 'AGUARDANDO_FINANCEIRO' || card.pedido_status === 'VALIDADO_FINANCEIRO' || card.pedido_status === 'LIBERADO_LOGISTICA') {
       return { label: '💰 Aguardando Financeiro', cls: 'bg-amber-500/15 text-amber-600 border-amber-500/30' };
     }
