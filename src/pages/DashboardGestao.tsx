@@ -60,17 +60,29 @@ export default function DashboardGestao() {
       { title: 'Em Atraso', count: rAtraso.count || 0, value: 0, icon: AlertTriangle, accent: 'text-destructive' },
     ]);
 
-    // 7-day chart
-    const days: DayBar[] = [];
+    // 7-day chart — single query instead of 7 sequential ones
+    const sevenDaysAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+    const { data: chartData } = await supabase
+      .from('pedidos')
+      .select('atualizado_em')
+      .in('status_atual', ['ENVIADO', 'ENTREGUE', 'FINALIZADO_SIMPLIFICA', 'PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL'])
+      .gte('atualizado_em', sevenDaysAgo);
+
+    const dayCounts = new Map<string, number>();
     for (let i = 6; i >= 0; i--) {
       const d = subDays(new Date(), i);
-      const ds = format(d, 'yyyy-MM-dd');
-      const de = format(subDays(new Date(), i - 1), 'yyyy-MM-dd');
-      const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true })
-        .in('status_atual', ['ENVIADO', 'ENTREGUE', 'FINALIZADO_SIMPLIFICA', 'PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL'])
-        .gte('atualizado_em', ds).lt('atualizado_em', de);
-      days.push({ day: format(d, 'EEE', { locale: ptBR }), count: count || 0 });
+      dayCounts.set(format(d, 'yyyy-MM-dd'), 0);
     }
+    for (const row of (chartData || [])) {
+      const dayKey = format(new Date(row.atualizado_em), 'yyyy-MM-dd');
+      if (dayCounts.has(dayKey)) {
+        dayCounts.set(dayKey, (dayCounts.get(dayKey) || 0) + 1);
+      }
+    }
+    const days: DayBar[] = Array.from(dayCounts.entries()).map(([dateStr, count]) => ({
+      day: format(new Date(dateStr + 'T12:00:00'), 'EEE', { locale: ptBR }),
+      count,
+    }));
     setChart(days);
 
     // Type progress (programmed today vs completed today)
