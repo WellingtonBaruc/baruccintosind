@@ -293,39 +293,29 @@ export default function ImportPlanilha() {
           const dataPrevista = adicionarDiasUteis(new Date(hoje), maxLeadTime, cal);
           const dataPrevistaStr = dataPrevista.toISOString().slice(0, 10);
 
-          // Parse data venda
-          let dataVendaApi: string | null = null;
-          if (venda.data) {
-            // Try dd/mm/yyyy format
-            const parts = venda.data.split('/');
-            if (parts.length === 3) {
-              dataVendaApi = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            } else {
-              // Try ISO or other format
-              const d = new Date(venda.data);
-              if (!isNaN(d.getTime())) dataVendaApi = d.toISOString().slice(0, 10);
-            }
-          }
+          const dataVendaApi = parseExcelDate(venda.data);
 
           if (venda.status === 'NOVA') {
             // Create new pedido
             const { data: newPedido, error: pedidoErr } = await supabase.from('pedidos').insert({
               numero_pedido: `V-${venda.numVenda}`,
               api_venda_id: venda.numVenda,
-              cliente_nome: venda.cliente,
+              cliente_nome: venda.cliente || 'Cliente não informado',
               data_venda_api: dataVendaApi,
               canal_venda: venda.origemVenda || null,
               status_api: venda.situacao || null,
               vendedor_nome: venda.consultor || null,
               observacao_api: `[IMPORTADO SEM DATA PREVISTA] ${venda.observacao || ''}`.trim(),
-              valor_bruto: venda.totalVenda,
-              valor_liquido: venda.totalVenda,
+              valor_bruto: venda.totalVenda || 0,
+              valor_desconto: 0,
+              valor_liquido: venda.totalVenda || 0,
               data_previsao_entrega: dataPrevistaStr,
               status_atual: 'EM_PRODUCAO' as any,
               tipo_fluxo: 'PRODUCAO',
             }).select().single();
 
             if (pedidoErr || !newPedido) {
+              console.error(`Erro ao inserir pedido V-${venda.numVenda}:`, pedidoErr);
               res.erros++;
               continue;
             }
