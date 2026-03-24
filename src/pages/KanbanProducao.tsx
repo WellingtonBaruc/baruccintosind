@@ -109,6 +109,7 @@ export default function KanbanProducao() {
   const [loading, setLoading] = useState(true);
   const [filterTipo, setFilterTipo] = useState<FilterTipo>('all');
   const [filterMode, setFilterMode] = useState(() => profile?.perfil === 'operador_producao' ? 'HOJE' : 'all');
+  const [filterDateStr, setFilterDateStr] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; type: string; card: KanbanCard | null }>({ open: false, type: '', card: null });
   
