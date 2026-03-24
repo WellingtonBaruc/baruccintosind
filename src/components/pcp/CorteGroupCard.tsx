@@ -200,22 +200,27 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   const filteredGroups = filterLargura === 'all' ? searchedGroups : searchedGroups.filter(g => g.largura === filterLargura);
   const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
 
+  const isDateMode = janelaDias != null;
+
   const handlePrint = () => {
     const rows = filteredGroups.map(g => {
       const itensHtml = g.itens.map(i =>
         `${i.descricao} ×${i.quantidade}${i.numero_venda ? ' <span style="color:#666">#' + i.numero_venda + '</span>' : ''}${i.data_venda ? ' <span style="color:#999">' + format(parseISO(i.data_venda), 'dd/MM') + '</span>' : ''}${i.lead_time_dias != null ? ' <span style="color:#999">' + i.lead_time_dias + 'd</span>' : ''}`
       ).join('<br>');
-      return `<tr><td>${g.largura}</td><td>${g.material}</td><td>${g.tamanho}</td><td>${g.cor}</td><td style="text-align:right;font-weight:bold">${g.quantidadeTotal}</td><td style="font-size:11px">${itensHtml}</td></tr>`;
+      const faixaTd = isDateMode ? `<td style="font-weight:bold;white-space:nowrap">${g.faixa_data || 'SEM DATA'}</td>` : '';
+      return `<tr><td>${g.largura}</td><td>${g.material}</td><td>${g.tamanho}</td><td>${g.cor}</td>${faixaTd}<td style="text-align:right;font-weight:bold">${g.quantidadeTotal}</td><td style="font-size:11px">${itensHtml}</td></tr>`;
     }).join('');
 
+    const janelaLabel = isDateMode ? ` — Agrupado por ${janelaDias === 0 ? 'mesmo dia' : janelaDias + ' dias'}` : '';
+    const faixaTh = isDateMode ? '<th>Faixa Data</th>' : '';
     const html = `<!DOCTYPE html><html><head><title>Corte - ${title}</title>
     <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;padding:15mm}
     h1{font-size:16px;margin-bottom:4px}.meta{color:#666;font-size:11px;margin-bottom:10px}
     table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;vertical-align:top}
     th{background:#f0f0f0;font-size:11px;text-transform:uppercase}@media print{body{padding:10mm}}</style>
-    </head><body><h1>Agrupamento de Corte — ${title}${filterLargura !== 'all' ? ' — ' + filterLargura : ''}</h1>
+    </head><body><h1>Agrupamento de Corte — ${title}${filterLargura !== 'all' ? ' — ' + filterLargura : ''}${janelaLabel}</h1>
     <p class="meta">${filteredGroups.length} grupos • ${totalPecas} peças • ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
-    <table><thead><tr><th>Largura</th><th>Material</th><th>Tamanho</th><th>Cor</th><th style="text-align:right">Qtd</th><th>Itens</th></tr></thead>
+    <table><thead><tr><th>Largura</th><th>Material</th><th>Tamanho</th><th>Cor</th>${faixaTh}<th style="text-align:right">Qtd</th><th>Itens</th></tr></thead>
     <tbody>${rows}</tbody></table></body></html>`;
 
     const w = window.open('', '_blank');
