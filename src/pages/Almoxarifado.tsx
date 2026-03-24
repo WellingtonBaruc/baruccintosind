@@ -226,12 +226,36 @@ export default function AlmoxarifadoPage() {
           });
         }
       } else {
-        await supabase.from('pedido_historico').insert({
-          pedido_id: venda.pedido_id,
-          usuario_id: profile.id,
-          tipo_acao: 'COMENTARIO' as any,
-          observacao: `Fivelas separadas pelo almoxarifado — ${profile.nome}`,
-        });
+        // Check if this is a pronta entrega / loja flow → return to Loja
+        const { data: pedidoCheck } = await supabase
+          .from('pedidos')
+          .select('tipo_fluxo, subtipo_pronta_entrega, status_atual')
+          .eq('id', venda.pedido_id)
+          .single();
+
+        const isLojaFlow = pedidoCheck?.tipo_fluxo === 'PRONTA_ENTREGA' || !!pedidoCheck?.subtipo_pronta_entrega;
+        const notAlreadyAdvanced = !['AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL', 'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO',
+          'LIBERADO_LOGISTICA', 'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO',
+          'LOJA_PENDENTE_FINALIZACAO', 'AGUARDANDO_CIENCIA_COMERCIAL'].includes(pedidoCheck?.status_atual || '');
+
+        if (isLojaFlow && notAlreadyAdvanced) {
+          await supabase.from('pedidos').update({ status_atual: 'LOJA_PENDENTE_FINALIZACAO' }).eq('id', venda.pedido_id);
+          await supabase.from('pedido_historico').insert({
+            pedido_id: venda.pedido_id,
+            usuario_id: profile.id,
+            tipo_acao: 'TRANSICAO' as any,
+            status_anterior: pedidoCheck?.status_atual || '',
+            status_novo: 'LOJA_PENDENTE_FINALIZACAO',
+            observacao: `Fivelas separadas pelo almoxarifado. Retornando para Loja finalizar — ${profile.nome}`,
+          });
+        } else {
+          await supabase.from('pedido_historico').insert({
+            pedido_id: venda.pedido_id,
+            usuario_id: profile.id,
+            tipo_acao: 'COMENTARIO' as any,
+            observacao: `Fivelas separadas pelo almoxarifado — ${profile.nome}`,
+          });
+        }
       }
 
       toast.success(`Separação confirmada — Venda #${venda.api_venda_id}`);
