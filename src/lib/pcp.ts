@@ -11,6 +11,12 @@ export interface CutGroup {
   quantidadeTotal: number;
   faixa_data?: string;
   data_mais_antiga?: string;
+  is_manual?: boolean;
+  manual_id?: string;
+  manual_descricao?: string;
+  manual_data_inicio?: string;
+  manual_data_fim?: string;
+  manual_observacao?: string;
 }
 
 export interface ObsCorte {

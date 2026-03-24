@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays, Package, Layers, Hash } from 'lucide-react';
 import { CutGroup, TIPO_PRODUTO_LABELS, ObsCorte } from '@/lib/pcp';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -26,6 +27,7 @@ interface CorteRegistro {
   operador_id: string | null;
   iniciado_em: string | null;
   concluido_em: string | null;
+  quantidade_cortada: number | null;
 }
 
 interface Operador {
@@ -42,6 +44,7 @@ interface CorteGroupCardProps {
   larguras: string[];
   janelaDias: number | null;
   onJanelaDiasChange: (v: number | null) => void;
+  onManualAdded?: () => void;
 }
 
 const JANELA_OPTIONS: { label: string; value: string }[] = [
@@ -53,10 +56,11 @@ const JANELA_OPTIONS: { label: string; value: string }[] = [
 ];
 
 function groupKey(tipo: string, g: CutGroup) {
+  if (g.is_manual && g.manual_id) return `manual|${g.manual_id}`;
   return `${tipo}|${g.largura}|${g.material}|${g.tamanho}|${g.cor}${g.faixa_data ? '|' + g.faixa_data : ''}`;
 }
 
-export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLarguraChange, larguras, janelaDias, onJanelaDiasChange }: CorteGroupCardProps) {
+export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLarguraChange, larguras, janelaDias, onJanelaDiasChange, onManualAdded }: CorteGroupCardProps) {
   const { profile } = useAuth();
   const [search, setSearch] = useState('');
   const [registros, setRegistros] = useState<Map<string, CorteRegistro>>(new Map());
@@ -66,6 +70,10 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   const [savingOperador, setSavingOperador] = useState(false);
   const [actionLoading, setActionLoading] = useState<Set<string>>(new Set());
   const [markingRead, setMarkingRead] = useState<Set<string>>(new Set());
+  // Manual OP modal
+  const [manualModal, setManualModal] = useState(false);
+  const [manualForm, setManualForm] = useState({ descricao: '', quantidade: '', dataInicio: '', dataFim: '', observacao: '' });
+  const [savingManual, setSavingManual] = useState(false);
 
   useEffect(() => {
     fetchRegistros();
@@ -99,17 +107,22 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
     const key = groupKey(tipo, g);
     setActionLoading(prev => new Set(prev).add(key));
     try {
-      const existing = registros.get(key);
-      if (existing) {
-        await supabase.from('pcp_corte_registro').update({ status: 'INICIADO', iniciado_em: new Date().toISOString() }).eq('id', existing.id);
+      if (g.is_manual && g.manual_id) {
+        await supabase.from('pcp_corte_manual').update({ status: 'INICIADO', iniciado_em: new Date().toISOString() }).eq('id', g.manual_id);
       } else {
-        await supabase.from('pcp_corte_registro').insert({
-          tipo_produto: tipo, largura: g.largura, material: g.material, tamanho: g.tamanho, cor: g.cor,
-          status: 'INICIADO', iniciado_em: new Date().toISOString(),
-        });
+        const existing = registros.get(key);
+        if (existing) {
+          await supabase.from('pcp_corte_registro').update({ status: 'INICIADO', iniciado_em: new Date().toISOString() }).eq('id', existing.id);
+        } else {
+          await supabase.from('pcp_corte_registro').insert({
+            tipo_produto: tipo, largura: g.largura, material: g.material, tamanho: g.tamanho, cor: g.cor,
+            status: 'INICIADO', iniciado_em: new Date().toISOString(),
+          });
+        }
       }
       toast.success('Corte iniciado');
       await fetchRegistros();
+      if (g.is_manual) onManualAdded?.();
     } catch { toast.error('Erro ao iniciar'); }
     setActionLoading(prev => { const n = new Set(prev); n.delete(key); return n; });
   };
@@ -118,17 +131,29 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
     const key = groupKey(tipo, g);
     setActionLoading(prev => new Set(prev).add(key));
     try {
-      const existing = registros.get(key);
-      if (existing) {
-        await supabase.from('pcp_corte_registro').update({ status: 'CONCLUIDO', concluido_em: new Date().toISOString() }).eq('id', existing.id);
+      if (g.is_manual && g.manual_id) {
+        await supabase.from('pcp_corte_manual').update({
+          status: 'CONCLUIDO', concluido_em: new Date().toISOString(),
+        }).eq('id', g.manual_id);
       } else {
-        await supabase.from('pcp_corte_registro').insert({
-          tipo_produto: tipo, largura: g.largura, material: g.material, tamanho: g.tamanho, cor: g.cor,
-          status: 'CONCLUIDO', iniciado_em: new Date().toISOString(), concluido_em: new Date().toISOString(),
-        });
+        const existing = registros.get(key);
+        if (existing) {
+          await supabase.from('pcp_corte_registro').update({
+            status: 'CONCLUIDO',
+            concluido_em: new Date().toISOString(),
+            quantidade_cortada: g.quantidadeTotal,
+          }).eq('id', existing.id);
+        } else {
+          await supabase.from('pcp_corte_registro').insert({
+            tipo_produto: tipo, largura: g.largura, material: g.material, tamanho: g.tamanho, cor: g.cor,
+            status: 'CONCLUIDO', iniciado_em: new Date().toISOString(), concluido_em: new Date().toISOString(),
+            quantidade_cortada: g.quantidadeTotal,
+          });
+        }
       }
       toast.success('Corte concluído');
       await fetchRegistros();
+      if (g.is_manual) onManualAdded?.();
     } catch { toast.error('Erro ao concluir'); }
     setActionLoading(prev => { const n = new Set(prev); n.delete(key); return n; });
   };
@@ -138,18 +163,23 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
     const g = operadorModal.group;
     const key = groupKey(tipo, g);
     try {
-      const existing = registros.get(key);
-      if (existing) {
-        await supabase.from('pcp_corte_registro').update({ operador_id: operadorId }).eq('id', existing.id);
+      if (g.is_manual && g.manual_id) {
+        await supabase.from('pcp_corte_manual').update({ operador_id: operadorId }).eq('id', g.manual_id);
       } else {
-        await supabase.from('pcp_corte_registro').insert({
-          tipo_produto: tipo, largura: g.largura, material: g.material, tamanho: g.tamanho, cor: g.cor,
-          operador_id: operadorId,
-        });
+        const existing = registros.get(key);
+        if (existing) {
+          await supabase.from('pcp_corte_registro').update({ operador_id: operadorId }).eq('id', existing.id);
+        } else {
+          await supabase.from('pcp_corte_registro').insert({
+            tipo_produto: tipo, largura: g.largura, material: g.material, tamanho: g.tamanho, cor: g.cor,
+            operador_id: operadorId,
+          });
+        }
       }
       toast.success('Operador atribuído');
       setOperadorModal({ open: false, group: null });
       await fetchRegistros();
+      if (g.is_manual) onManualAdded?.();
     } catch { toast.error('Erro ao atribuir operador'); }
   };
 
@@ -176,10 +206,30 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
         lido_por: profile.id,
       }).eq('id', obsId);
       toast.success('Observação marcada como lida');
-      // Trigger parent refresh would be ideal, but for now we update locally
-      // The parent PCP.tsx will refresh on next load
     } catch { toast.error('Erro ao marcar como lida'); }
     setMarkingRead(prev => { const n = new Set(prev); n.delete(obsId); return n; });
+  };
+
+  const handleCriarManual = async () => {
+    if (!manualForm.descricao.trim() || !manualForm.quantidade) return;
+    setSavingManual(true);
+    try {
+      const { error } = await supabase.from('pcp_corte_manual').insert({
+        tipo_produto: tipo,
+        descricao: manualForm.descricao.trim(),
+        quantidade: parseInt(manualForm.quantidade) || 0,
+        data_inicio: manualForm.dataInicio || null,
+        data_fim: manualForm.dataFim || null,
+        observacao: manualForm.observacao.trim() || null,
+        criado_por: profile?.id || null,
+      });
+      if (error) throw error;
+      toast.success('OP Manual criada com sucesso');
+      setManualModal(false);
+      setManualForm({ descricao: '', quantidade: '', dataInicio: '', dataFim: '', observacao: '' });
+      onManualAdded?.();
+    } catch { toast.error('Erro ao criar OP Manual'); }
+    setSavingManual(false);
   };
 
   const searchedGroups = useMemo(() => {
@@ -187,6 +237,10 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
     const term = search.trim().toLowerCase();
     return groups
       .map(g => {
+        if (g.is_manual) {
+          const match = (g.manual_descricao || '').toLowerCase().includes(term);
+          return match ? g : null;
+        }
         const matchedItens = g.itens.filter(i => {
           const vendaMatch = (i.numero_venda || '').toLowerCase().includes(term);
           const descMatch = (i.descricao || '').toLowerCase().includes(term);
@@ -199,16 +253,21 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
 
   const filteredGroups = filterLargura === 'all' ? searchedGroups : searchedGroups.filter(g => g.largura === filterLargura);
   const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
+  const totalItens = filteredGroups.reduce((sum, g) => sum + g.itens.length, 0);
+  const totalGrupos = filteredGroups.length;
 
   const isDateMode = janelaDias != null;
 
   const handlePrint = () => {
     const rows = filteredGroups.map(g => {
-      const itensHtml = g.itens.map(i =>
-        `${i.descricao} ×${i.quantidade}${i.numero_venda ? ' <span style="color:#666">#' + i.numero_venda + '</span>' : ''}${i.data_venda ? ' <span style="color:#999">' + format(parseISO(i.data_venda), 'dd/MM') + '</span>' : ''}${i.lead_time_dias != null ? ' <span style="color:#999">' + i.lead_time_dias + 'd</span>' : ''}`
-      ).join('<br>');
+      const manualTag = g.is_manual ? '<span style="background:#fed7aa;color:#c2410c;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:bold">OP MANUAL</span> ' : '';
+      const itensHtml = g.is_manual
+        ? `${manualTag}${g.manual_descricao || g.itens[0]?.descricao || '-'} ×${g.quantidadeTotal}`
+        : g.itens.map(i =>
+          `${i.descricao} ×${i.quantidade}${i.numero_venda ? ' <span style="color:#666">#' + i.numero_venda + '</span>' : ''}${i.data_venda ? ' <span style="color:#999">' + format(parseISO(i.data_venda), 'dd/MM') + '</span>' : ''}${i.lead_time_dias != null ? ' <span style="color:#999">' + i.lead_time_dias + 'd</span>' : ''}`
+        ).join('<br>');
       const faixaTd = isDateMode ? `<td style="font-weight:bold;white-space:nowrap">${g.faixa_data || 'SEM DATA'}</td>` : '';
-      return `<tr><td>${g.largura}</td><td>${g.material}</td><td>${g.tamanho}</td><td>${g.cor}</td>${faixaTd}<td style="text-align:right;font-weight:bold">${g.quantidadeTotal}</td><td style="font-size:11px">${itensHtml}</td></tr>`;
+      return `<tr${g.is_manual ? ' style="background:#fff7ed"' : ''}><td>${g.largura}</td><td>${g.material}</td><td>${g.tamanho}</td><td>${g.cor}</td>${faixaTd}<td style="text-align:right;font-weight:bold">${g.quantidadeTotal}</td><td style="font-size:11px">${itensHtml}</td></tr>`;
     }).join('');
 
     const janelaLabel = isDateMode ? ` — Agrupado por ${janelaDias === 0 ? 'mesmo dia' : janelaDias + ' dias'}` : '';
@@ -219,7 +278,7 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
     table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;vertical-align:top}
     th{background:#f0f0f0;font-size:11px;text-transform:uppercase}@media print{body{padding:10mm}}</style>
     </head><body><h1>Agrupamento de Corte — ${title}${filterLargura !== 'all' ? ' — ' + filterLargura : ''}${janelaLabel}</h1>
-    <p class="meta">${filteredGroups.length} grupos • ${totalPecas} peças • ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+    <p class="meta">${totalGrupos} grupos • ${totalPecas} peças • ${totalItens} itens • ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
     <table><thead><tr><th>Largura</th><th>Material</th><th>Tamanho</th><th>Cor</th>${faixaTh}<th style="text-align:right">Qtd</th><th>Itens</th></tr></thead>
     <tbody>${rows}</tbody></table></body></html>`;
 
@@ -235,56 +294,86 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
     return operadores.find(o => o.id === operadorId)?.nome || null;
   };
 
+  const getManualStatus = (g: CutGroup) => {
+    if (!g.is_manual) return null;
+    // For manual OPs, status comes from the group data (loaded from pcp_corte_manual)
+    // We check via manual fields
+    return (g as any)._manual_status || 'PENDENTE';
+  };
+
   return (
     <>
       <Card className="border-border/60 shadow-sm">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between gap-4 flex-wrap">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Scissors className="h-4 w-4" />
-              {title}
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">{filteredGroups.length} grupos • {totalPecas} peças</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Cliente ou nº venda..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-8 h-9 w-[180px] text-sm"
-              />
+        <CardHeader className="pb-3 flex flex-col gap-3">
+          <div className="flex flex-row items-center justify-between gap-4 flex-wrap">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Scissors className="h-4 w-4" />
+                {title}
+              </CardTitle>
             </div>
-            <Select value={filterLargura} onValueChange={onFilterLarguraChange}>
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="Largura" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {larguras.map(l => (
-                  <SelectItem key={l} value={l}>{l}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={janelaDias != null ? String(janelaDias) : 'padrao'}
-              onValueChange={v => onJanelaDiasChange(v === 'padrao' ? null : Number(v))}
-            >
-              <SelectTrigger className="w-[140px]">
-                <CalendarDays className="h-3.5 w-3.5 mr-1 shrink-0" />
-                <SelectValue placeholder="Agrup. data" />
-              </SelectTrigger>
-              <SelectContent>
-                {JANELA_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" onClick={handlePrint} disabled={filteredGroups.length === 0}>
-              <Printer className="h-4 w-4 mr-1" />
-              PDF
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Cliente ou nº venda..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="pl-8 h-9 w-[180px] text-sm"
+                />
+              </div>
+              <Select value={filterLargura} onValueChange={onFilterLarguraChange}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Largura" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {larguras.map(l => (
+                    <SelectItem key={l} value={l}>{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={janelaDias != null ? String(janelaDias) : 'padrao'}
+                onValueChange={v => onJanelaDiasChange(v === 'padrao' ? null : Number(v))}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <CalendarDays className="h-3.5 w-3.5 mr-1 shrink-0" />
+                  <SelectValue placeholder="Agrup. data" />
+                </SelectTrigger>
+                <SelectContent>
+                  {JANELA_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" onClick={handlePrint} disabled={filteredGroups.length === 0}>
+                <Printer className="h-4 w-4 mr-1" />
+                PDF
+              </Button>
+              <Button variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-50" onClick={() => setManualModal(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                OP Manual
+              </Button>
+            </div>
+          </div>
+          {/* Fase 2: Indicator mini-cards */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-1.5">
+              <Package className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs text-muted-foreground">Peças</span>
+              <span className="text-sm font-bold tabular-nums text-foreground">{totalPecas}</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-1.5">
+              <Layers className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs text-muted-foreground">Grupos</span>
+              <span className="text-sm font-bold tabular-nums text-foreground">{totalGrupos}</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-1.5">
+              <Hash className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs text-muted-foreground">Itens</span>
+              <span className="text-sm font-bold tabular-nums text-foreground">{totalItens}</span>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -308,15 +397,33 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
               <TableBody>
                 {filteredGroups.map((group, idx) => {
                   const key = groupKey(tipo, group);
-                  const reg = registros.get(key);
-                  const status = reg?.status || 'PENDENTE';
+                  const isManual = !!group.is_manual;
+                  const reg = isManual ? null : registros.get(key);
+                  const status = isManual ? ((group as any)._manual_status || 'PENDENTE') : (reg?.status || 'PENDENTE');
                   const isLoading = actionLoading.has(key);
-                  const operadorNome = getOperadorNome(reg?.operador_id);
+                  const operadorNome = isManual
+                    ? getOperadorNome((group as any)._manual_operador_id)
+                    : getOperadorNome(reg?.operador_id);
+
+                  const rowClass = isManual
+                    ? 'bg-orange-50/70 border-l-4 border-l-orange-400'
+                    : status === 'CONCLUIDO'
+                      ? 'bg-blue-50/50'
+                      : status === 'INICIADO'
+                        ? 'bg-yellow-50/30'
+                        : '';
 
                   return (
-                    <TableRow key={idx} className={status === 'CONCLUIDO' ? 'bg-blue-50/50' : status === 'INICIADO' ? 'bg-yellow-50/30' : ''}>
+                    <TableRow key={key + idx} className={rowClass}>
                       <TableCell>
-                        <Badge variant="outline" className="font-mono">{group.largura}</Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="outline" className="font-mono">{group.largura}</Badge>
+                          {isManual && (
+                            <Badge className="text-[9px] bg-orange-100 text-orange-700 border-orange-300 font-bold">
+                              OP Manual
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm">{group.material}</TableCell>
                       <TableCell className="text-sm">{group.tamanho}</TableCell>
@@ -384,96 +491,113 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Collapsible>
-                          <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group">
-                            <ChevronRight className="h-3 w-3 transition-transform group-data-[state=open]:rotate-90" />
-                            <span>{group.itens.length} {group.itens.length === 1 ? 'item' : 'itens'}</span>
-                            {(() => {
-                              const totalObs = group.itens.reduce((acc, item) => acc + (item.obs_corte || []).length, 0);
-                              const unreadCount = group.itens.reduce((acc, item) => acc + (item.obs_corte || []).filter(o => !o.lido).length, 0);
-                              if (totalObs === 0) return null;
-                              if (unreadCount > 0) {
+                        {isManual ? (
+                          <div className="text-xs space-y-0.5">
+                            <span className="font-bold text-foreground">{group.manual_descricao || '-'}</span>
+                            {group.manual_data_inicio && (
+                              <div className="text-foreground/70 text-[10px]">
+                                {format(parseISO(group.manual_data_inicio), 'dd/MM')}
+                                {group.manual_data_fim && ` → ${format(parseISO(group.manual_data_fim), 'dd/MM')}`}
+                              </div>
+                            )}
+                            {group.manual_observacao && (
+                              <div className="bg-orange-100/60 border border-orange-200 rounded px-1.5 py-0.5 text-orange-700 text-[10px]">
+                                {group.manual_observacao}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <Collapsible>
+                            <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group">
+                              <ChevronRight className="h-3 w-3 transition-transform group-data-[state=open]:rotate-90" />
+                              <span>{group.itens.length} {group.itens.length === 1 ? 'item' : 'itens'}</span>
+                              {(() => {
+                                const totalObs = group.itens.reduce((acc, item) => acc + (item.obs_corte || []).length, 0);
+                                const unreadCount = group.itens.reduce((acc, item) => acc + (item.obs_corte || []).filter(o => !o.lido).length, 0);
+                                if (totalObs === 0) return null;
+                                if (unreadCount > 0) {
+                                  return (
+                                    <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold animate-pulse">
+                                      {unreadCount} nova{unreadCount > 1 ? 's' : ''}
+                                    </span>
+                                  );
+                                }
                                 return (
-                                  <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold animate-pulse">
-                                    {unreadCount} nova{unreadCount > 1 ? 's' : ''}
+                                  <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-destructive/20 text-destructive text-[9px] font-semibold">
+                                    {totalObs} obs
                                   </span>
                                 );
-                              }
-                              return (
-                                <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-destructive/20 text-destructive text-[9px] font-semibold">
-                                  {totalObs} obs
-                                </span>
-                              );
-                            })()}
-                          </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-1.5 space-y-1.5 pl-4.5">
-                            {[...group.itens].sort((a, b) => {
-                              const aHas = (a.obs_corte || []).length > 0 ? 1 : 0;
-                              const bHas = (b.obs_corte || []).length > 0 ? 1 : 0;
-                              if (aHas !== bHas) return bHas - aHas;
-                              const aUnread = (a.obs_corte || []).some(o => !o.lido) ? 1 : 0;
-                              const bUnread = (b.obs_corte || []).some(o => !o.lido) ? 1 : 0;
-                              return bUnread - aUnread;
-                            }).map(item => {
-                              const obsCorteList = item.obs_corte || [];
-                              const hasObs = obsCorteList.length > 0;
-                              const hasUnread = obsCorteList.some(o => !o.lido);
-                              const itemBg = hasUnread
-                                ? 'bg-destructive/8 border border-destructive/30'
-                                : hasObs
-                                  ? 'bg-destructive/4 border border-destructive/15'
-                                  : '';
-                              return (
-                                <div key={item.id} className={`text-xs rounded-md p-1.5 ${itemBg}`}>
-                                  <div className="flex items-baseline gap-2 flex-wrap">
-                                    <span className="font-bold text-foreground">{item.descricao}</span>
-                                    <span className="font-semibold text-foreground/90">×{item.quantidade}</span>
-                                    {item.numero_venda && (
-                                      <span className="text-primary font-semibold font-mono text-[10px]">#{item.numero_venda}</span>
-                                    )}
-                                    {item.data_venda && (
-                                      <span className="text-foreground/70 font-semibold text-[10px]">{format(parseISO(item.data_venda), 'dd/MM')}</span>
-                                    )}
-                                    {item.lead_time_dias != null && (
-                                      <span className="text-foreground/70 font-semibold text-[10px]">{item.lead_time_dias}d</span>
-                                    )}
-                                    {item.referencia && <span className="text-foreground/70 font-semibold text-[10px]">({item.referencia})</span>}
-                                  </div>
-                                  {item.observacao_producao && (
-                                    <div className="mt-0.5 bg-warning/10 border border-warning/20 rounded px-1.5 py-0.5 text-warning text-[10px]">
-                                      {item.observacao_producao}
-                                    </div>
-                                  )}
-                                  {obsCorteList.map(obs => (
-                                    <div key={obs.id} className={`mt-1 rounded px-2 py-1.5 text-[10px] flex items-start justify-between gap-2 ${obs.lido ? 'bg-destructive/5 border border-destructive/15' : 'bg-destructive/10 border border-destructive/30'}`}>
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-1 mb-0.5">
-                                          <Scissors className={`h-3 w-3 shrink-0 ${obs.lido ? 'text-destructive/60' : 'text-destructive'}`} />
-                                          <span className={`font-semibold ${obs.lido ? 'text-destructive/60' : 'text-destructive'}`}>
-                                            {obs.lido ? 'Obs. Corte ✓' : '⚠️ Obs. Corte'}
-                                          </span>
-                                          <span className="text-muted-foreground/60 ml-auto">{format(parseISO(obs.criado_em), 'dd/MM HH:mm')}</span>
-                                        </div>
-                                        <p className={obs.lido ? 'text-destructive/70' : 'text-foreground font-medium'}>{obs.observacao}</p>
-                                      </div>
-                                      {!obs.lido && (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-6 text-[9px] px-2 shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10"
-                                          onClick={() => handleMarcarCiente(obs.id)}
-                                          disabled={markingRead.has(obs.id)}
-                                        >
-                                          {markingRead.has(obs.id) ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : 'Ciente'}
-                                        </Button>
+                              })()}
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-1.5 space-y-1.5 pl-4.5">
+                              {[...group.itens].sort((a, b) => {
+                                const aHas = (a.obs_corte || []).length > 0 ? 1 : 0;
+                                const bHas = (b.obs_corte || []).length > 0 ? 1 : 0;
+                                if (aHas !== bHas) return bHas - aHas;
+                                const aUnread = (a.obs_corte || []).some(o => !o.lido) ? 1 : 0;
+                                const bUnread = (b.obs_corte || []).some(o => !o.lido) ? 1 : 0;
+                                return bUnread - aUnread;
+                              }).map(item => {
+                                const obsCorteList = item.obs_corte || [];
+                                const hasObs = obsCorteList.length > 0;
+                                const hasUnread = obsCorteList.some(o => !o.lido);
+                                const itemBg = hasUnread
+                                  ? 'bg-destructive/8 border border-destructive/30'
+                                  : hasObs
+                                    ? 'bg-destructive/4 border border-destructive/15'
+                                    : '';
+                                return (
+                                  <div key={item.id} className={`text-xs rounded-md p-1.5 ${itemBg}`}>
+                                    <div className="flex items-baseline gap-2 flex-wrap">
+                                      <span className="font-bold text-foreground">{item.descricao}</span>
+                                      <span className="font-semibold text-foreground/90">×{item.quantidade}</span>
+                                      {item.numero_venda && (
+                                        <span className="text-primary font-semibold font-mono text-[10px]">#{item.numero_venda}</span>
                                       )}
+                                      {item.data_venda && (
+                                        <span className="text-foreground/70 font-semibold text-[10px]">{format(parseISO(item.data_venda), 'dd/MM')}</span>
+                                      )}
+                                      {item.lead_time_dias != null && (
+                                        <span className="text-foreground/70 font-semibold text-[10px]">{item.lead_time_dias}d</span>
+                                      )}
+                                      {item.referencia && <span className="text-foreground/70 font-semibold text-[10px]">({item.referencia})</span>}
                                     </div>
-                                  ))}
-                                </div>
-                              );
-                            })}
-                          </CollapsibleContent>
-                        </Collapsible>
+                                    {item.observacao_producao && (
+                                      <div className="mt-0.5 bg-warning/10 border border-warning/20 rounded px-1.5 py-0.5 text-warning text-[10px]">
+                                        {item.observacao_producao}
+                                      </div>
+                                    )}
+                                    {obsCorteList.map(obs => (
+                                      <div key={obs.id} className={`mt-1 rounded px-2 py-1.5 text-[10px] flex items-start justify-between gap-2 ${obs.lido ? 'bg-destructive/5 border border-destructive/15' : 'bg-destructive/10 border border-destructive/30'}`}>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-1 mb-0.5">
+                                            <Scissors className={`h-3 w-3 shrink-0 ${obs.lido ? 'text-destructive/60' : 'text-destructive'}`} />
+                                            <span className={`font-semibold ${obs.lido ? 'text-destructive/60' : 'text-destructive'}`}>
+                                              {obs.lido ? 'Obs. Corte ✓' : '⚠️ Obs. Corte'}
+                                            </span>
+                                            <span className="text-muted-foreground/60 ml-auto">{format(parseISO(obs.criado_em), 'dd/MM HH:mm')}</span>
+                                          </div>
+                                          <p className={obs.lido ? 'text-destructive/70' : 'text-foreground font-medium'}>{obs.observacao}</p>
+                                        </div>
+                                        {!obs.lido && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-6 text-[9px] px-2 shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10"
+                                            onClick={() => handleMarcarCiente(obs.id)}
+                                            disabled={markingRead.has(obs.id)}
+                                          >
+                                            {markingRead.has(obs.id) ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : 'Ciente'}
+                                          </Button>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })}
+                            </CollapsibleContent>
+                          </Collapsible>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -495,7 +619,7 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
           </DialogHeader>
           <div className="space-y-2 max-h-[300px] overflow-y-auto">
             {operadores.map(op => {
-              const isSelected = operadorModal.group && registros.get(groupKey(tipo, operadorModal.group))?.operador_id === op.id;
+              const isSelected = operadorModal.group && !operadorModal.group.is_manual && registros.get(groupKey(tipo, operadorModal.group))?.operador_id === op.id;
               return (
                 <Button
                   key={op.id}
@@ -531,6 +655,83 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual OP Modal */}
+      <Dialog open={manualModal} onOpenChange={setManualModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-orange-400" />
+              Nova OP Manual — {TIPO_PRODUTO_LABELS[tipo] || tipo}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Essa OP será adicionada à fila de corte com destaque em laranja.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Descrição *</Label>
+              <Input
+                placeholder="Ex: Cinto Sintético 35MM Preto..."
+                value={manualForm.descricao}
+                onChange={e => setManualForm(f => ({ ...f, descricao: e.target.value }))}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Quantidade *</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                value={manualForm.quantidade}
+                onChange={e => setManualForm(f => ({ ...f, quantidade: e.target.value }))}
+                className="mt-1 w-32"
+                min={1}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Data Início</Label>
+                <Input
+                  type="date"
+                  value={manualForm.dataInicio}
+                  onChange={e => setManualForm(f => ({ ...f, dataInicio: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Data Fim</Label>
+                <Input
+                  type="date"
+                  value={manualForm.dataFim}
+                  onChange={e => setManualForm(f => ({ ...f, dataFim: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Observação</Label>
+              <Textarea
+                placeholder="Observação opcional..."
+                value={manualForm.observacao}
+                onChange={e => setManualForm(f => ({ ...f, observacao: e.target.value }))}
+                className="mt-1 h-16"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManualModal(false)}>Cancelar</Button>
+            <Button
+              onClick={handleCriarManual}
+              disabled={!manualForm.descricao.trim() || !manualForm.quantidade || savingManual}
+              className="bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              {savingManual ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+              Criar OP Manual
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
