@@ -166,11 +166,11 @@ export default function PainelFilaPriorizada({ pedidos, onProgramarInicio, onPro
                         {/* Botão Concluir */}
                         {isProgramadoConclusao ? (
                           <Badge className="text-[10px] bg-emerald-500/15 text-emerald-700 border-emerald-300 gap-0.5">
-                            <CheckCircle className="h-3 w-3" /> Conclusão
+                            <CheckCircle className="h-3 w-3" /> {format(new Date(p.programado_conclusao_data! + 'T00:00:00'), 'dd/MM')}
                           </Badge>
                         ) : (
                           onProgramarConclusao && (
-                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-emerald-600 hover:bg-emerald-50" onClick={() => onProgramarConclusao(p)} title="Programar conclusão hoje">
+                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-emerald-600 hover:bg-emerald-50" onClick={() => onProgramarConclusao(p)} title="Programar conclusão">
                               <CalendarCheck className="h-3 w-3 mr-0.5" /> Conclusão
                             </Button>
                           )
