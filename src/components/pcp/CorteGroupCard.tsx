@@ -40,13 +40,23 @@ interface CorteGroupCardProps {
   filterLargura: string;
   onFilterLarguraChange: (v: string) => void;
   larguras: string[];
+  janelaDias: number | null;
+  onJanelaDiasChange: (v: number | null) => void;
 }
+
+const JANELA_OPTIONS: { label: string; value: string }[] = [
+  { label: 'Padrão', value: 'padrao' },
+  { label: 'Mesmo dia', value: '0' },
+  { label: '2 dias', value: '2' },
+  { label: '3 dias', value: '3' },
+  { label: '5 dias', value: '5' },
+];
 
 function groupKey(tipo: string, g: CutGroup) {
-  return `${tipo}|${g.largura}|${g.material}|${g.tamanho}|${g.cor}`;
+  return `${tipo}|${g.largura}|${g.material}|${g.tamanho}|${g.cor}${g.faixa_data ? '|' + g.faixa_data : ''}`;
 }
 
-export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLarguraChange, larguras }: CorteGroupCardProps) {
+export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLarguraChange, larguras, janelaDias, onJanelaDiasChange }: CorteGroupCardProps) {
   const { profile } = useAuth();
   const [search, setSearch] = useState('');
   const [registros, setRegistros] = useState<Map<string, CorteRegistro>>(new Map());
