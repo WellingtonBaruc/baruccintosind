@@ -79,10 +79,10 @@ export default function PainelDia() {
       });
     }
 
-    const capHoje = capacidadesDiarias.get(hoje) || capPadrao;
+    const capHoje = capacidadesDiarias.get(hoje) || capPadraoValues;
     setCapacidadeHoje(capHoje);
     setCalData(cal);
-    setCapPadrao(capPadrao);
+    setCapPadrao(capPadraoValues);
 
     // Load active orders with pedidos — filter final statuses server-side to avoid 1000-row limit
     const { data: ordensRaw } = await supabase
