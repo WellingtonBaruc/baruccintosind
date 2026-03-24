@@ -726,8 +726,10 @@ export default function KanbanProducao() {
   const canSendToComercial = (card: KanbanCard) => {
     const alreadySent = ['AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL', 
       'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA',
-      'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO'].includes(card.pedido_status);
-    return card.ordem_status === 'CONCLUIDA' && !alreadySent && isSupervisor;
+      'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO',
+      'AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO', 'LOJA_OK'].includes(card.pedido_status);
+    const hasPermission = isSupervisor || profile?.perfil === 'operador_producao';
+    return !alreadySent && hasPermission;
   };
 
   const handleEnviarParaComercial = async (card: KanbanCard) => {
