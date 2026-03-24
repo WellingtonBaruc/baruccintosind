@@ -164,12 +164,13 @@ export default function PainelDia() {
         if (diffDias < 0) diasAtraso = Math.abs(diffDias);
       }
 
-      // Accumulate daily load based on ideal start date
-      if (dataInicioIdeal && o.status !== 'CONCLUIDA') {
+      // Accumulate daily load — use programmed date if set, otherwise ideal date
+      const dataParaCarga = o.programado_inicio_data || dataInicioIdeal;
+      if (dataParaCarga && o.status !== 'CONCLUIDA') {
         const tipoKey = tipo as 'SINTETICO' | 'TECIDO';
-        const existing = cargasPorDia.get(dataInicioIdeal) || { sintetico: 0, tecido: 0 };
+        const existing = cargasPorDia.get(dataParaCarga) || { sintetico: 0, tecido: 0 };
         existing[tipoKey === 'SINTETICO' ? 'sintetico' : 'tecido'] += qtdMap[p.id] || 1;
-        cargasPorDia.set(dataInicioIdeal, existing);
+        cargasPorDia.set(dataParaCarga, existing);
       }
 
       const pedidoPainel: PedidoPainelDia = {
