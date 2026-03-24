@@ -1,4 +1,4 @@
-import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, Columns3, ShoppingBag, BarChart3, Package, LayoutGrid } from 'lucide-react';
+import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, Columns3, ShoppingBag, BarChart3, Package, LayoutGrid, PlusCircle } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {
@@ -32,7 +32,9 @@ const navItems: NavItem[] = [
 
   // Operador — only kanban (above)
 
-  // Comercial / Financeiro / Logística → agora usam Kanban Venda (já incluído acima)
+  // Comercial
+  { title: 'Nova Venda', url: '/comercial/nova-venda', icon: PlusCircle, perfis: ['comercial'] },
+  { title: 'Para Validar', url: '/comercial', icon: ShoppingBag, perfis: ['comercial'] },
 
   // Loja
   { title: 'Verificar Pedidos', url: '/loja', icon: Store, perfis: ['loja'] },
