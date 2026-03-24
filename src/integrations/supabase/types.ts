@@ -1412,6 +1412,7 @@ export type Database = {
         | "FINALIZADO_SIMPLIFICA"
         | "HISTORICO"
         | "AGUARDANDO_CIENCIA_COMERCIAL"
+        | "LOJA_PENDENTE_FINALIZACAO"
       tipo_acao_historico:
         | "TRANSICAO"
         | "EDICAO"
@@ -1587,6 +1588,7 @@ export const Constants = {
         "FINALIZADO_SIMPLIFICA",
         "HISTORICO",
         "AGUARDANDO_CIENCIA_COMERCIAL",
+        "LOJA_PENDENTE_FINALIZACAO",
       ],
       tipo_acao_historico: [
         "TRANSICAO",

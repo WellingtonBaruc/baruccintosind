@@ -203,14 +203,15 @@ export default function AlmoxarifadoPage() {
         const allOpsDone = !ops || ops.length === 0 || ops.every(o => o.aprovado_em !== null);
 
         if (allOpsDone) {
-          await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', venda.pedido_id);
+          // All resolved — return to Loja for finalization (NEVER auto-advance to Comercial)
+          await supabase.from('pedidos').update({ status_atual: 'LOJA_PENDENTE_FINALIZACAO' }).eq('id', venda.pedido_id);
           await supabase.from('pedido_historico').insert({
             pedido_id: venda.pedido_id,
             usuario_id: profile.id,
             tipo_acao: 'TRANSICAO' as any,
             status_anterior: 'AGUARDANDO_ALMOXARIFADO',
-            status_novo: 'AGUARDANDO_COMERCIAL',
-            observacao: 'Fivelas separadas e pendências resolvidas. Pedido encaminhado para comercial automaticamente.',
+            status_novo: 'LOJA_PENDENTE_FINALIZACAO',
+            observacao: 'Fivelas separadas e pendências resolvidas. Aguardando finalização pela Loja.',
           });
         } else {
           // Almox done but OP still pending — move to AGUARDANDO_OP_COMPLEMENTAR

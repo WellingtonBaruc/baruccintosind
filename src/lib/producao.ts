@@ -269,15 +269,15 @@ export async function aprovarOrdem(ordemId: string, pedidoId: string, supervisor
       solicitacoes.every(s => s.status === 'ATENDIDA' || s.status === 'ATENDIDO');
 
     if (allSolResolved) {
-      // All resolved — auto-advance to AGUARDANDO_COMERCIAL
-      await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', pedidoId);
+      // All resolved — return to Loja for finalization (NEVER auto-advance to Comercial)
+      await supabase.from('pedidos').update({ status_atual: 'LOJA_PENDENTE_FINALIZACAO' }).eq('id', pedidoId);
       await supabase.from('pedido_historico').insert({
         pedido_id: pedidoId,
         usuario_id: supervisorId,
         tipo_acao: 'TRANSICAO',
         status_anterior: 'AGUARDANDO_OP_COMPLEMENTAR',
-        status_novo: 'AGUARDANDO_COMERCIAL',
-        observacao: 'OP complementar aprovada. Pedido encaminhado para comercial automaticamente.',
+        status_novo: 'LOJA_PENDENTE_FINALIZACAO',
+        observacao: 'OP complementar aprovada e pendências resolvidas. Aguardando finalização pela Loja.',
       });
     } else {
       // OP done but almox pending — move to AGUARDANDO_ALMOXARIFADO
@@ -355,6 +355,7 @@ export const STATUS_PEDIDO_CONFIG: Record<string, { label: string; color: string
   AGUARDANDO_OP_COMPLEMENTAR: { label: 'Aguardando OP Complementar', color: 'bg-warning/15 text-warning' },
   AGUARDANDO_ALMOXARIFADO: { label: 'Aguardando Almoxarifado', color: 'bg-warning/15 text-warning' },
   LOJA_OK: { label: 'Loja OK', color: 'bg-success/15 text-success' },
+  LOJA_PENDENTE_FINALIZACAO: { label: 'Aguardando Finalização da Loja', color: 'bg-orange-500/15 text-orange-600' },
   AGUARDANDO_COMERCIAL: { label: 'Aguardando Comercial', color: 'bg-warning/15 text-warning' },
   VALIDADO_COMERCIAL: { label: 'Validado Comercial', color: 'bg-success/15 text-success' },
   AGUARDANDO_FINANCEIRO: { label: 'Aguardando Financeiro', color: 'bg-warning/15 text-warning' },

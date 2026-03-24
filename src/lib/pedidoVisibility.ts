@@ -24,6 +24,7 @@ export const STATUS_POS_PRODUCAO = [
 export const STATUS_LOJA = [
   'AGUARDANDO_LOJA', 'LOJA_VERIFICANDO',
   'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO',
+  'LOJA_PENDENTE_FINALIZACAO',
 ] as const;
 
 /** Statuses that should NOT appear in loja screens (post-loja + production) */
