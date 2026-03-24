@@ -735,16 +735,44 @@ export default function KanbanProducao() {
   const handleEnviarParaComercial = async (card: KanbanCard) => {
     if (!profile) return;
     try {
-      // Verify all orders for this pedido are CONCLUIDA
+      // Fetch all orders with their etapas to check effective completion
       const { data: allOrdens } = await supabase
         .from('ordens_producao')
-        .select('id, status')
+        .select('id, status, tipo_produto, op_etapas(id, nome_etapa, status, ordem_sequencia)')
         .eq('pedido_id', card.pedido_id);
-      
-      const allConcluidas = allOrdens?.every(o => o.status === 'CONCLUIDA');
-      if (!allConcluidas) {
-        toast.error('Ainda existem ordens em andamento para este pedido.');
+
+      if (!allOrdens) {
+        toast.error('Erro ao verificar ordens do pedido.');
         return;
+      }
+
+      // For each ordem not yet CONCLUIDA, check if it's effectively done
+      for (const ordem of allOrdens) {
+        if (ordem.status === 'CONCLUIDA') continue;
+
+        const etapas = (ordem as any).op_etapas as Array<{ id: string; nome_etapa: string; status: string; ordem_sequencia: number }> || [];
+        // Find the current active or last etapa
+        const sorted = [...etapas].sort((a, b) => a.ordem_sequencia - b.ordem_sequencia);
+        const activeEtapa = sorted.find(e => e.status === 'EM_ANDAMENTO') || sorted[sorted.length - 1];
+        
+        const effectiveColumn = activeEtapa 
+          ? mapEtapaToColumn(activeEtapa.nome_etapa, activeEtapa.status, ordem.status, ordem.tipo_produto || undefined)
+          : null;
+
+        if (effectiveColumn === 'Concluído' || sorted.every(e => e.status === 'CONCLUIDA')) {
+          // Auto-conclude this ordem and its pending etapas
+          await supabase.from('ordens_producao').update({ status: 'CONCLUIDA' }).eq('id', ordem.id);
+          const pendingEtapas = etapas.filter(e => e.status !== 'CONCLUIDA');
+          for (const pe of pendingEtapas) {
+            await supabase.from('op_etapas').update({ 
+              status: 'CONCLUIDA', 
+              concluido_em: new Date().toISOString() 
+            }).eq('id', pe.id);
+          }
+        } else {
+          toast.error('Ainda existem ordens em andamento para este pedido.');
+          return;
+        }
       }
 
       await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', card.pedido_id);
