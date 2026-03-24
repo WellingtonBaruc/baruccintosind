@@ -1,27 +1,82 @@
 
 
-## Problem
+# Importacao via Planilha — Plano
 
-The "Enviar para o Comercial" button appears on cards in the "Concluído" column, but clicking it fails with "Ainda existem ordens em andamento para este pedido." This happens because a card can land in the "Concluído" column when its current etapa is "Produção Finalizada" — even though the `ordens_producao.status` is still `EM_ANDAMENTO`, not `CONCLUIDA`.
+## Resumo
 
-The validation at line 744 checks `allOrdens?.every(o => o.status === 'CONCLUIDA')`, which fails for these cases.
+Adicionar na tela de Integracao um card para upload de planilha XLSX (formato do relatorio Simplifica). O sistema faz importacao inteligente: vendas novas entram, vendas ja existentes so atualizam se a Situacao ou itens mudaram, e vendas sem alteracao sao ignoradas. Como a planilha nao tem data prevista, o sistema calcula automaticamente usando o lead time do produto e sinaliza em vermelho que foi importada sem data prevista.
 
-## Solution
+## Mapeamento Planilha → Sistema
 
-Update `handleEnviarParaComercial` to treat orders whose last etapa is "Produção Finalizada" (or equivalent) as effectively concluded, rather than strictly requiring `status === 'CONCLUIDA'`.
+```text
+Planilha              →  Sistema (pedidos / pedido_itens)
+─────────────────────────────────────────────────────────
+# Venda               →  api_venda_id (chave de dedup)
+Cliente               →  cliente_nome
+Data                   →  data_venda_api
+Origem Venda          →  canal_venda
+Situação              →  status_api
+Consultor             →  vendedor_nome
+Observação            →  observacao_api
+Total(R$) [venda]     →  valor_liquido / valor_bruto
+REF.                  →  referencia_produto
+Produto               →  descricao_produto
+Medidas               →  (ignorado se vazio)
+Qtde                  →  quantidade
+Unit.(R$)             →  valor_unitario
+Total(R$) [item]      →  valor_total
+(ausente)             →  data_previsao_entrega = hoje + lead_time
+```
 
-### Changes in `src/pages/KanbanProducao.tsx`
+## Logica de Importacao Inteligente
 
-1. **Relax the all-concluded check**: Instead of only checking `ordens_producao.status === 'CONCLUIDA'`, also fetch each order's etapas and consider an order "done" if its current active etapa maps to the "Concluído" column (i.e., etapa name is "Produção Finalizada" or ordem status is "CONCLUIDA").
+1. **Agrupar linhas por # Venda** — cada # Venda unico = 1 pedido com N itens
+2. **Verificar se ja existe** — consultar `pedidos` WHERE `api_venda_id = #Venda`
+3. **Se NAO existe** → criar pedido + itens + ordens de producao (mesma logica do sync-simplifica)
+4. **Se JA existe**:
+   - Comparar `status_api` atual vs `Situação` da planilha → se mudou, atualizar
+   - Comparar itens (por referencia+descricao+quantidade) → se mudou, atualizar itens e recriar ordens se necessario
+   - Se nada mudou → ignorar (contabilizar como "ignorado")
+5. **Data prevista**: buscar lead time do `pcp_lead_times` pelo tipo classificado do produto, somar dias uteis a partir de hoje usando o calendario PCP. Marcar campo `importado_sem_data_prevista` (novo campo ou usar convencao existente).
 
-2. **Auto-mark ordem as CONCLUIDA**: When the card's etapa is "Produção Finalizada" but ordem status hasn't been updated yet, automatically update the ordem status to `CONCLUIDA` and mark remaining etapas as `CONCLUIDA` before transitioning to comercial. This keeps data consistent.
+## Sinalizacao Visual (Vermelho)
 
-### Implementation detail
+- Pedidos importados sem data prevista terao a `data_previsao_entrega` calculada pelo lead time mas serao sinalizados:
+  - Opcao: usar `observacao_api` com prefixo "[SEM DATA PREVISTA]" ou adicionar campo booleano
+  - Na Fila Mestre e KanbanProducao, mostrar badge/indicador vermelho quando detectar esse marcador
 
-In `handleEnviarParaComercial`:
-- Fetch all ordens for the pedido along with their etapas
-- For each ordem not yet `CONCLUIDA`, check if its current etapa maps to "Concluído" column
-- If so, auto-conclude that ordem (update status + etapas)
-- If any ordem is genuinely still in progress (not in final etapa), show the error
-- Otherwise proceed with the comercial transition
+## Alteracoes
+
+### 1. `src/pages/Integracao.tsx`
+- Adicionar novo Card "Importacao via Planilha" com:
+  - Input file (.xlsx)
+  - Botao "Processar Planilha"
+  - Preview dos dados agrupados por venda antes de importar
+  - Resumo: X novas, Y atualizadas, Z ignoradas
+  - Botao "Confirmar Importacao"
+- Usar biblioteca `xlsx` (SheetJS) para ler o arquivo no frontend
+- Implementar toda a logica de dedup e classificacao client-side
+- Reusar `detectOrderTypes` ja existente na mesma pagina
+
+### 2. Dependencia
+- Instalar `xlsx` (SheetJS) via package.json
+
+### 3. Logica de calculo da data prevista
+- Buscar `pcp_lead_times`, `pcp_config_semana`, `pcp_feriados`, `pcp_pausas` 
+- Usar `adicionarDiasUteis` de `src/lib/pcpCalendario.ts` para calcular `data_previsao_entrega = hoje + lead_time`
+- Salvar `observacao_api` com marcador "[IMPORTADO SEM DATA PREVISTA]" para rastreabilidade
+
+### 4. Sinalizacao visual nas filas
+- Na Fila Mestre e Kanban, detectar pedidos com observacao contendo "[IMPORTADO SEM DATA PREVISTA]" e renderizar badge vermelho
+
+### 5. Log de importacao
+- Registrar na tabela `integracao_logs` com tipo = 'PLANILHA' os totais de recebidos, inseridos, atualizados, ignorados
+
+## Fluxo do Usuario
+
+1. Admin acessa Integracao
+2. Clica em "Selecionar Planilha" e escolhe o .xlsx
+3. Sistema processa e mostra preview: lista de vendas com status (Nova / Atualizar / Ignorar)
+4. Usuario confirma
+5. Sistema importa, gera ordens, calcula datas e mostra resumo final
 
