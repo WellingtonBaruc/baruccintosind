@@ -309,10 +309,27 @@ export default function KanbanProducao() {
         corte_ok: (() => {
           const items = pedidoTipoItems.get(`${pedidoId}|${tipoProduto}`) || [];
           if (items.length === 0) return false;
-          return items.every(desc => {
+          const uniqueKeys = new Set(items.map(desc => {
             const attrs = extrairAtributosProduto(desc);
-            return corteConcluidoKeys.has(`${tipoProduto}|${attrs.largura}|${attrs.material}|${attrs.tamanho}|${attrs.cor}`);
-          });
+            return `${tipoProduto}|${attrs.largura}|${attrs.material}|${attrs.tamanho}|${attrs.cor}`;
+          }));
+          return [...uniqueKeys].every(k => corteConcluidoKeys.has(k));
+        })(),
+        corte_concluidos: (() => {
+          const items = pedidoTipoItems.get(`${pedidoId}|${tipoProduto}`) || [];
+          const uniqueKeys = new Set(items.map(desc => {
+            const attrs = extrairAtributosProduto(desc);
+            return `${tipoProduto}|${attrs.largura}|${attrs.material}|${attrs.tamanho}|${attrs.cor}`;
+          }));
+          return [...uniqueKeys].filter(k => corteConcluidoKeys.has(k)).length;
+        })(),
+        corte_total: (() => {
+          const items = pedidoTipoItems.get(`${pedidoId}|${tipoProduto}`) || [];
+          const uniqueKeys = new Set(items.map(desc => {
+            const attrs = extrairAtributosProduto(desc);
+            return `${tipoProduto}|${attrs.largura}|${attrs.material}|${attrs.tamanho}|${attrs.cor}`;
+          }));
+          return uniqueKeys.size;
         })(),
       };
     });
