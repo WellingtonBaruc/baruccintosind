@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { format, parseISO } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Navigate } from 'react-router-dom';
@@ -26,7 +27,7 @@ export default function PCP() {
     // Get all SINTETICO orders that have a Corte step in EM_ANDAMENTO or PENDENTE
     const { data: ordens } = await supabase
       .from('ordens_producao')
-      .select('id, pedido_id, tipo_produto, pedidos!inner(numero_pedido, cliente_nome, status_prazo, status_atual)')
+      .select('id, pedido_id, tipo_produto, pedidos!inner(numero_pedido, api_venda_id, cliente_nome, status_prazo, status_atual, data_venda_api, lead_time_preparacao_dias)')
       .eq('tipo_produto', 'SINTETICO')
       .in('status', ['EM_ANDAMENTO', 'AGUARDANDO'])
       .eq('pedidos.status_atual', 'EM_PRODUCAO');
@@ -56,19 +57,38 @@ export default function PCP() {
       .select('id, pedido_id, descricao_produto, referencia_produto, observacao_producao, quantidade')
       .in('pedido_id', pedidoIds);
 
+    // Build pedido lookup from ordens
+    const pedidoMap = new Map<string, { numero_venda: string | null; data_venda: string | null; lead_time_dias: number | null }>();
+    for (const o of ordens) {
+      const p = o.pedidos as any;
+      if (p && !pedidoMap.has(o.pedido_id)) {
+        pedidoMap.set(o.pedido_id, {
+          numero_venda: p.api_venda_id || p.numero_pedido,
+          data_venda: p.data_venda_api,
+          lead_time_dias: p.lead_time_preparacao_dias,
+        });
+      }
+    }
+
     // Filter only SINTETICO items
     const sinteticoItens: CutGroupItem[] = (itens || [])
       .filter(i => {
         const upper = (i.descricao_produto || '').toUpperCase();
         return upper.includes('CINTO SINTETICO') || upper.includes('TIRA SINTETICO') || upper.includes('CINTO SINTÉTICO') || upper.includes('TIRA SINTÉTICO');
       })
-      .map(i => ({
-        id: i.id,
-        descricao: i.descricao_produto,
-        referencia: i.referencia_produto,
-        observacao_producao: i.observacao_producao,
-        quantidade: i.quantidade,
-      }));
+      .map(i => {
+        const info = pedidoMap.get(i.pedido_id);
+        return {
+          id: i.id,
+          descricao: i.descricao_produto,
+          referencia: i.referencia_produto,
+          observacao_producao: i.observacao_producao,
+          quantidade: i.quantidade,
+          numero_venda: info?.numero_venda || null,
+          data_venda: info?.data_venda || null,
+          lead_time_dias: info?.lead_time_dias || null,
+        };
+      });
 
     setCutGroups(agruparParaCorte(sinteticoItens));
 
@@ -177,10 +197,19 @@ export default function PCP() {
                     <TableCell>
                       <div className="space-y-1">
                         {group.itens.map(item => (
-                          <div key={item.id} className="text-xs">
+                          <div key={item.id} className="text-xs flex items-baseline gap-2 flex-wrap">
                             <span className="text-muted-foreground">{item.descricao}</span>
-                            <span className="ml-2 font-medium">×{item.quantidade}</span>
-                            {item.referencia && <span className="ml-1 text-muted-foreground/70">({item.referencia})</span>}
+                            <span className="font-medium">×{item.quantidade}</span>
+                            {item.numero_venda && (
+                              <span className="text-primary/80 font-mono text-[10px]">#{item.numero_venda}</span>
+                            )}
+                            {item.data_venda && (
+                              <span className="text-muted-foreground/70 text-[10px]">{format(parseISO(item.data_venda), 'dd/MM')}</span>
+                            )}
+                            {item.lead_time_dias != null && (
+                              <span className="text-muted-foreground/70 text-[10px]">{item.lead_time_dias}d</span>
+                            )}
+                            {item.referencia && <span className="text-muted-foreground/70 text-[10px]">({item.referencia})</span>}
                             {item.observacao_producao && (
                               <div className="mt-0.5 bg-warning/10 border border-warning/20 rounded px-1.5 py-0.5 text-warning text-[10px]">
                                 {item.observacao_producao}
