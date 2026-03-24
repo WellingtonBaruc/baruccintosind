@@ -185,6 +185,9 @@ export default function PainelDia() {
         etiqueta,
         score_prioridade: 0,
         ordem_status: o.status,
+        programado_inicio_data: (o as any).programado_inicio_data || null,
+        programado_conclusao_data: (o as any).programado_conclusao_data || null,
+        pedido_id: p.id,
       };
 
       return pedidoPainel;
