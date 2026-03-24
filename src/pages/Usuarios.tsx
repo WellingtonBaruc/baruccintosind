@@ -288,8 +288,6 @@ export default function Usuarios() {
                       Nenhum usuário cadastrado.
                     </TableCell>
                   </TableRow>
-                    </TableCell>
-                  </TableRow>
                 )}
               </TableBody>
             </Table>
