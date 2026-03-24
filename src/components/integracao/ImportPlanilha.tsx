@@ -48,6 +48,30 @@ const PIPELINE_IDS: Record<string, string> = {
   FIVELA_COBERTA: '00000000-0000-0000-0000-000000000003',
 };
 
+function parseNumericValue(val: any): number {
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const str = String(val || '0').replace(/[^\d.,-]/g, '').replace(',', '.');
+  const num = Number(str);
+  return isNaN(num) ? 0 : num;
+}
+
+function parseExcelDate(val: any): string | null {
+  if (!val) return null;
+  if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString().slice(0, 10);
+  const s = String(val).trim();
+  const parts = s.split('/');
+  if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  // Excel serial number
+  const num = Number(s);
+  if (!isNaN(num) && num > 40000 && num < 60000) {
+    const d = new Date((num - 25569) * 86400000);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return null;
+}
+
 export default function ImportPlanilha() {
   const { profile } = useAuth();
   const [vendas, setVendas] = useState<ParsedVenda[]>([]);
@@ -74,15 +98,20 @@ export default function ImportPlanilha() {
 
     try {
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      // Detect duplicate header keys (SheetJS appends _1, _2 for dupes)
+      const firstRowKeys = rows.length > 0 ? Object.keys(rows[0]) : [];
+      const itemTotalKey = firstRowKeys.find(k => k.startsWith('Total(R$)') && k !== 'Total(R$)') || 'Total(R$)_1';
 
       // Group rows by # Venda
       const vendaMap = new Map<string, { venda: any; itens: ParsedItem[] }>();
       for (const row of rows) {
-        const numVenda = String(row['# Venda'] || row['#Venda'] || row['# venda'] || '').trim();
-        if (!numVenda) continue;
+        const rawVenda = row['# Venda'] ?? row['#Venda'] ?? row['# venda'] ?? '';
+        const numVenda = String(typeof rawVenda === 'number' ? Math.round(rawVenda) : rawVenda).trim();
+        if (!numVenda || numVenda === '0') continue;
 
         if (!vendaMap.has(numVenda)) {
           vendaMap.set(numVenda, {
@@ -93,9 +122,10 @@ export default function ImportPlanilha() {
 
         const ref = String(row['REF.'] || row['Ref.'] || row['REF'] || row['ref'] || '').trim();
         const desc = String(row['Produto'] || row['produto'] || '').trim();
-        const qtd = Number(row['Qtde'] || row['qtde'] || row['Qtd'] || 0);
-        const unitario = Number(String(row['Unit.(R$)'] || row['Unit.'] || row['Unitário'] || row['unitario'] || 0).toString().replace(',', '.'));
-        const total = Number(String(row['Total(R$)'] || row['Total'] || 0).toString().replace(',', '.'));
+        const qtd = Math.round(Number(row['Qtde'] || row['qtde'] || row['Qtd'] || 0)) || 1;
+        const unitario = parseNumericValue(row['Unit.(R$)'] || row['Unit.'] || row['Unitário'] || row['unitario'] || 0);
+        // Use the ITEM-level Total column (second occurrence), not the venda-level one
+        const total = parseNumericValue(row[itemTotalKey] || row['Total'] || 0);
         const medidas = String(row['Medidas'] || row['medidas'] || '').trim();
 
         if (desc) {
@@ -103,9 +133,9 @@ export default function ImportPlanilha() {
             referencia: ref,
             descricao: desc,
             medidas,
-            quantidade: qtd || 1,
+            quantidade: qtd,
             valorUnitario: unitario,
-            valorTotal: total || unitario * (qtd || 1),
+            valorTotal: total || unitario * qtd,
           });
         }
       }
@@ -263,39 +293,29 @@ export default function ImportPlanilha() {
           const dataPrevista = adicionarDiasUteis(new Date(hoje), maxLeadTime, cal);
           const dataPrevistaStr = dataPrevista.toISOString().slice(0, 10);
 
-          // Parse data venda
-          let dataVendaApi: string | null = null;
-          if (venda.data) {
-            // Try dd/mm/yyyy format
-            const parts = venda.data.split('/');
-            if (parts.length === 3) {
-              dataVendaApi = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            } else {
-              // Try ISO or other format
-              const d = new Date(venda.data);
-              if (!isNaN(d.getTime())) dataVendaApi = d.toISOString().slice(0, 10);
-            }
-          }
+          const dataVendaApi = parseExcelDate(venda.data);
 
           if (venda.status === 'NOVA') {
             // Create new pedido
             const { data: newPedido, error: pedidoErr } = await supabase.from('pedidos').insert({
               numero_pedido: `V-${venda.numVenda}`,
               api_venda_id: venda.numVenda,
-              cliente_nome: venda.cliente,
+              cliente_nome: venda.cliente || 'Cliente não informado',
               data_venda_api: dataVendaApi,
               canal_venda: venda.origemVenda || null,
               status_api: venda.situacao || null,
               vendedor_nome: venda.consultor || null,
               observacao_api: `[IMPORTADO SEM DATA PREVISTA] ${venda.observacao || ''}`.trim(),
-              valor_bruto: venda.totalVenda,
-              valor_liquido: venda.totalVenda,
+              valor_bruto: venda.totalVenda || 0,
+              valor_desconto: 0,
+              valor_liquido: venda.totalVenda || 0,
               data_previsao_entrega: dataPrevistaStr,
               status_atual: 'EM_PRODUCAO' as any,
               tipo_fluxo: 'PRODUCAO',
             }).select().single();
 
             if (pedidoErr || !newPedido) {
+              console.error(`Erro ao inserir pedido V-${venda.numVenda}:`, pedidoErr);
               res.erros++;
               continue;
             }
@@ -423,7 +443,8 @@ export default function ImportPlanilha() {
 
             res.atualizados++;
           }
-        } catch {
+        } catch (err: any) {
+          console.error(`Erro ao importar venda ${venda.numVenda}:`, err);
           res.erros++;
         }
       }
