@@ -10,9 +10,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2 } from 'lucide-react';
-import { CutGroup, TIPO_PRODUTO_LABELS } from '@/lib/pcp';
+import { CutGroup, TIPO_PRODUTO_LABELS, ObsCorte } from '@/lib/pcp';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 interface CorteRegistro {
   id: string;
@@ -46,6 +47,7 @@ function groupKey(tipo: string, g: CutGroup) {
 }
 
 export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLarguraChange, larguras }: CorteGroupCardProps) {
+  const { profile } = useAuth();
   const [search, setSearch] = useState('');
   const [registros, setRegistros] = useState<Map<string, CorteRegistro>>(new Map());
   const [operadores, setOperadores] = useState<Operador[]>([]);
@@ -53,6 +55,7 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   const [novoOperadorNome, setNovoOperadorNome] = useState('');
   const [savingOperador, setSavingOperador] = useState(false);
   const [actionLoading, setActionLoading] = useState<Set<string>>(new Set());
+  const [markingRead, setMarkingRead] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchRegistros();
