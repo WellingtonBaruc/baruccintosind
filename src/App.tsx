@@ -23,6 +23,7 @@ import RegistroEnvio from "./pages/RegistroEnvio";
 import Integracao from "./pages/Integracao";
 import PCP from "./pages/PCP";
 import DashboardComercial from "./pages/DashboardComercial";
+import NovaVendaComercial from "./pages/NovaVendaComercial";
 import DashboardFinanceiro from "./pages/DashboardFinanceiro";
 import DashboardLoja from "./pages/DashboardLoja";
 import CurvaABC from "./pages/CurvaABC";
@@ -69,6 +70,7 @@ const App = () => (
 
               {/* Role dashboards for specific profiles */}
               <Route path="/comercial" element={<DashboardComercial />} />
+              <Route path="/comercial/nova-venda" element={<NovaVendaComercial />} />
               <Route path="/painel-financeiro" element={<DashboardFinanceiro />} />
               <Route path="/painel-loja" element={<DashboardLoja />} />
 
