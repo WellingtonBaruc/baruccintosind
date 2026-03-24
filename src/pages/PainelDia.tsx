@@ -77,7 +77,7 @@ export default function PainelDia() {
     const capHoje = capacidadesDiarias.get(hoje) || capPadrao;
     setCapacidadeHoje(capHoje);
 
-    // Load active orders with pedidos
+    // Load active orders with pedidos — filter final statuses server-side to avoid 1000-row limit
     const { data: ordensRaw } = await supabase
       .from('ordens_producao')
       .select(`
@@ -88,15 +88,16 @@ export default function PainelDia() {
         )
       `)
       .in('tipo_produto', ['SINTETICO', 'TECIDO'])
-      .not('status', 'eq', 'CANCELADA');
+      .not('status', 'eq', 'CANCELADA')
+      .not('pedidos.status_atual', 'in', `(${STATUS_FINAIS.join(',')})`)
+      .not('status', 'eq', 'CONCLUIDA');
 
     if (!ordensRaw) {
       setLoading(false);
       return;
     }
 
-    // Filter out orders with final pedido status
-    const ordens = ordensRaw.filter((o: any) => !STATUS_FINAIS.includes(o.pedidos.status_atual));
+    const ordens = ordensRaw;
 
     // Get current etapa for each ordem
     const ordemIds = ordens.map((o: any) => o.id);
