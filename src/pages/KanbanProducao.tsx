@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { concluirEtapa, iniciarEtapa } from '@/lib/producao';
-import { TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
+import { TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE, extrairAtributosProduto, classificarProduto } from '@/lib/pcp';
 import { calcularPrazoPcp, PcpCalendarData } from '@/lib/pcpCalendario';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,7 @@ interface KanbanCard {
   fivela_coberta_status: string | null;
   programado_inicio_data: string | null;
   programado_conclusao_data: string | null;
+  corte_ok: boolean;
 }
 
 // Unified columns
@@ -200,11 +201,31 @@ export default function KanbanProducao() {
 
     const pedidoIds = [...new Set(visibleEtapas.map((e: any) => e.ordens_producao.pedido_id))];
 
-    const [itensRes, allOrdensRes, perdasRes] = await Promise.all([
+    const [itensRes, allOrdensRes, perdasRes, corteRegistrosRes] = await Promise.all([
       supabase.from('pedido_itens').select('pedido_id, quantidade, categoria_produto, descricao_produto').in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
       supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status').in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
       supabase.from('ordem_perdas').select('ordem_id, status').eq('status', 'PENDENTE_CONFIRMACAO'),
+      supabase.from('pcp_corte_registro').select('tipo_produto, largura, material, tamanho, cor, status').eq('status', 'CONCLUIDO'),
     ]);
+
+    // Build set of completed corte group keys
+    const corteConcluidoKeys = new Set<string>();
+    for (const r of (corteRegistrosRes.data || [])) {
+      corteConcluidoKeys.add(`${r.tipo_produto}|${r.largura}|${r.material}|${r.tamanho}|${r.cor}`);
+    }
+
+    // Build map: pedido_id+tipo -> list of item descriptions for corte check
+    const pedidoTipoItems = new Map<string, string[]>();
+    for (const item of (itensRes.data || [])) {
+      const desc = item.descricao_produto || '';
+      const tipo = classificarProduto(desc);
+      if (tipo === 'SINTETICO' || tipo === 'TECIDO') {
+        const key = `${item.pedido_id}|${tipo}`;
+        const list = pedidoTipoItems.get(key) || [];
+        list.push(desc);
+        pedidoTipoItems.set(key, list);
+      }
+    }
 
     const sinteticoMap = new Map<string, string>();
     const sinteticoExistsForPedido = new Set<string>();
@@ -283,6 +304,14 @@ export default function KanbanProducao() {
         fivela_coberta_status: e.ordens_producao.fivela_coberta_status || null,
         programado_inicio_data: (e.ordens_producao as any).programado_inicio_data || null,
         programado_conclusao_data: (e.ordens_producao as any).programado_conclusao_data || null,
+        corte_ok: (() => {
+          const items = pedidoTipoItems.get(`${pedidoId}|${tipoProduto}`) || [];
+          if (items.length === 0) return false;
+          return items.every(desc => {
+            const attrs = extrairAtributosProduto(desc);
+            return corteConcluidoKeys.has(`${tipoProduto}|${attrs.largura}|${attrs.material}|${attrs.tamanho}|${attrs.cor}`);
+          });
+        })(),
       };
     });
 
@@ -969,6 +998,12 @@ export default function KanbanProducao() {
                                 {card.is_piloto && (
                                   <Badge className={`mt-1.5 text-[10px] ${card.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
                                     {card.status_piloto === 'REPROVADO' ? 'PILOTO REPROVADO' : 'PILOTO'}
+                                  </Badge>
+                                )}
+
+                                {card.corte_ok && (
+                                  <Badge className="mt-1.5 text-[10px] bg-blue-500 text-white border-blue-600 font-bold">
+                                    Corte OK
                                   </Badge>
                                 )}
 

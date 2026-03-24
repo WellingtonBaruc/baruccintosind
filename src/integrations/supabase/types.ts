@@ -549,6 +549,56 @@ export type Database = {
           },
         ]
       }
+      pcp_corte_registro: {
+        Row: {
+          concluido_em: string | null
+          cor: string
+          criado_em: string
+          id: string
+          iniciado_em: string | null
+          largura: string
+          material: string
+          operador_id: string | null
+          status: string
+          tamanho: string
+          tipo_produto: string
+        }
+        Insert: {
+          concluido_em?: string | null
+          cor: string
+          criado_em?: string
+          id?: string
+          iniciado_em?: string | null
+          largura: string
+          material: string
+          operador_id?: string | null
+          status?: string
+          tamanho: string
+          tipo_produto: string
+        }
+        Update: {
+          concluido_em?: string | null
+          cor?: string
+          criado_em?: string
+          id?: string
+          iniciado_em?: string | null
+          largura?: string
+          material?: string
+          operador_id?: string | null
+          status?: string
+          tamanho?: string
+          tipo_produto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pcp_corte_registro_operador_id_fkey"
+            columns: ["operador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pcp_feriados: {
         Row: {
           criado_em: string
