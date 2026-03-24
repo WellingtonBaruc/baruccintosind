@@ -108,7 +108,7 @@ export default function KanbanProducao() {
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterTipo, setFilterTipo] = useState<FilterTipo>('all');
-  const [filterMode, setFilterMode] = useState(() => profile?.perfil === 'operador_producao' ? 'HOJE' : 'all');
+  const [filterMode, setFilterMode] = useState('all');
   const [filterDateStr, setFilterDateStr] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; type: string; card: KanbanCard | null }>({ open: false, type: '', card: null });
@@ -645,9 +645,7 @@ export default function KanbanProducao() {
     if (filterTipo !== 'all') {
       filtered = filtered.filter(c => c.tipo_produto === filterTipo);
     }
-    if (profile?.perfil === 'operador_producao') {
-      filtered = filtered.filter(c => !c.operador_id || c.operador_id === profile.id);
-    }
+    // Operadores veem TODOS os cards, sem restrição
     if (filterMode === 'ATRASADO') filtered = filtered.filter(c => c.status_prazo === 'ATRASADO');
     if (filterMode === 'SEM_OPERADOR') filtered = filtered.filter(c => !c.operador_id);
     if (filterMode === 'HOJE') {
