@@ -74,7 +74,16 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">{filteredGroups.length} grupos • {totalPecas} peças</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Cliente ou nº venda..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-8 h-9 w-[180px] text-sm"
+            />
+          </div>
           <Select value={filterLargura} onValueChange={onFilterLarguraChange}>
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Largura" />
