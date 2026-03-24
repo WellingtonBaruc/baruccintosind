@@ -221,6 +221,7 @@ export default function FilaMestre() {
         is_piloto: (p as any).is_piloto || false,
         status_piloto: (p as any).status_piloto || null,
         fivelas_separadas: (p as any).fivelas_separadas || false,
+        observacao_api: (p as any).observacao_api || null,
         status_prazo: statusPrazo,
         dataPcpCalculada: pcp.dataPcpCalculada,
         dataInicioIdeal: pcp.dataInicioIdeal,
@@ -505,6 +506,11 @@ export default function FilaMestre() {
                     {r.fivelas_separadas && (
                       <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
                         Fivelas ✓
+                      </Badge>
+                    )}
+                    {r.observacao_api?.includes('[IMPORTADO SEM DATA PREVISTA]') && (
+                      <Badge className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">
+                        📋 Sem data prevista
                       </Badge>
                     )}
                     {r.ordem_status && (
