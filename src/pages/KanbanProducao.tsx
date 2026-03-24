@@ -356,7 +356,8 @@ export default function KanbanProducao() {
     const allowedDestIdx = allowedColumns.indexOf(destCol);
 
     if (allowedDestIdx !== allowedSrcIdx + 1) { toast.error('Só é possível avançar uma etapa por vez.'); return; }
-    if (!isSupervisor) { toast.error('Apenas supervisores podem arrastar cards.'); return; }
+    const canDrag = isSupervisor || profile?.perfil === 'operador_producao';
+    if (!canDrag) { toast.error('Sem permissão para mover cards.'); return; }
 
     // Tecido going to Concluído — confirm cross-pipeline transfer
     if (destCol === 'Concluído' && card.tipo_produto === 'TECIDO') {
@@ -888,7 +889,7 @@ export default function KanbanProducao() {
                         const cardInPrep = isInPreparacao(card);
 
                         return (
-                          <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={!isSupervisor || inConcluido}>
+                          <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={(!isSupervisor && profile?.perfil !== 'operador_producao') || inConcluido}>
                             {(prov, snap) => (
                               <div
                                 ref={prov.innerRef}
@@ -1085,10 +1086,8 @@ export default function KanbanProducao() {
                                 )}
 
                                 {profile?.perfil === 'operador_producao' && !inConcluido && col !== 'Aguardando Início' && !card.operador_id && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="w-full mt-2 h-8 text-xs"
+                                  <button
+                                    className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors"
                                     onClick={async () => {
                                       await supabase
                                         .from('op_etapas')
@@ -1099,8 +1098,8 @@ export default function KanbanProducao() {
                                       fetchCards();
                                     }}
                                   >
-                                    <User className="h-3 w-3 mr-1" /> Assumir tarefa
-                                  </Button>
+                                    <User className="h-3 w-3" /> Assumir
+                                  </button>
                                 )}
 
                                 {profile?.perfil === 'operador_producao' && card.operador_id === profile.id && !inConcluido && col !== 'Aguardando Início' && (
