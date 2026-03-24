@@ -143,7 +143,7 @@ export default function FilaMestre() {
     // 2) Fetch active ordens_producao (not completed/cancelled) to find complementary OPs from Loja
     const { data: todasOrdens } = await supabase
       .from('ordens_producao')
-      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp')
+      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp, sequencia')
       .not('status', 'in', '("CONCLUIDA","CANCELADA")');
 
     // 3) Find pedido_ids that have active OPs but are NOT in the first query (e.g. complementary OPs from Loja)
