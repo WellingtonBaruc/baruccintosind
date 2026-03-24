@@ -64,7 +64,7 @@ export default function PainelDia() {
       leadTimes[lt.tipo] = lt.lead_time_dias;
     }
 
-    const capPadrao = {
+    const capPadraoValues = {
       sintetico: capPadraoResult.data?.capacidade_sintetico ?? 30,
       tecido: capPadraoResult.data?.capacidade_tecido ?? 20,
       total: capPadraoResult.data?.capacidade_total ?? 50,
