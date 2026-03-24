@@ -45,18 +45,7 @@ export default function PCP() {
 
     if (!ordens?.length) { setLoading(false); return; }
 
-    const ordemIds = ordens.map(o => o.id);
-    const { data: etapasCorte } = await supabase
-      .from('op_etapas')
-      .select('id, ordem_id')
-      .in('ordem_id', ordemIds)
-      .in('nome_etapa', ['Corte', 'Conferência'])
-      .in('status', ['EM_ANDAMENTO', 'PENDENTE']);
-
-    if (!etapasCorte?.length) { setLoading(false); return; }
-
-    const ordensComEtapa = new Set(etapasCorte.map(e => e.ordem_id));
-    const ordensFiltered = ordens.filter(o => ordensComEtapa.has(o.id));
+    const ordensFiltered = ordens;
 
     const pedidoIds = [...new Set(ordensFiltered.map(o => o.pedido_id))];
     const { data: itens } = await supabase
