@@ -351,26 +351,42 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                             <ChevronRight className="h-3 w-3 transition-transform group-data-[state=open]:rotate-90" />
                             <span>{group.itens.length} {group.itens.length === 1 ? 'item' : 'itens'}</span>
                             {(() => {
-                              const unreadCount = group.itens.reduce((acc, item) => {
-                                const unread = (item.obs_corte || []).filter(o => !o.lido).length;
-                                return acc + unread;
-                              }, 0);
+                              const totalObs = group.itens.reduce((acc, item) => acc + (item.obs_corte || []).length, 0);
+                              const unreadCount = group.itens.reduce((acc, item) => acc + (item.obs_corte || []).filter(o => !o.lido).length, 0);
+                              if (totalObs === 0) return null;
                               if (unreadCount > 0) {
                                 return (
                                   <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold animate-pulse">
-                                    {unreadCount}
+                                    {unreadCount} nova{unreadCount > 1 ? 's' : ''}
                                   </span>
                                 );
                               }
-                              return null;
+                              return (
+                                <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-destructive/20 text-destructive text-[9px] font-semibold">
+                                  {totalObs} obs
+                                </span>
+                              );
                             })()}
                           </CollapsibleTrigger>
                           <CollapsibleContent className="mt-1.5 space-y-1.5 pl-4.5">
-                            {group.itens.map(item => {
+                            {[...group.itens].sort((a, b) => {
+                              const aHas = (a.obs_corte || []).length > 0 ? 1 : 0;
+                              const bHas = (b.obs_corte || []).length > 0 ? 1 : 0;
+                              if (aHas !== bHas) return bHas - aHas;
+                              const aUnread = (a.obs_corte || []).some(o => !o.lido) ? 1 : 0;
+                              const bUnread = (b.obs_corte || []).some(o => !o.lido) ? 1 : 0;
+                              return bUnread - aUnread;
+                            }).map(item => {
                               const obsCorteList = item.obs_corte || [];
+                              const hasObs = obsCorteList.length > 0;
                               const hasUnread = obsCorteList.some(o => !o.lido);
+                              const itemBg = hasUnread
+                                ? 'bg-destructive/8 border border-destructive/30'
+                                : hasObs
+                                  ? 'bg-destructive/4 border border-destructive/15'
+                                  : '';
                               return (
-                                <div key={item.id} className={`text-xs rounded-md p-1.5 ${hasUnread ? 'bg-destructive/5 border border-destructive/20' : ''}`}>
+                                <div key={item.id} className={`text-xs rounded-md p-1.5 ${itemBg}`}>
                                   <div className="flex items-baseline gap-2 flex-wrap">
                                     <span className="text-muted-foreground">{item.descricao}</span>
                                     <span className="font-medium">×{item.quantidade}</span>
@@ -391,16 +407,16 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                                     </div>
                                   )}
                                   {obsCorteList.map(obs => (
-                                    <div key={obs.id} className={`mt-1 rounded px-2 py-1.5 text-[10px] flex items-start justify-between gap-2 ${obs.lido ? 'bg-muted/40 border border-border/50' : 'bg-destructive/10 border border-destructive/30'}`}>
+                                    <div key={obs.id} className={`mt-1 rounded px-2 py-1.5 text-[10px] flex items-start justify-between gap-2 ${obs.lido ? 'bg-destructive/5 border border-destructive/15' : 'bg-destructive/10 border border-destructive/30'}`}>
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-1 mb-0.5">
-                                          <Scissors className={`h-3 w-3 shrink-0 ${obs.lido ? 'text-muted-foreground' : 'text-destructive'}`} />
-                                          <span className={`font-semibold ${obs.lido ? 'text-muted-foreground' : 'text-destructive'}`}>
-                                            {obs.lido ? 'Obs. Corte (lida)' : '⚠️ Obs. Corte'}
+                                          <Scissors className={`h-3 w-3 shrink-0 ${obs.lido ? 'text-destructive/60' : 'text-destructive'}`} />
+                                          <span className={`font-semibold ${obs.lido ? 'text-destructive/60' : 'text-destructive'}`}>
+                                            {obs.lido ? 'Obs. Corte ✓' : '⚠️ Obs. Corte'}
                                           </span>
                                           <span className="text-muted-foreground/60 ml-auto">{format(parseISO(obs.criado_em), 'dd/MM HH:mm')}</span>
                                         </div>
-                                        <p className={obs.lido ? 'text-muted-foreground' : 'text-foreground font-medium'}>{obs.observacao}</p>
+                                        <p className={obs.lido ? 'text-destructive/70' : 'text-foreground font-medium'}>{obs.observacao}</p>
                                       </div>
                                       {!obs.lido && (
                                         <Button
