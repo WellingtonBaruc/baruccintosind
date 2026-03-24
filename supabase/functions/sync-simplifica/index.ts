@@ -408,6 +408,7 @@ async function inserirNovoPedido(
   const apiVendaId = String(venda.id_venda);
   const tipoFluxo = statusApi === 'Em Produção' ? 'PRODUCAO' : 'PRONTA_ENTREGA';
   const statusAtual = statusApi === 'Em Produção' ? 'AGUARDANDO_PRODUCAO' : 'AGUARDANDO_LOJA';
+  const shouldCreateOPs = statusApi === 'Em Produção';
 
   const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true });
   const numeroPedido = `PED-${String((count || 0) + 1).padStart(5, '0')}`;
@@ -503,7 +504,7 @@ async function inserirNovoPedido(
   }
 
   // Create production orders only for PRODUCAO flow
-  if (tipoFluxo === 'PRODUCAO') {
+  if (shouldCreateOPs) {
     // Group items by type and create one order per type
     const itensByTipo: Record<string, any[]> = {};
     for (const item of (Array.isArray(itens) ? itens : [])) {
@@ -543,14 +544,15 @@ async function inserirNovoPedido(
       sequencia++;
     }
 
-    await supabase.from('pedidos').update({ status_atual: 'EM_PRODUCAO' }).eq('id', pedido.id);
-  }
+    if (shouldCreateOPs) {
+      await supabase.from('pedidos').update({ status_atual: 'EM_PRODUCAO' }).eq('id', pedido.id);
+    }
 
   await supabase.from('pedido_historico').insert({
     pedido_id: pedido.id,
     tipo_acao: 'TRANSICAO',
     status_anterior: null,
-    status_novo: tipoFluxo === 'PRODUCAO' ? 'EM_PRODUCAO' : statusAtual,
+    status_novo: shouldCreateOPs ? 'EM_PRODUCAO' : statusAtual,
     observacao: `Pedido importado da API Simplifica (${statusApi}). Fluxo: ${tipoFluxo}.${tiposProduto.size > 1 ? ` Tipos: ${[...tiposProduto].join(', ')}.` : ''}`,
   });
 
