@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { Navigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { concluirEtapa, iniciarEtapa } from '@/lib/producao';
 import { TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE, extrairAtributosProduto, classificarProduto } from '@/lib/pcp';
@@ -109,6 +110,7 @@ type FilterTipo = 'all' | 'SINTETICO' | 'TECIDO' | 'FIVELA_COBERTA';
 
 export default function KanbanProducao() {
   const { profile } = useAuth();
+
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterTipo, setFilterTipo] = useState<FilterTipo>('all');
@@ -908,6 +910,10 @@ export default function KanbanProducao() {
 
   // KPI: Fivela coberta aguardando
   const fivelaAguardandoCards = cards.filter(c => c.tem_fivela_coberta && c.fivela_coberta_status !== 'CONCLUIDO');
+
+  if (profile && !profile.kanban_producao_acesso) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className="animate-fade-in space-y-4">
