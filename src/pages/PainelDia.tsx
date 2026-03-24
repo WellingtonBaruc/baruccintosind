@@ -20,6 +20,7 @@ import PainelTipoAnalytics from '@/components/painel-dia/PainelTipoAnalytics';
 import PainelAgendaDia from '@/components/painel-dia/PainelAgendaDia';
 import PainelCapacidadeCarga from '@/components/painel-dia/PainelCapacidadeCarga';
 import PainelFilaPriorizada from '@/components/painel-dia/PainelFilaPriorizada';
+import ProgramacaoDialog from '@/components/painel-dia/ProgramacaoDialog';
 import CapacidadeDialog from '@/components/painel-dia/CapacidadeDialog';
 
 const STATUS_FINAIS = ['ENVIADO', 'ENTREGUE', 'FINALIZADO_SIMPLIFICA', 'CANCELADO', 'HISTORICO'];
