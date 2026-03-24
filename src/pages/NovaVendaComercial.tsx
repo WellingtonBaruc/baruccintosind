@@ -11,8 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Loader2, ArrowLeft, ShoppingBag } from 'lucide-react';
+import { Plus, Trash2, Loader2, ArrowLeft, ShoppingBag, Download, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface ItemForm {
   descricao_produto: string;
