@@ -105,7 +105,7 @@ export default function VerificacaoLoja() {
   const isVerificando = pedido.status_atual === 'LOJA_VERIFICANDO';
   const isAguardandoOp = pedido.status_atual === 'AGUARDANDO_OP_COMPLEMENTAR';
   const isAguardandoAlmox = pedido.status_atual === 'AGUARDANDO_ALMOXARIFADO';
-  const allSolicitacoesAtendidas = solicitacoes.length > 0 && solicitacoes.every(s => s.status === 'ATENDIDA');
+  const allSolicitacoesAtendidas = solicitacoes.length > 0 && solicitacoes.every(s => s.status === 'ATENDIDA' || s.status === 'ATENDIDO');
 
   const handleToggleConferido = async (itemId: string, checked: boolean) => {
     await supabase.from('pedido_itens').update({ conferido: checked } as any).eq('id', itemId);
