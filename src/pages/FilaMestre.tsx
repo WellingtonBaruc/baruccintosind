@@ -324,7 +324,9 @@ export default function FilaMestre() {
   });
 
   // Intelligence bar stats
-  const tipoStats = Object.entries(leadTimes).map(([tipo, lt]) => {
+  const tipoStats = Object.entries(leadTimes)
+    .filter(([tipo]) => tipo !== 'FIVELA_COBERTA')
+    .map(([tipo, lt]) => {
     const tipoRows = rows.filter(r => r.tipo_produto === tipo);
     const emProducao = tipoRows.filter(r => r.status_atual === 'EM_PRODUCAO').length;
     const emFila = tipoRows.filter(r => r.status_atual === 'AGUARDANDO_PRODUCAO').length;
