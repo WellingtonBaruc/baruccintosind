@@ -889,7 +889,7 @@ export default function KanbanProducao() {
                         const cardInPrep = isInPreparacao(card);
 
                         return (
-                          <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={!isSupervisor || inConcluido}>
+                          <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={(!isSupervisor && profile?.perfil !== 'operador_producao') || inConcluido}>
                             {(prov, snap) => (
                               <div
                                 ref={prov.innerRef}
