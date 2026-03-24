@@ -907,6 +907,7 @@ export default function KanbanProducao() {
                                   return null;
                                 })()}
 
+                                {card.is_piloto && (
                                   <Badge className={`mt-1.5 text-[10px] ${card.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
                                     {card.status_piloto === 'REPROVADO' ? 'PILOTO REPROVADO' : 'PILOTO'}
                                   </Badge>
