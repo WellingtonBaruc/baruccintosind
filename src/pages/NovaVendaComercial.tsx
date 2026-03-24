@@ -394,6 +394,35 @@ export default function NovaVendaComercial() {
     setItens([emptyItem()]); setTipoFluxo('PRODUCAO');
   };
 
+  if (vendaCriada) {
+    return (
+      <div className="animate-fade-in space-y-6 max-w-lg mx-auto mt-12">
+        <Card className="border-border/60 shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center py-12 space-y-6">
+            <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="text-center space-y-1">
+              <h2 className="text-xl font-semibold">Venda criada com sucesso!</h2>
+              <p className="text-muted-foreground">Pedido <span className="font-medium text-foreground">{vendaCriada.numeroPedido}</span> inserido no sistema.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <Button onClick={gerarPDF} className="min-h-[48px]" variant="default">
+                <Download className="h-4 w-4 mr-2" /> Baixar PDF da Venda
+              </Button>
+              <Button onClick={handleNovaVenda} variant="outline" className="min-h-[48px]">
+                <Plus className="h-4 w-4 mr-2" /> Nova Venda
+              </Button>
+            </div>
+            <Button variant="ghost" className="text-muted-foreground" onClick={() => navigate(tipoFluxo === 'PRODUCAO' ? '/producao' : '/kanban-venda')}>
+              Ir para a fila
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fade-in space-y-6 max-w-4xl">
       <div className="flex items-center gap-3">
