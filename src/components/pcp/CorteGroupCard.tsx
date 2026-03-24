@@ -10,7 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays, Package, Layers, Hash, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays, Package, Layers, Hash, ArrowUp, ArrowDown, ArrowUpDown, EyeOff } from 'lucide-react';
 import { CutGroup, TIPO_PRODUTO_LABELS, ObsCorte } from '@/lib/pcp';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -73,6 +73,8 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   // Sorting
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  // Hide completed toggle
+  const [hideCompleted, setHideCompleted] = useState(false);
   // Manual OP modal
   const [manualModal, setManualModal] = useState(false);
   const [manualForm, setManualForm] = useState({ descricao: '', quantidade: '', dataInicio: '', dataFim: '', observacao: '' });
@@ -256,21 +258,40 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
 
   const filteredUnsorted = filterLargura === 'all' ? searchedGroups : searchedGroups.filter(g => g.largura === filterLargura);
 
+  const STATUS_PRIORITY: Record<string, number> = { PENDENTE: 0, INICIADO: 1, CONCLUIDO: 2 };
+
+  const getGroupStatus = (g: CutGroup): string => {
+    if (g.is_manual) return (g as any)._manual_status || 'PENDENTE';
+    const key = groupKey(tipo, g);
+    return registros.get(key)?.status || 'PENDENTE';
+  };
+
   const filteredGroups = useMemo(() => {
-    if (!sortCol) return filteredUnsorted;
-    return [...filteredUnsorted].sort((a, b) => {
-      let cmp = 0;
-      switch (sortCol) {
-        case 'largura': cmp = a.largura.localeCompare(b.largura); break;
-        case 'material': cmp = a.material.localeCompare(b.material); break;
-        case 'tamanho': cmp = a.tamanho.localeCompare(b.tamanho); break;
-        case 'cor': cmp = a.cor.localeCompare(b.cor); break;
-        case 'qtd': cmp = a.quantidadeTotal - b.quantidadeTotal; break;
-        default: cmp = 0;
+    let list = hideCompleted
+      ? filteredUnsorted.filter(g => getGroupStatus(g) !== 'CONCLUIDO')
+      : filteredUnsorted;
+
+    return [...list].sort((a, b) => {
+      // Status priority first: PENDENTE < INICIADO < CONCLUIDO
+      const sa = STATUS_PRIORITY[getGroupStatus(a)] ?? 0;
+      const sb = STATUS_PRIORITY[getGroupStatus(b)] ?? 0;
+      if (sa !== sb) return sa - sb;
+
+      // Then user-chosen column sort
+      if (sortCol) {
+        let cmp = 0;
+        switch (sortCol) {
+          case 'largura': cmp = a.largura.localeCompare(b.largura); break;
+          case 'material': cmp = a.material.localeCompare(b.material); break;
+          case 'tamanho': cmp = a.tamanho.localeCompare(b.tamanho); break;
+          case 'cor': cmp = a.cor.localeCompare(b.cor); break;
+          case 'qtd': cmp = a.quantidadeTotal - b.quantidadeTotal; break;
+        }
+        if (cmp !== 0) return sortDir === 'desc' ? -cmp : cmp;
       }
-      return sortDir === 'desc' ? -cmp : cmp;
+      return 0;
     });
-  }, [filteredUnsorted, sortCol, sortDir]);
+  }, [filteredUnsorted, sortCol, sortDir, registros, hideCompleted]);
 
   const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
   const totalItens = filteredGroups.reduce((sum, g) => sum + g.itens.length, 0);
@@ -390,6 +411,15 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                 <Plus className="h-4 w-4 mr-1" />
                 OP Manual
               </Button>
+              <Button
+                variant={hideCompleted ? 'default' : 'outline'}
+                size="sm"
+                className={hideCompleted ? 'gap-1' : 'gap-1 text-muted-foreground'}
+                onClick={() => setHideCompleted(v => !v)}
+              >
+                <EyeOff className="h-3.5 w-3.5" />
+                <span className="text-xs">{hideCompleted ? 'Mostrar concluídos' : 'Ocultar concluídos'}</span>
+              </Button>
             </div>
           </div>
           {/* Fase 2: Indicator mini-cards */}
@@ -450,10 +480,11 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                     ? getOperadorNome((group as any)._manual_operador_id)
                     : getOperadorNome(reg?.operador_id);
 
+                  const isConcluido = status === 'CONCLUIDO';
                   const rowClass = isManual
                     ? 'bg-orange-50/70 border-l-4 border-l-orange-400'
-                    : status === 'CONCLUIDO'
-                      ? 'bg-blue-50/50'
+                    : isConcluido
+                      ? 'bg-muted/30 opacity-60'
                       : status === 'INICIADO'
                         ? 'bg-yellow-50/30'
                         : '';
@@ -529,8 +560,8 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                             </>
                           )}
                           {status === 'CONCLUIDO' && (
-                            <Badge className="text-[10px] bg-blue-500 text-white border-blue-600 font-bold">
-                              Corte OK
+                            <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground border-border font-medium">
+                              ✓ Concluído
                             </Badge>
                           )}
                         </div>
