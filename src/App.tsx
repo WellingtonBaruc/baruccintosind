@@ -22,7 +22,6 @@ import FilaLogistica from "./pages/FilaLogistica";
 import RegistroEnvio from "./pages/RegistroEnvio";
 import Integracao from "./pages/Integracao";
 import PCP from "./pages/PCP";
-import DashboardComercial from "./pages/DashboardComercial";
 import NovaVendaComercial from "./pages/NovaVendaComercial";
 import DashboardFinanceiro from "./pages/DashboardFinanceiro";
 import DashboardLoja from "./pages/DashboardLoja";
@@ -69,7 +68,6 @@ const App = () => (
               <Route path="/logistica/envio/:id" element={<RegistroEnvio />} />
 
               {/* Role dashboards for specific profiles */}
-              <Route path="/comercial" element={<DashboardComercial />} />
               <Route path="/comercial/nova-venda" element={<NovaVendaComercial />} />
               <Route path="/painel-financeiro" element={<DashboardFinanceiro />} />
               <Route path="/painel-loja" element={<DashboardLoja />} />
