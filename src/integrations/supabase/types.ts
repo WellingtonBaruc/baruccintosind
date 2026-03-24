@@ -559,6 +559,7 @@ export type Database = {
           largura: string
           material: string
           operador_id: string | null
+          quantidade_cortada: number | null
           status: string
           tamanho: string
           tipo_produto: string
@@ -572,6 +573,7 @@ export type Database = {
           largura: string
           material: string
           operador_id?: string | null
+          quantidade_cortada?: number | null
           status?: string
           tamanho: string
           tipo_produto: string
@@ -585,6 +587,7 @@ export type Database = {
           largura?: string
           material?: string
           operador_id?: string | null
+          quantidade_cortada?: number | null
           status?: string
           tamanho?: string
           tipo_produto?: string
