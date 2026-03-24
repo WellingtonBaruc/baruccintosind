@@ -1,16 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { format, parseISO } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Navigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, Scissors, AlertTriangle, ChevronRight, Printer } from 'lucide-react';
-import { agruparParaCorte, CutGroupItem, TIPO_PRODUTO_LABELS } from '@/lib/pcp';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2, Scissors, AlertTriangle } from 'lucide-react';
+import { agruparParaCorte, CutGroupItem } from '@/lib/pcp';
+import { CorteGroupCard } from '@/components/pcp/CorteGroupCard';
 
 const PERFIS_PCP = ['supervisor_producao', 'gestor', 'admin'];
 
@@ -29,11 +24,10 @@ export default function PCP() {
   const [loading, setLoading] = useState(true);
   const [allItems, setAllItems] = useState<CutGroupItem[]>([]);
   const [leadTimeStats, setLeadTimeStats] = useState({ atrasados: 0, atencao: 0, noPrazo: 0 });
-  const [filterTipo, setFilterTipo] = useState('all');
-  const [filterLargura, setFilterLargura] = useState('all');
+  const [filterLarguraSint, setFilterLarguraSint] = useState('all');
+  const [filterLarguraTec, setFilterLarguraTec] = useState('all');
 
   useEffect(() => { fetchData(); }, []);
-  useEffect(() => { setFilterLargura('all'); }, [filterTipo]);
 
   const fetchData = async () => {
     const { data: ordens } = await supabase
@@ -53,7 +47,6 @@ export default function PCP() {
       .select('id, pedido_id, descricao_produto, referencia_produto, observacao_producao, quantidade')
       .in('pedido_id', pedidoIds);
 
-    // Map pedido+tipo → info
     const pedidoTipoMap = new Map<string, { numero_venda: string | null; data_venda: string | null; lead_time_dias: number | null }>();
     for (const o of ordensFiltered) {
       const p = o.pedidos as any;
@@ -98,41 +91,15 @@ export default function PCP() {
     setLoading(false);
   };
 
-  // Derived data
-  const filteredItems = useMemo(() =>
-    filterTipo === 'all' ? allItems : allItems.filter(i => i.tipo_produto === filterTipo),
-  [allItems, filterTipo]);
+  // Separate items by tipo
+  const sinteticoItems = useMemo(() => allItems.filter(i => i.tipo_produto === 'SINTETICO'), [allItems]);
+  const tecidoItems = useMemo(() => allItems.filter(i => i.tipo_produto === 'TECIDO'), [allItems]);
 
-  const cutGroups = useMemo(() => agruparParaCorte(filteredItems), [filteredItems]);
-  const larguras = useMemo(() => [...new Set(cutGroups.map(g => g.largura))].sort(), [cutGroups]);
-  const filteredGroups = filterLargura === 'all' ? cutGroups : cutGroups.filter(g => g.largura === filterLargura);
-  const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
+  const sinteticoGroups = useMemo(() => agruparParaCorte(sinteticoItems), [sinteticoItems]);
+  const tecidoGroups = useMemo(() => agruparParaCorte(tecidoItems), [tecidoItems]);
 
-  const handlePrint = () => {
-    const tipoLabel = filterTipo === 'all' ? 'Todos' : TIPO_PRODUTO_LABELS[filterTipo] || filterTipo;
-    const rows = filteredGroups.map(g => {
-      const itensHtml = g.itens.map(i =>
-        `${i.descricao} ×${i.quantidade}${i.numero_venda ? ' <span style="color:#666">#' + i.numero_venda + '</span>' : ''}${i.data_venda ? ' <span style="color:#999">' + format(parseISO(i.data_venda), 'dd/MM') + '</span>' : ''}${i.lead_time_dias != null ? ' <span style="color:#999">' + i.lead_time_dias + 'd</span>' : ''}`
-      ).join('<br>');
-      return `<tr><td>${g.largura}</td><td>${g.material}</td><td>${g.tamanho}</td><td>${g.cor}</td><td style="text-align:right;font-weight:bold">${g.quantidadeTotal}</td><td style="font-size:11px">${itensHtml}</td></tr>`;
-    }).join('');
-
-    const html = `<!DOCTYPE html><html><head><title>Corte - ${tipoLabel}</title>
-    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;padding:15mm}
-    h1{font-size:16px;margin-bottom:4px}.meta{color:#666;font-size:11px;margin-bottom:10px}
-    table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;vertical-align:top}
-    th{background:#f0f0f0;font-size:11px;text-transform:uppercase}@media print{body{padding:10mm}}</style>
-    </head><body><h1>Agrupamento de Corte — ${tipoLabel}${filterLargura !== 'all' ? ' — ' + filterLargura : ''}</h1>
-    <p class="meta">${filteredGroups.length} grupos • ${totalPecas} peças • ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
-    <table><thead><tr><th>Largura</th><th>Material</th><th>Tamanho</th><th>Cor</th><th style="text-align:right">Qtd</th><th>Itens</th></tr></thead>
-    <tbody>${rows}</tbody></table></body></html>`;
-
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    setTimeout(() => w.print(), 300);
-  };
+  const largurasSint = useMemo(() => [...new Set(sinteticoGroups.map(g => g.largura))].sort(), [sinteticoGroups]);
+  const largurasTec = useMemo(() => [...new Set(tecidoGroups.map(g => g.largura))].sort(), [tecidoGroups]);
 
   if (!profile || !PERFIS_PCP.includes(profile.perfil)) {
     return <Navigate to="/dashboard" replace />;
@@ -170,111 +137,30 @@ export default function PCP() {
         </Card>
       </div>
 
-      {/* Cut grouping */}
-      <Card className="border-border/60 shadow-sm">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between gap-4 flex-wrap">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Scissors className="h-4 w-4" />
-              Agrupamento de Corte
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">{filteredGroups.length} grupos • {totalPecas} peças total</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Select value={filterTipo} onValueChange={setFilterTipo}>
-              <SelectTrigger className="w-[130px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="SINTETICO">Sintético</SelectItem>
-                <SelectItem value="TECIDO">Tecido</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterLargura} onValueChange={setFilterLargura}>
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="Largura" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {larguras.map(l => (
-                  <SelectItem key={l} value={l}>{l}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" onClick={handlePrint} disabled={filteredGroups.length === 0}>
-              <Printer className="h-4 w-4 mr-1" />
-              PDF
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          ) : filteredGroups.length === 0 ? (
-            <p className="text-center py-12 text-muted-foreground text-sm">Nenhum item pendente de corte.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Largura</TableHead>
-                  <TableHead>Material</TableHead>
-                  <TableHead>Tamanho</TableHead>
-                  <TableHead>Cor</TableHead>
-                  <TableHead className="text-right">Qtd Total</TableHead>
-                  <TableHead>Itens</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredGroups.map((group, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>
-                      <Badge variant="outline" className="font-mono">{group.largura}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{group.material}</TableCell>
-                    <TableCell className="text-sm">{group.tamanho}</TableCell>
-                    <TableCell className="text-sm">{group.cor}</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">{group.quantidadeTotal}</TableCell>
-                    <TableCell>
-                      <Collapsible>
-                        <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group">
-                          <ChevronRight className="h-3 w-3 transition-transform group-data-[state=open]:rotate-90" />
-                          <span>{group.itens.length} {group.itens.length === 1 ? 'item' : 'itens'}</span>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="mt-1.5 space-y-1 pl-4.5">
-                          {group.itens.map(item => (
-                            <div key={item.id} className="text-xs flex items-baseline gap-2 flex-wrap">
-                              <span className="text-muted-foreground">{item.descricao}</span>
-                              <span className="font-medium">×{item.quantidade}</span>
-                              {item.numero_venda && (
-                                <span className="text-primary/80 font-mono text-[10px]">#{item.numero_venda}</span>
-                              )}
-                              {item.data_venda && (
-                                <span className="text-muted-foreground/70 text-[10px]">{format(parseISO(item.data_venda), 'dd/MM')}</span>
-                              )}
-                              {item.lead_time_dias != null && (
-                                <span className="text-muted-foreground/70 text-[10px]">{item.lead_time_dias}d</span>
-                              )}
-                              {item.referencia && <span className="text-muted-foreground/70 text-[10px]">({item.referencia})</span>}
-                              {item.observacao_producao && (
-                                <div className="mt-0.5 bg-warning/10 border border-warning/20 rounded px-1.5 py-0.5 text-warning text-[10px]">
-                                  {item.observacao_producao}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <CorteGroupCard
+            title="Corte — Sintético"
+            tipo="SINTETICO"
+            groups={sinteticoGroups}
+            filterLargura={filterLarguraSint}
+            onFilterLarguraChange={setFilterLarguraSint}
+            larguras={largurasSint}
+          />
+          <CorteGroupCard
+            title="Corte — Tecido"
+            tipo="TECIDO"
+            groups={tecidoGroups}
+            filterLargura={filterLarguraTec}
+            onFilterLarguraChange={setFilterLarguraTec}
+            larguras={largurasTec}
+          />
+        </div>
+      )}
     </div>
   );
 }
