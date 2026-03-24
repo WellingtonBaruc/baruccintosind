@@ -51,6 +51,8 @@ interface KanbanCard {
   ordem_observacao: string | null;
   tem_fivela_coberta: boolean;
   fivela_coberta_status: string | null;
+  programado_inicio_data: string | null;
+  programado_conclusao_data: string | null;
 }
 
 // Unified columns
@@ -106,7 +108,7 @@ export default function KanbanProducao() {
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterTipo, setFilterTipo] = useState<FilterTipo>('all');
-  const [filterMode, setFilterMode] = useState('all');
+  const [filterMode, setFilterMode] = useState(() => profile?.perfil === 'operador_producao' ? 'HOJE' : 'all');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; type: string; card: KanbanCard | null }>({ open: false, type: '', card: null });
   
@@ -151,7 +153,7 @@ export default function KanbanProducao() {
           id, ordem_id, nome_etapa, ordem_sequencia, operador_id, status,
           usuarios(nome),
           ordens_producao!inner(
-            id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao, tem_fivela_coberta, fivela_coberta_status,
+            id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao, tem_fivela_coberta, fivela_coberta_status, programado_inicio_data, programado_conclusao_data,
             pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas)
           )
         `)
@@ -278,6 +280,8 @@ export default function KanbanProducao() {
         ordem_observacao: e.ordens_producao.observacao || null,
         tem_fivela_coberta: e.ordens_producao.tem_fivela_coberta || false,
         fivela_coberta_status: e.ordens_producao.fivela_coberta_status || null,
+        programado_inicio_data: (e.ordens_producao as any).programado_inicio_data || null,
+        programado_conclusao_data: (e.ordens_producao as any).programado_conclusao_data || null,
       };
     });
 
@@ -635,6 +639,8 @@ export default function KanbanProducao() {
   // Filter logic
   const getFilteredCards = () => {
     let filtered = cards;
+    const todayStr = new Date().toISOString().slice(0, 10);
+
     if (filterTipo !== 'all') {
       filtered = filtered.filter(c => c.tipo_produto === filterTipo);
     }
@@ -643,6 +649,11 @@ export default function KanbanProducao() {
     }
     if (filterMode === 'ATRASADO') filtered = filtered.filter(c => c.status_prazo === 'ATRASADO');
     if (filterMode === 'SEM_OPERADOR') filtered = filtered.filter(c => !c.operador_id);
+    if (filterMode === 'HOJE') filtered = filtered.filter(c => c.programado_inicio_data === todayStr || c.programado_conclusao_data === todayStr);
+    if (filterMode === 'PROXIMOS') filtered = filtered.filter(c => {
+      const d = c.programado_inicio_data || c.programado_conclusao_data;
+      return d && d > todayStr;
+    });
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(c => c.api_venda_id.toLowerCase().includes(q) || c.cliente_nome.toLowerCase().includes(q));
@@ -758,7 +769,9 @@ export default function KanbanProducao() {
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="HOJE">🗓️ Programados Hoje</SelectItem>
               <SelectItem value="ATRASADO">Atrasados</SelectItem>
+              <SelectItem value="PROXIMOS">Próximos</SelectItem>
               <SelectItem value="SEM_OPERADOR">Sem operador</SelectItem>
             </SelectContent>
           </Select>
@@ -853,7 +866,11 @@ export default function KanbanProducao() {
                                 ref={prov.innerRef}
                                 {...prov.draggableProps}
                                 {...prov.dragHandleProps}
-                                className={`rounded-lg border bg-white shadow-sm overflow-hidden group ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''}`}
+                                className={`rounded-lg border bg-white shadow-sm overflow-hidden group ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''} ${(() => {
+                                  const todayStr = new Date().toISOString().slice(0, 10);
+                                  if (card.programado_inicio_data === todayStr || card.programado_conclusao_data === todayStr) return 'ring-2 ring-primary/40 border-primary/30';
+                                  return '';
+                                })()}`}
                               >
                                 <div
                                   className={`px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity ${prazoHeaderClasses[card.status_prazo] || 'bg-muted/30 border-b border-border/40'}`}
@@ -880,6 +897,15 @@ export default function KanbanProducao() {
                                     {prazoBadge[card.status_prazo]?.label || '—'}
                                   </Badge>
                                 </div>
+
+                                {(() => {
+                                  const todayStr = new Date().toISOString().slice(0, 10);
+                                  const isProgInicio = card.programado_inicio_data === todayStr;
+                                  const isProgConclusao = card.programado_conclusao_data === todayStr;
+                                  if (isProgInicio) return <Badge className="mt-1.5 text-[10px] bg-primary/15 text-primary border-primary/30">🗓️ Início programado</Badge>;
+                                  if (isProgConclusao) return <Badge className="mt-1.5 text-[10px] bg-orange-500/15 text-orange-600 border-orange-300">🗓️ Conclusão programada</Badge>;
+                                  return null;
+                                })()}
 
                                 {card.is_piloto && (
                                   <Badge className={`mt-1.5 text-[10px] ${card.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
