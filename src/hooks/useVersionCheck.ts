@@ -14,8 +14,11 @@ export function useVersionCheck(intervalMs = 60_000) {
         const data = await res.json();
         const remote = String(data.version || '');
         const local = String(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '');
-        if (remote && local && remote !== local && !checkedRef.current) {
-          setHasUpdate(true);
+        if (remote && local && remote !== local) {
+          if (!checkedRef.current) {
+            checkedRef.current = true;
+            setHasUpdate(true);
+          }
         }
       } catch {
         // silently ignore fetch errors
