@@ -112,8 +112,8 @@ export default function PCP() {
   const sinteticoItems = useMemo(() => allItems.filter(i => i.tipo_produto === 'SINTETICO'), [allItems]);
   const tecidoItems = useMemo(() => allItems.filter(i => i.tipo_produto === 'TECIDO'), [allItems]);
 
-  const sinteticoGroups = useMemo(() => agruparParaCorte(sinteticoItems), [sinteticoItems]);
-  const tecidoGroups = useMemo(() => agruparParaCorte(tecidoItems), [tecidoItems]);
+  const sinteticoGroups = useMemo(() => agruparParaCorte(sinteticoItems, janelaDiasSint), [sinteticoItems, janelaDiasSint]);
+  const tecidoGroups = useMemo(() => agruparParaCorte(tecidoItems, janelaDiasTec), [tecidoItems, janelaDiasTec]);
 
   const largurasSint = useMemo(() => [...new Set(sinteticoGroups.map(g => g.largura))].sort(), [sinteticoGroups]);
   const largurasTec = useMemo(() => [...new Set(tecidoGroups.map(g => g.largura))].sort(), [tecidoGroups]);
