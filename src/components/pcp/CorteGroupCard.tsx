@@ -1,11 +1,13 @@
+import { useState, useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Scissors, ChevronRight, Printer } from 'lucide-react';
+import { Scissors, ChevronRight, Printer, Search } from 'lucide-react';
 import { CutGroup, TIPO_PRODUTO_LABELS } from '@/lib/pcp';
 
 interface CorteGroupCardProps {
@@ -18,7 +20,23 @@ interface CorteGroupCardProps {
 }
 
 export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLarguraChange, larguras }: CorteGroupCardProps) {
-  const filteredGroups = filterLargura === 'all' ? groups : groups.filter(g => g.largura === filterLargura);
+  const [search, setSearch] = useState('');
+
+  const searchedGroups = useMemo(() => {
+    if (!search.trim()) return groups;
+    const term = search.trim().toLowerCase();
+    return groups
+      .map(g => {
+        const matchedItens = g.itens.filter(i => {
+          const vendaMatch = (i.numero_venda || '').toLowerCase().includes(term);
+          const descMatch = (i.descricao || '').toLowerCase().includes(term);
+          return vendaMatch || descMatch;
+        });
+        return matchedItens.length > 0 ? { ...g, itens: matchedItens, quantidadeTotal: matchedItens.reduce((s, i) => s + i.quantidade, 0) } : null;
+      })
+      .filter(Boolean) as CutGroup[];
+  }, [groups, search]);
+  const filteredGroups = filterLargura === 'all' ? searchedGroups : searchedGroups.filter(g => g.largura === filterLargura);
   const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
 
   const handlePrint = () => {
@@ -56,7 +74,16 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">{filteredGroups.length} grupos • {totalPecas} peças</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Cliente ou nº venda..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-8 h-9 w-[180px] text-sm"
+            />
+          </div>
           <Select value={filterLargura} onValueChange={onFilterLarguraChange}>
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Largura" />
