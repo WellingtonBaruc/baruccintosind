@@ -44,6 +44,8 @@ const navItems: NavItem[] = [
 
   // Admin extras — under Setores group
   { title: 'Loja', url: '/loja', icon: Store, perfis: ['admin', 'gestor'], group: 'setores' },
+  { title: 'Comercial', url: '/comercial', icon: ShoppingBag, perfis: ['admin', 'gestor'], group: 'setores' },
+  { title: 'Nova Venda', url: '/comercial/nova-venda', icon: PlusCircle, perfis: ['admin', 'gestor'], group: 'setores' },
   { title: 'Almoxarifado', url: '/almoxarifado', icon: Package, perfis: ['admin', 'gestor'], group: 'setores' },
   // Config
   { title: 'Relatórios', url: '/relatorios/abc', icon: BarChart3, perfis: ['admin', 'gestor'], group: 'config' },
