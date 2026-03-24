@@ -1,5 +1,6 @@
 import { Factory, Users, Settings, LayoutDashboard, LogOut, ClipboardList, Store, DollarSign, Truck, RefreshCw, Calendar, Columns3, ShoppingBag, BarChart3, Package, LayoutGrid, PlusCircle, Scissors } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
+import { getAppVersion } from '@/hooks/useVersionCheck';
 import { useAuth, PerfilUsuario } from '@/hooks/useAuth';
 import {
   Sidebar,
@@ -150,6 +151,9 @@ export function AppSidebar() {
           <LogOut className="h-4 w-4" />
           {!collapsed && <span className="ml-2">Sair</span>}
         </Button>
+        {!collapsed && (
+          <p className="text-[10px] text-muted-foreground/50 text-center mt-2">v{getAppVersion().slice(-6)}</p>
+        )}
       </SidebarFooter>
     </Sidebar>
   );
