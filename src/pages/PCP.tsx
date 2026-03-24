@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Navigate } from 'react-router-dom';
@@ -57,7 +57,32 @@ export default function PCP() {
   const [reportData, setReportData] = useState<any>(null);
   const [loadingReport, setLoadingReport] = useState(false);
 
-  useEffect(() => { fetchData(); fetchManualOPs(); }, []);
+  // Debounced realtime refresh
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedRefresh = useCallback((fetchFn: () => void) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(fetchFn, 400);
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+    fetchManualOPs();
+
+    // Realtime: listen to tables relevant to Setor Corte
+    const channel = supabase
+      .channel('pcp-corte-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => debouncedRefresh(fetchData))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_itens' }, () => debouncedRefresh(fetchData))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_obs_corte' }, () => debouncedRefresh(fetchData))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pcp_corte_registro' }, () => debouncedRefresh(() => { fetchData(); fetchDailyStats(); }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pcp_corte_manual' }, () => debouncedRefresh(fetchManualOPs))
+      .subscribe();
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, []);
   useEffect(() => { fetchDailyStats(); }, [dailyPeriodo]);
 
   const fetchData = async () => {
