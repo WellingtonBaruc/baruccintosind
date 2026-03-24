@@ -155,10 +155,15 @@ export default function FilaLoja() {
     const matchStatus = statusFilter === 'all' || p.status_atual === statusFilter;
     return matchSearch && matchStatus;
   }).sort((a, b) => {
-    // LOJA_PENDENTE_FINALIZACAO always on top
-    const aIsPending = a.status_atual === 'LOJA_PENDENTE_FINALIZACAO' ? 0 : 1;
-    const bIsPending = b.status_atual === 'LOJA_PENDENTE_FINALIZACAO' ? 0 : 1;
-    if (aIsPending !== bIsPending) return aIsPending - bIsPending;
+    // Priority: LOJA_PENDENTE_FINALIZACAO (0) > active loja (1) > commercial tracking (2)
+    const priority = (s: string) => {
+      if (s === 'LOJA_PENDENTE_FINALIZACAO') return 0;
+      if (s === 'AGUARDANDO_COMERCIAL' || s === 'VALIDADO_COMERCIAL') return 2;
+      return 1;
+    };
+    const aPri = priority(a.status_atual);
+    const bPri = priority(b.status_atual);
+    if (aPri !== bPri) return aPri - bPri;
     return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
   });
 
