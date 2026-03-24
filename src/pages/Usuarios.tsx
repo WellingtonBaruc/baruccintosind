@@ -241,6 +241,7 @@ export default function Usuarios() {
                   <TableHead>Email</TableHead>
                   <TableHead>Perfil</TableHead>
                   <TableHead>Setor</TableHead>
+                  <TableHead>Kanbans</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-24">Ações</TableHead>
                 </TableRow>
@@ -256,6 +257,13 @@ export default function Usuarios() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{usuario.setor || '—'}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 flex-wrap">
+                        {usuario.kanban_producao_acesso && <Badge variant="outline" className="text-xs">Produção</Badge>}
+                        {usuario.kanban_venda_acesso && <Badge variant="outline" className="text-xs">Venda</Badge>}
+                        {!usuario.kanban_producao_acesso && !usuario.kanban_venda_acesso && <span className="text-xs text-muted-foreground">Nenhum</span>}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Switch checked={usuario.ativo} onCheckedChange={() => toggleAtivo(usuario)} />
                     </TableCell>
@@ -276,8 +284,10 @@ export default function Usuarios() {
                 ))}
                 {usuarios.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                       Nenhum usuário cadastrado.
+                    </TableCell>
+                  </TableRow>
                     </TableCell>
                   </TableRow>
                 )}
