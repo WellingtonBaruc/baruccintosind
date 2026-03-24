@@ -150,12 +150,24 @@ export default function FilaMestre() {
     const emProducaoIds = new Set((pedidosEmProducao || []).map(p => p.id));
     const opPedidoIds = [...new Set((todasOrdens || []).map(o => o.pedido_id))].filter(id => !emProducaoIds.has(id));
 
+    // For backfill: only include pedidos with complementary OPs (sequencia > 1)
+    // This prevents "Pedido Enviado" pedidos from leaking into Fila Mestre
+    const complementaryOpPedidoIds = new Set<string>();
+    for (const o of (todasOrdens || [])) {
+      if ((o as any).sequencia > 1 && !emProducaoIds.has(o.pedido_id)) {
+        complementaryOpPedidoIds.add(o.pedido_id);
+      }
+    }
+    // Also include pedidos that have active primary OPs and status_api = 'Em Produção'
+    // (these should already be in emProducaoIds, but just in case)
+    const backfillIds = [...complementaryOpPedidoIds];
+
     let pedidosComOp: any[] = [];
-    if (opPedidoIds.length > 0) {
+    if (backfillIds.length > 0) {
       const { data } = await supabase
         .from('pedidos')
         .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
-        .in('id', opPedidoIds)
+        .in('id', backfillIds)
         .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")');
       pedidosComOp = data || [];
     }

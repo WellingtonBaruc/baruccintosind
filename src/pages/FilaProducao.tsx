@@ -111,7 +111,7 @@ export default function FilaProducao() {
     const { data: pedidos } = await supabase
       .from('pedidos')
       .select('id')
-      .in('status_api', ['Em Produção', 'Pedido Enviado']);
+      .eq('status_api', 'Em Produção');
 
     if (!pedidos || pedidos.length === 0) return;
 

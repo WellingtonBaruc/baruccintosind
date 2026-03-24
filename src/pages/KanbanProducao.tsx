@@ -189,7 +189,14 @@ export default function KanbanProducao() {
 
     const visibleEtapas = (etapas as any[]).filter(e => {
       const pedidoStatus = e.ordens_producao.pedidos.status_atual;
+      const statusApi = (e.ordens_producao.pedidos.status_api || '').trim();
       const ordemSequencia = e.ordens_producao.sequencia || 1;
+
+      // RULE: "Pedido Enviado" from Simplifica should NEVER appear in production Kanban
+      // Exception: complementary OPs (sequencia > 1) from Loja workflow
+      if (statusApi === 'Pedido Enviado' && ordemSequencia <= 1) return false;
+      if (statusApi === 'Finalizado') return false;
+
       if (LOJA_HIDE_ALL.includes(pedidoStatus)) return false;
       if (LOJA_SHOW_ONLY_OP.includes(pedidoStatus)) return ordemSequencia > 1;
       if (pedidoStatus === 'AGUARDANDO_FINANCEIRO') {

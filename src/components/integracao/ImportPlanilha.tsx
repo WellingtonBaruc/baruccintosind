@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { classificarProduto } from '@/lib/pcp';
 import { adicionarDiasUteis, PcpCalendarData } from '@/lib/pcpCalendario';
+import { mapSituacaoToStatusAtual, mapSituacaoToTipoFluxo } from '@/lib/pedidoVisibility';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -310,8 +311,8 @@ export default function ImportPlanilha() {
               valor_desconto: 0,
               valor_liquido: venda.totalVenda || 0,
               data_previsao_entrega: dataPrevistaStr,
-              status_atual: 'EM_PRODUCAO' as any,
-              tipo_fluxo: 'PRODUCAO',
+              status_atual: mapSituacaoToStatusAtual(venda.situacao || 'Em Produção') as any,
+              tipo_fluxo: mapSituacaoToTipoFluxo(venda.situacao || 'Em Produção'),
             }).select().single();
 
             if (pedidoErr || !newPedido) {
