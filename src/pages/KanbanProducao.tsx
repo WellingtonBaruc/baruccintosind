@@ -651,6 +651,15 @@ export default function KanbanProducao() {
     if (filterMode === 'ATRASADO') filtered = filtered.filter(c => c.status_prazo === 'ATRASADO');
     if (filterMode === 'SEM_OPERADOR') filtered = filtered.filter(c => !c.operador_id);
     if (filterMode === 'HOJE') filtered = filtered.filter(c => c.programado_inicio_data === todayStr || c.programado_conclusao_data === todayStr);
+    if (filterMode === 'AMANHA') {
+      const amanha = new Date();
+      amanha.setDate(amanha.getDate() + 1);
+      const amanhaStr = amanha.toISOString().slice(0, 10);
+      filtered = filtered.filter(c => c.programado_inicio_data === amanhaStr || c.programado_conclusao_data === amanhaStr);
+    }
+    if (filterMode === 'DATA' && filterDateStr) {
+      filtered = filtered.filter(c => c.programado_inicio_data === filterDateStr || c.programado_conclusao_data === filterDateStr);
+    }
     if (filterMode === 'PROXIMOS') filtered = filtered.filter(c => {
       const d = c.programado_inicio_data || c.programado_conclusao_data;
       return d && d > todayStr;
