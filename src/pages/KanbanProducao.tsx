@@ -768,11 +768,14 @@ export default function KanbanProducao() {
   const isConcluido = (card: KanbanCard) => card.ordem_status === 'CONCLUIDA';
 
   const getConcluidoBadge = (card: KanbanCard) => {
-    if (card.pedido_status === 'AGUARDANDO_FINANCEIRO') {
-      return { label: 'Enviado ao Financeiro', cls: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30' };
+    if (card.pedido_status === 'AGUARDANDO_FINANCEIRO' || card.pedido_status === 'VALIDADO_FINANCEIRO' || card.pedido_status === 'LIBERADO_LOGISTICA') {
+      return { label: '💰 Aguardando Financeiro', cls: 'bg-amber-500/15 text-amber-600 border-amber-500/30' };
+    }
+    if (card.pedido_status === 'VALIDADO_COMERCIAL') {
+      return { label: '✅ Validado Comercial', cls: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' };
     }
     if (card.pedido_status === 'AGUARDANDO_COMERCIAL') {
-      return { label: 'Enviado ao Comercial ✓', cls: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30' };
+      return { label: '📤 Enviado ao Comercial', cls: 'bg-blue-500/15 text-blue-600 border-blue-500/30' };
     }
     if (card.pedido_status === 'PRODUCAO_CONCLUIDA' || card.pedido_status === 'EM_PRODUCAO') {
       return { label: 'Produção concluída', cls: 'bg-orange-500/15 text-orange-600 border-orange-500/30' };

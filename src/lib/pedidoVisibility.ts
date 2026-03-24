@@ -16,7 +16,7 @@ export const STATUS_POS_PRODUCAO = [
   'AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL',
   'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO',
   'LIBERADO_LOGISTICA', 'EM_SEPARACAO',
-  'ENVIADO', 'ENTREGUE',
+  'ENVIADO', 'ENTREGUE', 'AGUARDANDO_CIENCIA_COMERCIAL',
   'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO',
 ] as const;
 
@@ -128,7 +128,7 @@ export function reconcileStatusAtual(
 
   if (normalized === 'Finalizado') {
     // Finalizado: move to FINALIZADO_SIMPLIFICA unless already in a terminal state
-    const terminalStates = ['CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'ENVIADO', 'ENTREGUE'];
+    const terminalStates = ['CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'ENVIADO', 'ENTREGUE', 'AGUARDANDO_CIENCIA_COMERCIAL'];
     if (terminalStates.includes(currentStatusAtual)) return null;
     return 'FINALIZADO_SIMPLIFICA';
   }
@@ -140,7 +140,7 @@ export function reconcileStatusAtual(
       'AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL',
       'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO',
       'LIBERADO_LOGISTICA', 'EM_SEPARACAO',
-      'ENVIADO', 'ENTREGUE', 'CANCELADO',
+      'ENVIADO', 'ENTREGUE', 'AGUARDANDO_CIENCIA_COMERCIAL', 'CANCELADO',
       'FINALIZADO_SIMPLIFICA', 'HISTORICO',
     ];
     if (postLojaStates.includes(currentStatusAtual)) return null;
