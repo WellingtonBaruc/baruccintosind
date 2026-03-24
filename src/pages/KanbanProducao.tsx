@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { concluirEtapa, iniciarEtapa } from '@/lib/producao';
-import { TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
+import { TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE, extrairAtributosProduto, classificarProduto } from '@/lib/pcp';
 import { calcularPrazoPcp, PcpCalendarData } from '@/lib/pcpCalendario';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Badge } from '@/components/ui/badge';
