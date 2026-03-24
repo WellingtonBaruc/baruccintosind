@@ -298,6 +298,7 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                   <TableHead>Material</TableHead>
                   <TableHead>Tamanho</TableHead>
                   <TableHead>Cor</TableHead>
+                  {isDateMode && <TableHead>Faixa Data</TableHead>}
                   <TableHead className="text-right">Qtd Total</TableHead>
                   <TableHead>Operador</TableHead>
                   <TableHead>Status</TableHead>
@@ -320,6 +321,14 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                       <TableCell className="text-sm">{group.material}</TableCell>
                       <TableCell className="text-sm">{group.tamanho}</TableCell>
                       <TableCell className="text-sm">{group.cor}</TableCell>
+                      {isDateMode && (
+                        <TableCell>
+                          <Badge variant="outline" className={`font-mono text-[10px] ${group.faixa_data === 'SEM DATA' ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary border-primary/30'}`}>
+                            <CalendarDays className="h-3 w-3 mr-1" />
+                            {group.faixa_data || 'SEM DATA'}
+                          </Badge>
+                        </TableCell>
+                      )}
                       <TableCell className="text-right font-semibold tabular-nums">{group.quantidadeTotal}</TableCell>
                       <TableCell>
                         <Button
