@@ -261,7 +261,7 @@ export default function PainelDia() {
 
     // Generate capacity projection
     const proj = gerarProjecaoCapacidade(
-      hojeDate, 8, cal, capPadrao, capacidadesDiarias, cargasPorDia,
+      hojeDate, 8, cal, capPadraoValues, capacidadesDiarias, cargasPorDia,
     );
 
     setPedidos(pedidosDedup);
