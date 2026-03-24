@@ -75,9 +75,8 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
 
   const fetchOperadores = async () => {
     const { data } = await supabase
-      .from('usuarios')
+      .from('pcp_operadores_corte')
       .select('id, nome')
-      .in('perfil', ['operador_producao', 'supervisor_producao'])
       .eq('ativo', true)
       .order('nome');
     setOperadores(data || []);
@@ -144,10 +143,14 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   const handleCriarOperador = async () => {
     if (!novoOperadorNome.trim()) return;
     setSavingOperador(true);
-    // We can't create auth users from client. Just show info.
-    toast.info('Para cadastrar novos operadores, use a tela de Usuários.');
+    try {
+      const { error } = await supabase.from('pcp_operadores_corte').insert({ nome: novoOperadorNome.trim() });
+      if (error) throw error;
+      toast.success(`Operador "${novoOperadorNome.trim()}" cadastrado`);
+      setNovoOperadorNome('');
+      await fetchOperadores();
+    } catch { toast.error('Erro ao cadastrar operador'); }
     setSavingOperador(false);
-    setNovoOperadorNome('');
   };
 
   const searchedGroups = useMemo(() => {
@@ -389,8 +392,26 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
               );
             })}
           </div>
-          <div className="border-t pt-3 mt-2">
-            <Label className="text-xs text-muted-foreground">Novo operador? Cadastre na tela de Usuários.</Label>
+          <div className="border-t pt-3 mt-2 space-y-2">
+            <Label className="text-xs font-medium">Cadastrar novo operador</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nome do operador..."
+                value={novoOperadorNome}
+                onChange={e => setNovoOperadorNome(e.target.value)}
+                className="h-9 text-sm"
+                onKeyDown={e => e.key === 'Enter' && handleCriarOperador()}
+              />
+              <Button
+                size="sm"
+                onClick={handleCriarOperador}
+                disabled={!novoOperadorNome.trim() || savingOperador}
+                className="h-9 gap-1"
+              >
+                {savingOperador ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Adicionar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
