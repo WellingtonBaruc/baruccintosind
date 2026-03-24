@@ -23,7 +23,7 @@ import PainelFilaPriorizada from '@/components/painel-dia/PainelFilaPriorizada';
 import ProgramacaoDialog from '@/components/painel-dia/ProgramacaoDialog';
 import CapacidadeDialog from '@/components/painel-dia/CapacidadeDialog';
 
-const STATUS_FINAIS = ['ENVIADO', 'ENTREGUE', 'FINALIZADO_SIMPLIFICA', 'CANCELADO', 'HISTORICO'];
+const STATUS_FINAIS = ['ENVIADO', 'ENTREGUE', 'FINALIZADO_SIMPLIFICA', 'CANCELADO', 'HISTORICO', 'AGUARDANDO_CIENCIA_COMERCIAL'];
 
 export default function PainelDia() {
   const [loading, setLoading] = useState(true);
