@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -374,14 +374,24 @@ export default function KanbanProducao() {
     setLoading(false);
   }, [recentFinanceiro]);
 
+  // Debounced realtime refresh
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedFetch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchCards(), 400);
+  }, [fetchCards]);
+
   useEffect(() => {
     fetchCards();
     const channel = supabase
       .channel('kanban-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordens_producao' }, () => fetchCards())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'op_etapas' }, () => fetchCards())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordens_producao' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'op_etapas' }, debouncedFetch)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {

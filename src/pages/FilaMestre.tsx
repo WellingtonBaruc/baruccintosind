@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { STATUS_PRAZO_CONFIG, TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
@@ -94,17 +94,27 @@ export default function FilaMestre() {
   const [editingPcp, setEditingPcp] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
 
+  // Debounced realtime refresh
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedFetchAll = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchAll(), 400);
+  }, []);
+
   useEffect(() => {
     fetchAll();
 
     // Realtime: refresh when ordens_producao or op_etapas change
     const channel = supabase
       .channel('filamestre-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordens_producao' }, () => fetchAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'op_etapas' }, () => fetchAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordens_producao' }, debouncedFetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'op_etapas' }, debouncedFetchAll)
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchCalendarData = async () => {

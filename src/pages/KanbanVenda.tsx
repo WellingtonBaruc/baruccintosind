@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { STATUS_PRAZO_CONFIG, TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
@@ -145,13 +145,23 @@ export default function KanbanVenda() {
 
   const allowedPerfis = ['admin', 'gestor', 'supervisor_producao', 'comercial', 'financeiro', 'logistica'];
 
+  // Debounced realtime refresh
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedFetch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchCards(), 400);
+  }, []);
+
   useEffect(() => {
     fetchCards();
     const channel = supabase
       .channel('kanban-venda-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => fetchCards())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, debouncedFetch)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   if (!profile || !allowedPerfis.includes(profile.perfil) || !profile.kanban_venda_acesso) {
