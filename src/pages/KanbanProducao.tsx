@@ -646,17 +646,16 @@ export default function KanbanProducao() {
       filtered = filtered.filter(c => c.tipo_produto === filterTipo);
     }
     if (profile?.perfil === 'operador_producao') {
-      filtered = filtered.filter(c => c.operador_id === profile.id);
+      filtered = filtered.filter(c => !c.operador_id || c.operador_id === profile.id);
     }
     if (filterMode === 'ATRASADO') filtered = filtered.filter(c => c.status_prazo === 'ATRASADO');
     if (filterMode === 'SEM_OPERADOR') filtered = filtered.filter(c => !c.operador_id);
     if (filterMode === 'HOJE') {
       if (profile?.perfil === 'operador_producao') {
-        // Operadores veem: programados para hoje OU em andamento atribuídos a eles (sem data)
         filtered = filtered.filter(c =>
           c.programado_inicio_data === todayStr ||
           c.programado_conclusao_data === todayStr ||
-          (c.etapa_status === 'EM_ANDAMENTO' && c.operador_id === profile.id)
+          c.etapa_status === 'EM_ANDAMENTO'
         );
       } else {
         filtered = filtered.filter(c => c.programado_inicio_data === todayStr || c.programado_conclusao_data === todayStr);
