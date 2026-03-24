@@ -1334,6 +1334,8 @@ export type Database = {
           criado_em: string
           email: string
           id: string
+          kanban_producao_acesso: boolean
+          kanban_venda_acesso: boolean
           nome: string
           perfil: Database["public"]["Enums"]["perfil_usuario"]
           setor: string | null
@@ -1343,6 +1345,8 @@ export type Database = {
           criado_em?: string
           email: string
           id: string
+          kanban_producao_acesso?: boolean
+          kanban_venda_acesso?: boolean
           nome: string
           perfil?: Database["public"]["Enums"]["perfil_usuario"]
           setor?: string | null
@@ -1352,6 +1356,8 @@ export type Database = {
           criado_em?: string
           email?: string
           id?: string
+          kanban_producao_acesso?: boolean
+          kanban_venda_acesso?: boolean
           nome?: string
           perfil?: Database["public"]["Enums"]["perfil_usuario"]
           setor?: string | null
