@@ -47,6 +47,7 @@ export default function FilaLoja() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [finalizadasHoje, setFinalizadasHoje] = useState(0);
 
   useEffect(() => { fetchPedidos(); }, []);
 
