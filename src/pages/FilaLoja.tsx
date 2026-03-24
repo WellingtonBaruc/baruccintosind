@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Search, Clock, Package, Eye, CheckCircle2, Send } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow, format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import LojaKpiCards, { type LojaKpiData } from '@/components/loja/LojaKpiCards';
 
 const PERFIS_LOJA = ['loja', 'admin', 'gestor'];
 const STATUS_LOJA = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO', 'LOJA_PENDENTE_FINALIZACAO', 'AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL'] as const;
@@ -46,6 +47,7 @@ export default function FilaLoja() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [finalizadasHoje, setFinalizadasHoje] = useState(0);
 
   useEffect(() => { fetchPedidos(); }, []);
 
@@ -106,6 +108,18 @@ export default function FilaLoja() {
         almox_atendido: almoxMap[p.id] !== undefined ? almoxMap[p.id] : true, // no solicitações = ok
       })));
     }
+
+    // Fetch finalizadas hoje
+    const todayStart = startOfDay(new Date()).toISOString();
+    const { count: finHoje } = await supabase
+      .from('pedido_historico')
+      .select('*', { count: 'exact', head: true })
+      .eq('tipo_acao', 'TRANSICAO')
+      .eq('status_novo', 'AGUARDANDO_FINANCEIRO')
+      .in('status_anterior', ['VALIDADO_COMERCIAL', 'LOJA_OK', 'LOJA_PENDENTE_FINALIZACAO', 'AGUARDANDO_COMERCIAL'])
+      .gte('criado_em', todayStart);
+    setFinalizadasHoje(finHoje || 0);
+
     setLoading(false);
   };
 
@@ -166,6 +180,16 @@ export default function FilaLoja() {
     if (aPri !== bPri) return aPri - bPri;
     return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
   });
+  const kpiData: LojaKpiData = {
+    total: pedidos.length,
+    aguardandoLoja: pedidos.filter(p => p.status_atual === 'AGUARDANDO_LOJA').length,
+    aguardandoOp: pedidos.filter(p => p.status_atual === 'AGUARDANDO_OP_COMPLEMENTAR').length,
+    aguardandoAlmox: pedidos.filter(p => p.status_atual === 'AGUARDANDO_ALMOXARIFADO').length,
+    pendenteFinalizacao: pedidos.filter(p => p.status_atual === 'LOJA_PENDENTE_FINALIZACAO').length,
+    enviadasComercial: pedidos.filter(p => p.status_atual === 'AGUARDANDO_COMERCIAL').length,
+    validadasComercial: pedidos.filter(p => p.status_atual === 'VALIDADO_COMERCIAL').length,
+    finalizadasHoje,
+  };
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -173,6 +197,8 @@ export default function FilaLoja() {
         <h1 className="text-2xl font-semibold tracking-tight">Fila da Loja</h1>
         <p className="text-muted-foreground mt-0.5">Pedidos aguardando verificação e expedição.</p>
       </div>
+
+      <LojaKpiCards data={kpiData} onFilterClick={setStatusFilter} />
 
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
