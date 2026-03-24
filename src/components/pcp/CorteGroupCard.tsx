@@ -262,6 +262,20 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                 ))}
               </SelectContent>
             </Select>
+            <Select
+              value={janelaDias != null ? String(janelaDias) : 'padrao'}
+              onValueChange={v => onJanelaDiasChange(v === 'padrao' ? null : Number(v))}
+            >
+              <SelectTrigger className="w-[140px]">
+                <CalendarDays className="h-3.5 w-3.5 mr-1 shrink-0" />
+                <SelectValue placeholder="Agrup. data" />
+              </SelectTrigger>
+              <SelectContent>
+                {JANELA_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" size="sm" onClick={handlePrint} disabled={filteredGroups.length === 0}>
               <Printer className="h-4 w-4 mr-1" />
               PDF
