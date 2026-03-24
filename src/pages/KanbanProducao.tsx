@@ -599,7 +599,46 @@ export default function KanbanProducao() {
   };
 
 
-  // --- Preparação Sub-etapas (inline expandable) ---
+  // --- Obs para Corte ---
+  const openObsCorteModal = async (card: KanbanCard) => {
+    setObsCorteModal({ open: true, card, items: [], loading: true });
+    setObsCorteTexts(new Map());
+    const { data: items } = await supabase
+      .from('pedido_itens')
+      .select('id, descricao_produto, referencia_produto, quantidade')
+      .eq('pedido_id', card.pedido_id)
+      .order('descricao_produto');
+
+    // Filter only TECIDO items
+    const tecidoItems = (items || []).filter(i => {
+      const upper = (i.descricao_produto || '').toUpperCase();
+      return upper.includes('CINTO TECIDO') || upper.includes('TIRA TECIDO');
+    });
+
+    setObsCorteModal(prev => ({ ...prev, items: tecidoItems, loading: false }));
+  };
+
+  const saveObsCorte = async () => {
+    if (!profile || !obsCorteModal.card) return;
+    const entries = Array.from(obsCorteTexts.entries()).filter(([, text]) => text.trim());
+    if (entries.length === 0) { toast.error('Preencha pelo menos uma observação'); return; }
+
+    setSavingObsCorte(true);
+    try {
+      const inserts = entries.map(([itemId, text]) => ({
+        pedido_item_id: itemId,
+        observacao: text.trim(),
+        criado_por: profile.id,
+      }));
+      const { error } = await supabase.from('pedido_item_obs_corte').insert(inserts);
+      if (error) throw error;
+      toast.success(`${entries.length} observação(ões) enviada(s) ao Corte`);
+      setObsCorteModal({ open: false, card: null, items: [], loading: false });
+      setObsCorteTexts(new Map());
+    } catch { toast.error('Erro ao salvar observações'); }
+    setSavingObsCorte(false);
+  };
+
   const togglePrepExpand = async (card: KanbanCard) => {
     const isExpanded = expandedPrepCards.has(card.id);
     if (isExpanded) {
