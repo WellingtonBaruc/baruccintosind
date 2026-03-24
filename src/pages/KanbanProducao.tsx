@@ -286,7 +286,7 @@ export default function KanbanProducao() {
       };
     });
 
-    // Deduplicate: hide CONCLUÍDA OPs when same pedido has active OPs
+    // Deduplicate: hide CONCLUÍDA OPs when same pedido has other OPs still active
     const pedidoGroups = new Map<string, typeof kanbanCards>();
     for (const c of kanbanCards) {
       const group = pedidoGroups.get(c.pedido_id) || [];
@@ -296,9 +296,9 @@ export default function KanbanProducao() {
     const filteredCards = kanbanCards.filter(c => {
       const group = pedidoGroups.get(c.pedido_id);
       if (!group || group.length <= 1) return true;
-      const col = mapEtapaToColumn(c.nome_etapa, c.etapa_status, c.ordem_status, c.tipo_produto);
-      if (col === 'Concluído') {
-        const hasActiveOp = group.some(g => g.id !== c.id && mapEtapaToColumn(g.nome_etapa, g.etapa_status, g.ordem_status, g.tipo_produto) !== 'Concluído');
+      // Hide cards whose ordem is CONCLUIDA when another OP for same pedido is still active
+      if (c.ordem_status === 'CONCLUIDA') {
+        const hasActiveOp = group.some(g => g.id !== c.id && g.ordem_status !== 'CONCLUIDA');
         if (hasActiveOp) return false;
       }
       return true;
