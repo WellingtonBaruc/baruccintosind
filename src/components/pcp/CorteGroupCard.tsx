@@ -36,7 +36,7 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
       })
       .filter(Boolean) as CutGroup[];
   }, [groups, search]);
-  const filteredGroups = filterLargura === 'all' ? groups : groups.filter(g => g.largura === filterLargura);
+  const filteredGroups = filterLargura === 'all' ? searchedGroups : searchedGroups.filter(g => g.largura === filterLargura);
   const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
 
   const handlePrint = () => {
