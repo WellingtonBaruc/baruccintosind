@@ -594,7 +594,7 @@ export type Database = {
             foreignKeyName: "pcp_corte_registro_operador_id_fkey"
             columns: ["operador_id"]
             isOneToOne: false
-            referencedRelation: "usuarios"
+            referencedRelation: "pcp_operadores_corte"
             referencedColumns: ["id"]
           },
         ]
@@ -650,6 +650,27 @@ export type Database = {
           lead_time_dias?: number
           observacao?: string | null
           tipo?: string
+        }
+        Relationships: []
+      }
+      pcp_operadores_corte: {
+        Row: {
+          ativo: boolean
+          criado_em: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          ativo?: boolean
+          criado_em?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          ativo?: boolean
+          criado_em?: string
+          id?: string
+          nome?: string
         }
         Relationships: []
       }
