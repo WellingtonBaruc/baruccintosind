@@ -32,7 +32,10 @@ export interface PedidoPainelDia {
   status_pcp: StatusPcpInteligente;
   etiqueta: EtiquetaPrioridade;
   score_prioridade: number;
-  ordem_status: string; // status da ordem de produção
+  ordem_status: string;
+  programado_inicio_data: string | null;
+  programado_conclusao_data: string | null;
+  pedido_id: string;
 }
 
 export interface CapacidadeDia {
