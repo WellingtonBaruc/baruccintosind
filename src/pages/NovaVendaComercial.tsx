@@ -11,8 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Loader2, ArrowLeft, ShoppingBag } from 'lucide-react';
+import { Plus, Trash2, Loader2, ArrowLeft, ShoppingBag, Download, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface ItemForm {
   descricao_produto: string;
@@ -66,7 +68,7 @@ export default function NovaVendaComercial() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
-
+  const [vendaCriada, setVendaCriada] = useState<{ numeroPedido: string } | null>(null);
   // Tipo de fluxo
   const [tipoFluxo, setTipoFluxo] = useState<'PRODUCAO' | 'PRONTA_ENTREGA'>('PRODUCAO');
 
@@ -278,13 +280,148 @@ export default function NovaVendaComercial() {
       });
 
       toast.success('Venda criada com sucesso! Pedido inserido no sistema.');
-      navigate(tipoFluxo === 'PRODUCAO' ? '/producao' : '/loja');
+      setVendaCriada({ numeroPedido });
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Erro ao criar venda.');
     }
     setSaving(false);
   };
+
+  const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const gerarPDF = () => {
+    if (!vendaCriada) return;
+    const doc = new jsPDF();
+    const pw = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BARUC - Pedido de Venda', pw / 2, 20, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Pedido: ${vendaCriada.numeroPedido}`, 14, 32);
+    doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, pw - 14, 32, { align: 'right' });
+    doc.text(`Fluxo: ${tipoFluxo === 'PRODUCAO' ? 'Produção' : 'Pronta Entrega'}`, 14, 38);
+
+    // Line
+    doc.setDrawColor(200);
+    doc.line(14, 42, pw - 14, 42);
+
+    // Client info
+    let y = 50;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Dados do Cliente', 14, y);
+    y += 7;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Nome: ${clienteNome}`, 14, y); y += 5;
+    if (clienteCpf) { doc.text(`CPF/CNPJ: ${clienteCpf}`, 14, y); y += 5; }
+    if (clienteTelefone) { doc.text(`Telefone: ${clienteTelefone}`, 14, y); y += 5; }
+    if (clienteEmail) { doc.text(`Email: ${clienteEmail}`, 14, y); y += 5; }
+    if (clienteEndereco) { doc.text(`Endereço: ${clienteEndereco}`, 14, y); y += 5; }
+
+    // Sale info
+    y += 4;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Dados da Venda', 14, y);
+    y += 7;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    if (vendedorNome) { doc.text(`Vendedor: ${vendedorNome}`, 14, y); y += 5; }
+    if (canalVenda) { doc.text(`Canal: ${canalVenda}`, 14, y); y += 5; }
+    if (dataPrevisaoEntrega) { doc.text(`Previsão entrega: ${new Date(dataPrevisaoEntrega + 'T12:00:00').toLocaleDateString('pt-BR')}`, 14, y); y += 5; }
+    if (formaPagamento) { doc.text(`Pagamento: ${formaPagamento}`, 14, y); y += 5; }
+    if (formaEnvio) { doc.text(`Envio: ${formaEnvio}`, 14, y); y += 5; }
+    if (observacaoComercial) { doc.text(`Obs: ${observacaoComercial}`, 14, y); y += 5; }
+
+    // Items table
+    y += 4;
+    const tableData = itens.map((item, idx) => [
+      String(idx + 1),
+      item.descricao_produto,
+      item.referencia_produto || '-',
+      item.categoria_produto || '-',
+      String(item.quantidade),
+      fmtBRL(item.valor_unitario),
+      fmtBRL(item.quantidade * item.valor_unitario),
+    ]);
+
+    autoTable(doc, {
+      startY: y,
+      head: [['#', 'Descrição', 'Ref.', 'Categoria', 'Qtd', 'Vl. Un.', 'Total']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [41, 128, 185], fontSize: 8 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        1: { cellWidth: 50 },
+        4: { halign: 'center', cellWidth: 15 },
+        5: { halign: 'right', cellWidth: 25 },
+        6: { halign: 'right', cellWidth: 25 },
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    // Totals
+    const finalY = (doc as any).lastAutoTable?.finalY || y + 40;
+    let ty = finalY + 8;
+    doc.setFontSize(9);
+    const rx = pw - 14;
+    doc.text(`Produtos: ${fmtBRL(valorProdutos)}`, rx, ty, { align: 'right' }); ty += 5;
+    if (valorFrete > 0) { doc.text(`Frete: ${fmtBRL(valorFrete)}`, rx, ty, { align: 'right' }); ty += 5; }
+    if (valorAcrescimo > 0) { doc.text(`Acréscimo: ${fmtBRL(valorAcrescimo)}`, rx, ty, { align: 'right' }); ty += 5; }
+    if (valorDesconto > 0) { doc.text(`Desconto: -${fmtBRL(valorDesconto)}`, rx, ty, { align: 'right' }); ty += 5; }
+    doc.setDrawColor(200);
+    doc.line(rx - 60, ty, rx, ty); ty += 4;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`TOTAL: ${fmtBRL(valorLiquido)}`, rx, ty, { align: 'right' });
+
+    doc.save(`${vendaCriada.numeroPedido}.pdf`);
+  };
+
+  const handleNovaVenda = () => {
+    setVendaCriada(null);
+    setClienteNome(''); setClienteCpf(''); setClienteTelefone(''); setClienteEmail(''); setClienteEndereco('');
+    setVendedorNome(''); setCanalVenda(''); setDataPrevisaoEntrega(''); setFormaPagamento(''); setFormaEnvio('');
+    setObservacaoComercial(''); setValorFrete(0); setValorDesconto(0); setValorAcrescimo(0);
+    setItens([emptyItem()]); setTipoFluxo('PRODUCAO');
+  };
+
+  if (vendaCriada) {
+    return (
+      <div className="animate-fade-in space-y-6 max-w-lg mx-auto mt-12">
+        <Card className="border-border/60 shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center py-12 space-y-6">
+            <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="text-center space-y-1">
+              <h2 className="text-xl font-semibold">Venda criada com sucesso!</h2>
+              <p className="text-muted-foreground">Pedido <span className="font-medium text-foreground">{vendaCriada.numeroPedido}</span> inserido no sistema.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <Button onClick={gerarPDF} className="min-h-[48px]" variant="default">
+                <Download className="h-4 w-4 mr-2" /> Baixar PDF da Venda
+              </Button>
+              <Button onClick={handleNovaVenda} variant="outline" className="min-h-[48px]">
+                <Plus className="h-4 w-4 mr-2" /> Nova Venda
+              </Button>
+            </div>
+            <Button variant="ghost" className="text-muted-foreground" onClick={() => navigate(tipoFluxo === 'PRODUCAO' ? '/producao' : '/kanban-venda')}>
+              Ir para a fila
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in space-y-6 max-w-4xl">
