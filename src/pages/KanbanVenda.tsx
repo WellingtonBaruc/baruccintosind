@@ -153,7 +153,7 @@ export default function KanbanVenda() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  if (!profile || !allowedPerfis.includes(profile.perfil)) {
+  if (!profile || !allowedPerfis.includes(profile.perfil) || !profile.kanban_venda_acesso) {
     return <Navigate to="/dashboard" replace />;
   }
 
