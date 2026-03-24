@@ -411,6 +411,15 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                 <Plus className="h-4 w-4 mr-1" />
                 OP Manual
               </Button>
+              <Button
+                variant={hideCompleted ? 'default' : 'outline'}
+                size="sm"
+                className={hideCompleted ? 'gap-1' : 'gap-1 text-muted-foreground'}
+                onClick={() => setHideCompleted(v => !v)}
+              >
+                <EyeOff className="h-3.5 w-3.5" />
+                <span className="text-xs">{hideCompleted ? 'Mostrar concluídos' : 'Ocultar concluídos'}</span>
+              </Button>
             </div>
           </div>
           {/* Fase 2: Indicator mini-cards */}
@@ -471,10 +480,11 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                     ? getOperadorNome((group as any)._manual_operador_id)
                     : getOperadorNome(reg?.operador_id);
 
+                  const isConcluido = status === 'CONCLUIDO';
                   const rowClass = isManual
                     ? 'bg-orange-50/70 border-l-4 border-l-orange-400'
-                    : status === 'CONCLUIDO'
-                      ? 'bg-blue-50/50'
+                    : isConcluido
+                      ? 'bg-muted/30 opacity-60'
                       : status === 'INICIADO'
                         ? 'bg-yellow-50/30'
                         : '';
