@@ -304,6 +304,14 @@ export default function KanbanProducao() {
         fivela_coberta_status: e.ordens_producao.fivela_coberta_status || null,
         programado_inicio_data: (e.ordens_producao as any).programado_inicio_data || null,
         programado_conclusao_data: (e.ordens_producao as any).programado_conclusao_data || null,
+        corte_ok: (() => {
+          const items = pedidoTipoItems.get(`${pedidoId}|${tipoProduto}`) || [];
+          if (items.length === 0) return false;
+          return items.every(desc => {
+            const attrs = extrairAtributosProduto(desc);
+            return corteConcluidoKeys.has(`${tipoProduto}|${attrs.largura}|${attrs.material}|${attrs.tamanho}|${attrs.cor}`);
+          });
+        })(),
       };
     });
 
