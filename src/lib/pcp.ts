@@ -15,6 +15,9 @@ export interface CutGroupItem {
   referencia: string | null;
   observacao_producao: string | null;
   quantidade: number;
+  numero_venda?: string | null;
+  data_venda?: string | null;
+  lead_time_dias?: number | null;
 }
 
 // Extract attributes from product name for cut grouping
