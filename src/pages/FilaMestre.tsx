@@ -42,6 +42,7 @@ interface VendaRow {
   status_atual: string;
   status_prazo: string | null;
   status_api: string | null;
+  observacao_api: string | null;
   criado_em: string;
   ordem_id: string | null;
   ordem_status: string | null;
@@ -135,7 +136,7 @@ export default function FilaMestre() {
     // 1) Fetch pedidos with status_api = 'Em Produção'
     const { data: pedidosEmProducao } = await supabase
       .from('pedidos')
-      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
+      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
       .eq('status_api', 'Em Produção')
       .order('criado_em', { ascending: false });
 
@@ -153,7 +154,7 @@ export default function FilaMestre() {
     if (opPedidoIds.length > 0) {
       const { data } = await supabase
         .from('pedidos')
-        .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
+        .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
         .in('id', opPedidoIds)
         .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")');
       pedidosComOp = data || [];
@@ -220,6 +221,7 @@ export default function FilaMestre() {
         is_piloto: (p as any).is_piloto || false,
         status_piloto: (p as any).status_piloto || null,
         fivelas_separadas: (p as any).fivelas_separadas || false,
+        observacao_api: (p as any).observacao_api || null,
         status_prazo: statusPrazo,
         dataPcpCalculada: pcp.dataPcpCalculada,
         dataInicioIdeal: pcp.dataInicioIdeal,
@@ -504,6 +506,11 @@ export default function FilaMestre() {
                     {r.fivelas_separadas && (
                       <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
                         Fivelas ✓
+                      </Badge>
+                    )}
+                    {r.observacao_api?.includes('[IMPORTADO SEM DATA PREVISTA]') && (
+                      <Badge className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">
+                        📋 Sem data prevista
                       </Badge>
                     )}
                     {r.ordem_status && (

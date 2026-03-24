@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertTriangle, Wifi, Layers, RotateCcw } from 'lucide-react';
+import ImportPlanilha from '@/components/integracao/ImportPlanilha';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -613,6 +614,9 @@ export default function Integracao() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Spreadsheet import */}
+      <ImportPlanilha />
 
       {/* Diagnostics */}
       <Card className="border-border/60 shadow-sm">

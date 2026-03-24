@@ -53,6 +53,7 @@ interface KanbanCard {
   fivela_coberta_status: string | null;
   programado_inicio_data: string | null;
   programado_conclusao_data: string | null;
+  observacao_api: string | null;
   corte_ok: boolean;
   corte_total: number;
   corte_concluidos: number;
@@ -158,7 +159,7 @@ export default function KanbanProducao() {
           usuarios(nome),
           ordens_producao!inner(
             id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao, tem_fivela_coberta, fivela_coberta_status, programado_inicio_data, programado_conclusao_data,
-            pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas)
+            pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas, observacao_api)
           )
         `)
         .in('status', ['EM_ANDAMENTO', 'CONCLUIDA', 'PENDENTE']),
@@ -306,6 +307,7 @@ export default function KanbanProducao() {
         fivela_coberta_status: e.ordens_producao.fivela_coberta_status || null,
         programado_inicio_data: (e.ordens_producao as any).programado_inicio_data || null,
         programado_conclusao_data: (e.ordens_producao as any).programado_conclusao_data || null,
+        observacao_api: e.ordens_producao.pedidos.observacao_api || null,
         corte_ok: (() => {
           const items = pedidoTipoItems.get(`${pedidoId}|${tipoProduto}`) || [];
           if (items.length === 0) return false;
@@ -1040,6 +1042,12 @@ export default function KanbanProducao() {
                                 {card.tipo_produto === 'SINTETICO' && card.fivelas_separadas && (
                                   <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
                                     Fivelas separadas ✓
+                                  </Badge>
+                                )}
+
+                                {card.observacao_api?.includes('[IMPORTADO SEM DATA PREVISTA]') && (
+                                  <Badge className="mt-1.5 text-[10px] bg-destructive/15 text-destructive border-destructive/30">
+                                    📋 Sem data prevista
                                   </Badge>
                                 )}
 
