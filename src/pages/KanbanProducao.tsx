@@ -54,6 +54,8 @@ interface KanbanCard {
   programado_inicio_data: string | null;
   programado_conclusao_data: string | null;
   corte_ok: boolean;
+  corte_total: number;
+  corte_concluidos: number;
 }
 
 // Unified columns
