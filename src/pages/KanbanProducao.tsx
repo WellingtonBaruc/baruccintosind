@@ -51,6 +51,8 @@ interface KanbanCard {
   ordem_observacao: string | null;
   tem_fivela_coberta: boolean;
   fivela_coberta_status: string | null;
+  programado_inicio_data: string | null;
+  programado_conclusao_data: string | null;
 }
 
 // Unified columns
