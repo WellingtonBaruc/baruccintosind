@@ -10,7 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays, Package, Layers, Hash } from 'lucide-react';
+import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays, Package, Layers, Hash, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { CutGroup, TIPO_PRODUTO_LABELS, ObsCorte } from '@/lib/pcp';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -70,6 +70,9 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   const [savingOperador, setSavingOperador] = useState(false);
   const [actionLoading, setActionLoading] = useState<Set<string>>(new Set());
   const [markingRead, setMarkingRead] = useState<Set<string>>(new Set());
+  // Sorting
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   // Manual OP modal
   const [manualModal, setManualModal] = useState(false);
   const [manualForm, setManualForm] = useState({ descricao: '', quantidade: '', dataInicio: '', dataFim: '', observacao: '' });
