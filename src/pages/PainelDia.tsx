@@ -190,7 +190,22 @@ export default function PainelDia() {
       return pedidoPainel;
     });
 
-    // Identify bottleneck type
+    // Deduplicate by pedido (numero_pedido) — keep entry with highest priority status
+    const STATUS_PRIORITY: Record<string, number> = {
+      ATRASADO: 6, EM_RISCO: 5, CONCLUIR_HOJE: 4, PROGRAMADO_HOJE: 3,
+      EM_PRODUCAO_PRAZO: 2, NAO_INICIADO: 1, CONCLUIDO: 0,
+    };
+    const pedidoMap = new Map<string, PedidoPainelDia>();
+    for (const p of pedidosList) {
+      const key = p.numero_pedido;
+      const existing = pedidoMap.get(key);
+      if (!existing || (STATUS_PRIORITY[p.status_pcp] || 0) > (STATUS_PRIORITY[existing.status_pcp] || 0)) {
+        pedidoMap.set(key, p);
+      }
+    }
+    const pedidosDedup = Array.from(pedidoMap.values());
+
+
     const tipoAtrasos: Record<string, number[]> = {};
     for (const p of pedidosList) {
       if (p.dias_atraso > 0 && p.tipo_produto) {
