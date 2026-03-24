@@ -105,7 +105,7 @@ export default function VerificacaoLoja() {
   const isVerificando = pedido.status_atual === 'LOJA_VERIFICANDO';
   const isAguardandoOp = pedido.status_atual === 'AGUARDANDO_OP_COMPLEMENTAR';
   const isAguardandoAlmox = pedido.status_atual === 'AGUARDANDO_ALMOXARIFADO';
-  const allSolicitacoesAtendidas = solicitacoes.length > 0 && solicitacoes.every(s => s.status === 'ATENDIDA');
+  const allSolicitacoesAtendidas = solicitacoes.length > 0 && solicitacoes.every(s => s.status === 'ATENDIDA' || s.status === 'ATENDIDO');
 
   const handleToggleConferido = async (itemId: string, checked: boolean) => {
     await supabase.from('pedido_itens').update({ conferido: checked } as any).eq('id', itemId);
@@ -507,8 +507,8 @@ export default function VerificacaoLoja() {
                   <span className="text-xs text-muted-foreground ml-2">Qtd: {s.quantidade}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={s.status === 'ATENDIDA' ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'}>
-                    {s.status === 'ATENDIDA' ? 'Atendida' : 'Pendente'}
+                  <Badge className={s.status === 'ATENDIDA' || s.status === 'ATENDIDO' ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'}>
+                    {s.status === 'ATENDIDA' || s.status === 'ATENDIDO' ? 'Atendida' : 'Pendente'}
                   </Badge>
                   {s.status === 'PENDENTE' && ['admin', 'gestor', 'supervisor_producao', 'loja'].includes(profile.perfil) && (
                     <Button size="sm" variant="outline" onClick={() => handleAtenderSolicitacao(s.id)}>

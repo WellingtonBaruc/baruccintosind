@@ -90,7 +90,7 @@ export default function FilaLoja() {
           grouped[s.pedido_id].push(s.status);
         });
         for (const [pid, statuses] of Object.entries(grouped)) {
-          almoxMap[pid] = statuses.length > 0 && statuses.every(s => s === 'ATENDIDA');
+          almoxMap[pid] = statuses.length > 0 && statuses.every(s => s === 'ATENDIDA' || s === 'ATENDIDO');
         }
       }
 
