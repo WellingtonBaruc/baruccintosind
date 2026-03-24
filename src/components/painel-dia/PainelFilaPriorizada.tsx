@@ -1,17 +1,25 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TIPO_PRODUTO_BADGE, TIPO_PRODUTO_LABELS } from '@/lib/pcp';
-import { STATUS_PCP_CONFIG, ETIQUETA_CONFIG, type PedidoPainelDia, type StatusPcpInteligente, type EtiquetaPrioridade } from '@/lib/pcpPainelDia';
-import { ListOrdered, ArrowUpDown } from 'lucide-react';
+import { STATUS_PCP_CONFIG, ETIQUETA_CONFIG, type PedidoPainelDia } from '@/lib/pcpPainelDia';
+import { ListOrdered, ArrowUpDown, CalendarPlus, CalendarCheck, X, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
+import { Progress } from '@/components/ui/progress';
 
 interface Props {
   pedidos: PedidoPainelDia[];
+  onProgramarInicio?: (pedido: PedidoPainelDia) => void;
+  onProgramarConclusao?: (pedido: PedidoPainelDia) => void;
+  onDesprogramar?: (pedido: PedidoPainelDia) => void;
+  hoje?: string;
+  capacidadeTotal?: number;
+  cargaProgramada?: number;
 }
 
-export default function PainelFilaPriorizada({ pedidos }: Props) {
+export default function PainelFilaPriorizada({ pedidos, onProgramarInicio, onProgramarConclusao, onDesprogramar, hoje, capacidadeTotal = 0, cargaProgramada = 0 }: Props) {
   const [filtroTipo, setFiltroTipo] = useState<string>('TODOS');
   const [filtroStatus, setFiltroStatus] = useState<string>('TODOS');
   const [filtroEtiqueta, setFiltroEtiqueta] = useState<string>('TODOS');
@@ -22,6 +30,9 @@ export default function PainelFilaPriorizada({ pedidos }: Props) {
     if (filtroEtiqueta !== 'TODOS' && p.etiqueta !== filtroEtiqueta) return false;
     return true;
   });
+
+  const cargaPct = capacidadeTotal > 0 ? Math.min((cargaProgramada / capacidadeTotal) * 100, 100) : 0;
+  const excedido = cargaProgramada > capacidadeTotal && capacidadeTotal > 0;
 
   return (
     <Card className="border-border/60">
@@ -71,6 +82,20 @@ export default function PainelFilaPriorizada({ pedidos }: Props) {
             </Select>
           </div>
         </div>
+
+        {/* Capacity bar */}
+        {capacidadeTotal > 0 && (
+          <div className="mt-3 space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Carga programada</span>
+              <span className={excedido ? 'text-destructive font-semibold' : 'text-foreground'}>
+                {cargaProgramada} / {capacidadeTotal} peças
+                {excedido && <AlertTriangle className="h-3 w-3 inline ml-1" />}
+              </span>
+            </div>
+            <Progress value={cargaPct} className={`h-2 ${excedido ? '[&>div]:bg-destructive' : ''}`} />
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -84,21 +109,23 @@ export default function PainelFilaPriorizada({ pedidos }: Props) {
                 <th className="text-center pb-2 font-medium">Status</th>
                 <th className="text-center pb-2 font-medium">Etiqueta</th>
                 <th className="text-center pb-2 font-medium">Entrega</th>
-                <th className="text-center pb-2 font-medium">Início Ideal</th>
-                <th className="text-center pb-2 font-medium">Atraso</th>
                 <th className="text-center pb-2 font-medium">Peças</th>
                 <th className="text-right pb-2 font-medium flex items-center justify-end gap-1">
                   <ArrowUpDown className="h-3 w-3" /> Score
                 </th>
+                <th className="text-center pb-2 font-medium">Programação</th>
               </tr>
             </thead>
             <tbody>
               {filtered.slice(0, 50).map((p, i) => {
                 const statusCfg = STATUS_PCP_CONFIG[p.status_pcp];
                 const etiqCfg = ETIQUETA_CONFIG[p.etiqueta];
+                const isProgramadoInicio = hoje && p.programado_inicio_data === hoje;
+                const isProgramadoConclusao = hoje && p.programado_conclusao_data === hoje;
+                const isProgramado = isProgramadoInicio || isProgramadoConclusao;
 
                 return (
-                  <tr key={p.id} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
+                  <tr key={p.id} className={`border-b border-border/40 hover:bg-muted/30 transition-colors ${isProgramado ? 'bg-primary/5' : ''}`}>
                     <td className="py-2 text-muted-foreground">{i + 1}</td>
                     <td className="py-2 font-medium">{p.api_venda_id || p.numero_pedido}</td>
                     <td className="py-2 max-w-[150px] truncate">{p.cliente_nome}</td>
@@ -120,18 +147,35 @@ export default function PainelFilaPriorizada({ pedidos }: Props) {
                     <td className="py-2 text-center tabular-nums">
                       {p.data_previsao_entrega ? format(new Date(p.data_previsao_entrega + 'T00:00:00'), 'dd/MM') : '—'}
                     </td>
-                    <td className="py-2 text-center tabular-nums">
-                      {p.data_inicio_ideal ? format(new Date(p.data_inicio_ideal + 'T00:00:00'), 'dd/MM') : '—'}
-                    </td>
-                    <td className="py-2 text-center">
-                      {p.dias_atraso > 0 ? (
-                        <span className="text-destructive font-medium">-{p.dias_atraso}d</span>
-                      ) : (
-                        <span className="text-[hsl(var(--success))]">OK</span>
-                      )}
-                    </td>
                     <td className="py-2 text-center tabular-nums">{p.quantidade_itens}</td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{p.score_prioridade}</td>
+                    <td className="py-2 text-center">
+                      {isProgramado ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <Badge className="text-[10px] bg-primary/15 text-primary border-primary/30">
+                            {isProgramadoInicio ? 'Início' : 'Conclusão'}
+                          </Badge>
+                          {onDesprogramar && (
+                            <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive" onClick={() => onDesprogramar(p)}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1">
+                          {onProgramarInicio && p.status_atual === 'AGUARDANDO_PRODUCAO' && (
+                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-blue-600 hover:bg-blue-50" onClick={() => onProgramarInicio(p)} title="Programar início hoje">
+                              <CalendarPlus className="h-3 w-3 mr-0.5" /> Início
+                            </Button>
+                          )}
+                          {onProgramarConclusao && p.status_atual === 'EM_PRODUCAO' && (
+                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-orange-600 hover:bg-orange-50" onClick={() => onProgramarConclusao(p)} title="Programar conclusão hoje">
+                              <CalendarCheck className="h-3 w-3 mr-0.5" /> Conclusão
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
