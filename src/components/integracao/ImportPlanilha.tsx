@@ -443,7 +443,8 @@ export default function ImportPlanilha() {
 
             res.atualizados++;
           }
-        } catch {
+        } catch (err: any) {
+          console.error(`Erro ao importar venda ${venda.numVenda}:`, err);
           res.erros++;
         }
       }
