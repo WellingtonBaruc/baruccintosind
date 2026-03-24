@@ -911,6 +911,10 @@ export default function KanbanProducao() {
   // KPI: Fivela coberta aguardando
   const fivelaAguardandoCards = cards.filter(c => c.tem_fivela_coberta && c.fivela_coberta_status !== 'CONCLUIDO');
 
+  if (profile && !profile.kanban_producao_acesso) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
