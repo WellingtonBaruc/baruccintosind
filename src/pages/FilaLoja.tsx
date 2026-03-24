@@ -247,6 +247,10 @@ export default function FilaLoja() {
                               ⚡ Aguardando Finalização
                             </Badge>
                           )}
+                          {(p.status_atual === 'AGUARDANDO_COMERCIAL' || p.status_atual === 'VALIDADO_COMERCIAL') && (
+                            <Badge className="bg-blue-500/15 text-blue-700 border-blue-500/30 text-[10px]" variant="outline">
+                              📤 {p.status_atual === 'VALIDADO_COMERCIAL' ? 'Validado Comercial' : 'Aguardando Comercial'}
+                            </Badge>
                           <div className="flex items-center gap-1 flex-wrap">
                             {p.fivelas_separadas && (
                               <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px]" variant="outline">
