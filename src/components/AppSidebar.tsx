@@ -61,10 +61,10 @@ export function AppSidebar() {
   if (!profile) return null;
 
   const visible = navItems.filter(i => {
+    // Kanban access is driven by the toggle flags, not just by profile
+    if (i.url === '/kanban') return !!profile.kanban_producao_acesso;
+    if (i.url === '/kanban-venda') return !!profile.kanban_venda_acesso;
     if (!i.perfis.includes(profile.perfil)) return false;
-    // Respect kanban access flags
-    if (i.url === '/kanban' && !profile.kanban_producao_acesso) return false;
-    if (i.url === '/kanban-venda' && !profile.kanban_venda_acesso) return false;
     return true;
   });
   const mainItems = visible.filter(i => !i.group);
