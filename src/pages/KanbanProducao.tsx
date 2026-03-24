@@ -1022,7 +1022,12 @@ export default function KanbanProducao() {
 
                                 {card.corte_ok && (
                                   <Badge className="mt-1.5 text-[10px] bg-blue-500 text-white border-blue-600 font-bold">
-                                    Corte OK
+                                    Corte OK ✓
+                                  </Badge>
+                                )}
+                                {!card.corte_ok && card.corte_concluidos > 0 && (
+                                  <Badge className="mt-1.5 text-[10px] bg-blue-400/20 text-blue-600 border-blue-400/40 font-semibold">
+                                    Corte {card.corte_concluidos}/{card.corte_total}
                                   </Badge>
                                 )}
 
