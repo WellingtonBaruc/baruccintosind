@@ -214,7 +214,7 @@ export default function FilaLoja() {
                   const cfg = STATUS_PEDIDO_CONFIG[p.status_atual] || { label: p.status_atual, color: 'bg-muted text-muted-foreground' };
                   const showSendButton = canSendToComercial(p);
                   return (
-                    <TableRow key={p.id}>
+                    <TableRow key={p.id} className={p.status_atual === 'LOJA_PENDENTE_FINALIZACAO' ? 'border-l-4 border-l-amber-500 bg-amber-500/5' : ''}>
                       <TableCell className="font-medium">{p.api_venda_id || p.numero_pedido}</TableCell>
                       <TableCell className="text-muted-foreground">{p.cliente_nome}</TableCell>
                       <TableCell>
@@ -242,19 +242,24 @@ export default function FilaLoja() {
                           <div className="flex items-center gap-1.5">
                             <Badge className={`font-normal ${cfg.color}`}>{cfg.label}</Badge>
                           </div>
+                          {p.status_atual === 'LOJA_PENDENTE_FINALIZACAO' && (
+                            <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/30 text-[10px] font-semibold animate-pulse" variant="outline">
+                              ⚡ Aguardando Finalização
+                            </Badge>
+                          )}
                           <div className="flex items-center gap-1 flex-wrap">
                             {p.fivelas_separadas && (
                               <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px]" variant="outline">
                                 <CheckCircle2 className="h-3 w-3 mr-0.5" /> Fivelas ✓
                               </Badge>
                             )}
-                            {p.status_atual === 'AGUARDANDO_OP_COMPLEMENTAR' && p.op_concluida && (
-                              <Badge className="bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30 text-[10px]" variant="outline">
+                            {(p.status_atual === 'AGUARDANDO_OP_COMPLEMENTAR' || p.status_atual === 'LOJA_PENDENTE_FINALIZACAO') && p.op_concluida && (
+                              <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px]" variant="outline">
                                 <CheckCircle2 className="h-3 w-3 mr-0.5" /> OP Concluída ✓
                               </Badge>
                             )}
-                            {p.status_atual === 'AGUARDANDO_ALMOXARIFADO' && p.almox_atendido && (
-                              <Badge className="bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30 text-[10px]" variant="outline">
+                            {(p.status_atual === 'AGUARDANDO_ALMOXARIFADO' || p.status_atual === 'LOJA_PENDENTE_FINALIZACAO') && p.almox_atendido && (
+                              <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px]" variant="outline">
                                 <CheckCircle2 className="h-3 w-3 mr-0.5" /> Almox Atendido ✓
                               </Badge>
                             )}
