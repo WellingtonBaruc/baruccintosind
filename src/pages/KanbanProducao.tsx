@@ -280,6 +280,8 @@ export default function KanbanProducao() {
         ordem_observacao: e.ordens_producao.observacao || null,
         tem_fivela_coberta: e.ordens_producao.tem_fivela_coberta || false,
         fivela_coberta_status: e.ordens_producao.fivela_coberta_status || null,
+        programado_inicio_data: (e.ordens_producao as any).programado_inicio_data || null,
+        programado_conclusao_data: (e.ordens_producao as any).programado_conclusao_data || null,
       };
     });
 
