@@ -60,7 +60,13 @@ export function AppSidebar() {
 
   if (!profile) return null;
 
-  const visible = navItems.filter(i => i.perfis.includes(profile.perfil));
+  const visible = navItems.filter(i => {
+    if (!i.perfis.includes(profile.perfil)) return false;
+    // Respect kanban access flags
+    if (i.url === '/kanban' && !profile.kanban_producao_acesso) return false;
+    if (i.url === '/kanban-venda' && !profile.kanban_venda_acesso) return false;
+    return true;
+  });
   const mainItems = visible.filter(i => !i.group);
   const setoresItems = visible.filter(i => i.group === 'setores');
   const configItems = visible.filter(i => i.group === 'config');
