@@ -143,10 +143,14 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   const handleCriarOperador = async () => {
     if (!novoOperadorNome.trim()) return;
     setSavingOperador(true);
-    // We can't create auth users from client. Just show info.
-    toast.info('Para cadastrar novos operadores, use a tela de Usuários.');
+    try {
+      const { error } = await supabase.from('pcp_operadores_corte').insert({ nome: novoOperadorNome.trim() });
+      if (error) throw error;
+      toast.success(`Operador "${novoOperadorNome.trim()}" cadastrado`);
+      setNovoOperadorNome('');
+      await fetchOperadores();
+    } catch { toast.error('Erro ao cadastrar operador'); }
     setSavingOperador(false);
-    setNovoOperadorNome('');
   };
 
   const searchedGroups = useMemo(() => {
