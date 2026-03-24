@@ -1086,10 +1086,8 @@ export default function KanbanProducao() {
                                 )}
 
                                 {profile?.perfil === 'operador_producao' && !inConcluido && col !== 'Aguardando Início' && !card.operador_id && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="w-full mt-2 h-8 text-xs"
+                                  <button
+                                    className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors"
                                     onClick={async () => {
                                       await supabase
                                         .from('op_etapas')
@@ -1100,8 +1098,8 @@ export default function KanbanProducao() {
                                       fetchCards();
                                     }}
                                   >
-                                    <User className="h-3 w-3 mr-1" /> Assumir tarefa
-                                  </Button>
+                                    <User className="h-3 w-3" /> Assumir
+                                  </button>
                                 )}
 
                                 {profile?.perfil === 'operador_producao' && card.operador_id === profile.id && !inConcluido && col !== 'Aguardando Início' && (
