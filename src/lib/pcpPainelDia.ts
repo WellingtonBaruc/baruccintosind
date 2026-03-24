@@ -64,7 +64,7 @@ export interface TipoAnalytics {
   atrasados: number;
 }
 
-const STATUS_FINAIS = ['ENVIADO', 'ENTREGUE', 'FINALIZADO_SIMPLIFICA', 'CANCELADO', 'HISTORICO'];
+const STATUS_FINAIS = ['ENVIADO', 'ENTREGUE', 'FINALIZADO_SIMPLIFICA', 'CANCELADO', 'HISTORICO', 'AGUARDANDO_CIENCIA_COMERCIAL'];
 
 export function calcularStatusPcp(
   pedido: {

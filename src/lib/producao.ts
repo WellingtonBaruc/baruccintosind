@@ -366,6 +366,8 @@ export const STATUS_PEDIDO_CONFIG: Record<string, { label: string; color: string
   BLOQUEADO: { label: 'Bloqueado', color: 'bg-destructive/15 text-destructive' },
   CANCELADO: { label: 'Cancelado', color: 'bg-destructive/15 text-destructive' },
   FINALIZADO_SIMPLIFICA: { label: 'Finalizado (Simplifica)', color: 'bg-muted text-muted-foreground' },
+  AGUARDANDO_CIENCIA_COMERCIAL: { label: 'Aguardando Ciência do Comercial', color: 'bg-warning/15 text-warning' },
+  HISTORICO: { label: 'Histórico', color: 'bg-muted text-muted-foreground' },
 };
 
 export const STATUS_ORDEM_CONFIG: Record<string, { label: string; color: string }> = {
