@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Search, Clock, Package, Eye, CheckCircle2, Send } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
@@ -29,6 +29,9 @@ interface PedidoLoja {
   criado_em: string;
   valor_liquido: number;
   qtd_itens?: number;
+  data_venda_api?: string | null;
+  data_previsao_entrega?: string | null;
+  observacao_api?: string | null;
   fivelas_separadas?: boolean;
   op_concluida?: boolean;
   almox_atendido?: boolean;
@@ -188,6 +191,8 @@ export default function FilaLoja() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Itens</TableHead>
                   <TableHead>Valor</TableHead>
+                  <TableHead>Data Venda</TableHead>
+                  <TableHead>Prev. Entrega</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Tempo em espera</TableHead>
                   <TableHead className="text-right">Ação</TableHead>
@@ -208,6 +213,18 @@ export default function FilaLoja() {
                       </TableCell>
                       <TableCell className="text-sm">
                         {p.valor_liquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {p.data_venda_api ? format(new Date(p.data_venda_api + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {p.data_previsao_entrega ? (
+                          <span className={p.observacao_api?.includes('[IMPORTADO SEM DATA PREVISTA]') ? 'text-destructive font-medium' : ''}>
+                            {format(new Date(p.data_previsao_entrega + 'T12:00:00'), 'dd/MM/yyyy')}
+                          </span>
+                        ) : (
+                          <span className="text-destructive font-medium">Sem previsão</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
