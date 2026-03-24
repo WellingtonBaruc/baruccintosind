@@ -296,6 +296,9 @@ export default function ImportPlanilha() {
 
           const dataVendaApi = parseExcelDate(venda.data);
 
+          const situacaoNorm = (venda.situacao || '').trim();
+          const shouldCreateOPs = situacaoNorm === 'Em Produção';
+
           if (venda.status === 'NOVA') {
             // Create new pedido
             const { data: newPedido, error: pedidoErr } = await supabase.from('pedidos').insert({
@@ -332,68 +335,70 @@ export default function ImportPlanilha() {
             }));
             await supabase.from('pedido_itens').insert(itensToInsert);
 
-            // Create production orders
-            for (const tipo of tipos) {
-              const pid = pipelineMap[tipo];
-              if (!pid) continue;
+            // Create production orders ONLY for 'Em Produção'
+            if (shouldCreateOPs) {
+              for (const tipo of tipos) {
+                const pid = pipelineMap[tipo];
+                if (!pid) continue;
 
-              const { data: newOrdem } = await supabase.from('ordens_producao').insert({
-                pedido_id: newPedido.id,
-                pipeline_id: pid,
-                status: 'AGUARDANDO' as any,
-                tipo_produto: tipo,
-              }).select().single();
+                const { data: newOrdem } = await supabase.from('ordens_producao').insert({
+                  pedido_id: newPedido.id,
+                  pipeline_id: pid,
+                  status: 'AGUARDANDO' as any,
+                  tipo_produto: tipo,
+                }).select().single();
 
-              if (newOrdem) {
-                const { data: etapas } = await supabase
-                  .from('pipeline_etapas')
-                  .select('*')
-                  .eq('pipeline_id', pid)
-                  .order('ordem');
+                if (newOrdem) {
+                  const { data: etapas } = await supabase
+                    .from('pipeline_etapas')
+                    .select('*')
+                    .eq('pipeline_id', pid)
+                    .order('ordem');
 
-                if (etapas && etapas.length > 0) {
-                  await supabase.from('op_etapas').insert(
-                    etapas.map((e, idx) => ({
-                      ordem_id: newOrdem.id,
-                      pipeline_etapa_id: e.id,
-                      nome_etapa: e.nome,
-                      ordem_sequencia: e.ordem,
-                      status: (idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as any,
-                      ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
-                    }))
-                  );
+                  if (etapas && etapas.length > 0) {
+                    await supabase.from('op_etapas').insert(
+                      etapas.map((e, idx) => ({
+                        ordem_id: newOrdem.id,
+                        pipeline_etapa_id: e.id,
+                        nome_etapa: e.nome,
+                        ordem_sequencia: e.ordem,
+                        status: (idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as any,
+                        ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
+                      }))
+                    );
+                  }
                 }
               }
-            }
 
-            // If no recognized types, create with default pipeline
-            if (tipos.size === 0) {
-              const defaultPid = pipelineMap['SINTETICO'];
-              const { data: newOrdem } = await supabase.from('ordens_producao').insert({
-                pedido_id: newPedido.id,
-                pipeline_id: defaultPid,
-                status: 'AGUARDANDO' as any,
-                tipo_produto: 'SINTETICO',
-              }).select().single();
+              // If no recognized types, create with default pipeline
+              if (tipos.size === 0) {
+                const defaultPid = pipelineMap['SINTETICO'];
+                const { data: newOrdem } = await supabase.from('ordens_producao').insert({
+                  pedido_id: newPedido.id,
+                  pipeline_id: defaultPid,
+                  status: 'AGUARDANDO' as any,
+                  tipo_produto: 'SINTETICO',
+                }).select().single();
 
-              if (newOrdem) {
-                const { data: etapas } = await supabase
-                  .from('pipeline_etapas')
-                  .select('*')
-                  .eq('pipeline_id', defaultPid)
-                  .order('ordem');
+                if (newOrdem) {
+                  const { data: etapas } = await supabase
+                    .from('pipeline_etapas')
+                    .select('*')
+                    .eq('pipeline_id', defaultPid)
+                    .order('ordem');
 
-                if (etapas && etapas.length > 0) {
-                  await supabase.from('op_etapas').insert(
-                    etapas.map((e, idx) => ({
-                      ordem_id: newOrdem.id,
-                      pipeline_etapa_id: e.id,
-                      nome_etapa: e.nome,
-                      ordem_sequencia: e.ordem,
-                      status: (idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as any,
-                      ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
-                    }))
-                  );
+                  if (etapas && etapas.length > 0) {
+                    await supabase.from('op_etapas').insert(
+                      etapas.map((e, idx) => ({
+                        ordem_id: newOrdem.id,
+                        pipeline_etapa_id: e.id,
+                        nome_etapa: e.nome,
+                        ordem_sequencia: e.ordem,
+                        status: (idx === 0 ? 'EM_ANDAMENTO' : 'PENDENTE') as any,
+                        ...(idx === 0 ? { iniciado_em: new Date().toISOString() } : {}),
+                      }))
+                    );
+                  }
                 }
               }
             }
@@ -417,12 +422,28 @@ export default function ImportPlanilha() {
             if (!existing) { res.erros++; continue; }
 
             // Update pedido
-            await supabase.from('pedidos').update({
+            // Update pedido + reconcile status_atual if situação changed
+            const updatePayload: any = {
               status_api: venda.situacao || existing.status_api,
               cliente_nome: venda.cliente,
               vendedor_nome: venda.consultor || null,
               canal_venda: venda.origemVenda || null,
-            }).eq('id', existing.id);
+            };
+
+            // Reconcile status_atual based on new situação
+            if (venda.situacao && venda.situacao !== existing.status_api) {
+              const newStatusAtual = mapSituacaoToStatusAtual(venda.situacao);
+              // Only reconcile if moving to a "lower" state (avoid overriding advanced states)
+              const productionStates = ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO', 'PRODUCAO_CONCLUIDA'];
+              if (venda.situacao.trim() === 'Pedido Enviado' && productionStates.includes(existing.status_api === 'Em Produção' ? 'EM_PRODUCAO' : '')) {
+                updatePayload.status_atual = newStatusAtual;
+              }
+              if (venda.situacao.trim() === 'Finalizado') {
+                updatePayload.status_atual = 'FINALIZADO_SIMPLIFICA';
+              }
+            }
+
+            await supabase.from('pedidos').update(updatePayload).eq('id', existing.id);
 
             // Reinsert itens
             await supabase.from('pedido_itens').delete().eq('pedido_id', existing.id);

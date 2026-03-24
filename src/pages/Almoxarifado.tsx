@@ -55,10 +55,11 @@ export default function AlmoxarifadoPage() {
     setLoading(true);
 
     // ── Fonte A: Pedidos "Em Produção" com itens que requerem separação ──
+    // Fetch pedidos 'Em Produção' + 'Pedido Enviado' (for buckle exception)
     const { data: pedidosA } = await supabase
       .from('pedidos')
       .select('id, api_venda_id, cliente_nome, data_previsao_entrega, status_prazo, status_atual, status_api, fivelas_separadas')
-      .eq('status_api', 'Em Produção')
+      .in('status_api', ['Em Produção', 'Pedido Enviado'])
       .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
       .order('data_previsao_entrega', { ascending: true });
 
@@ -80,6 +81,18 @@ export default function AlmoxarifadoPage() {
         requerSeparacaoAlmoxarifado(i.descricao_produto, i.categoria_produto)
       );
       if (itensRequerem.length === 0) continue;
+
+      // REGRA: 'Pedido Enviado' só aparece no Almoxarifado se for venda de fivelas
+      // (todos os itens que requerem separação são fivelas/aviamentos)
+      const statusApi = ((p as any).status_api || '').trim();
+      if (statusApi === 'Pedido Enviado') {
+        const hasFivelas = itensRequerem.some(i => {
+          const desc = (i.descricao_produto || '').toUpperCase();
+          const cat = (i.categoria_produto || '').toUpperCase();
+          return desc.includes('FIVELA') || desc.includes('PASSANTE') || cat.includes('FIVELA') || cat.includes('AVIAMENTO');
+        });
+        if (!hasFivelas) continue;
+      }
 
       mapA.set(p.id, {
         pedido_id: p.id,

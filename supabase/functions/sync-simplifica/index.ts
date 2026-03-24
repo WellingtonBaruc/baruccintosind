@@ -46,6 +46,53 @@ function classificarProduto(nomeProduto: string, categoriaProduto?: string, refe
   return 'OUTROS';
 }
 
+/**
+ * Reconcile status_atual based on new status_api from Simplifica.
+ * Returns the new status_atual or null if no change needed.
+ */
+function reconcileStatusAtual(
+  newStatusApi: string,
+  currentStatusAtual: string,
+  hasActiveComplementaryOp: boolean
+): string | null {
+  const normalized = (newStatusApi || '').trim();
+
+  if (normalized === 'Finalizado') {
+    const terminalStates = ['CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'ENVIADO', 'ENTREGUE'];
+    if (terminalStates.includes(currentStatusAtual)) return null;
+    return 'FINALIZADO_SIMPLIFICA';
+  }
+
+  if (normalized === 'Pedido Enviado') {
+    const postLojaStates = [
+      'AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL',
+      'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO',
+      'LIBERADO_LOGISTICA', 'EM_SEPARACAO',
+      'ENVIADO', 'ENTREGUE', 'CANCELADO',
+      'FINALIZADO_SIMPLIFICA', 'HISTORICO',
+    ];
+    if (postLojaStates.includes(currentStatusAtual)) return null;
+    
+    if (hasActiveComplementaryOp) {
+      if (['AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO'].includes(currentStatusAtual)) {
+        return null;
+      }
+    }
+    
+    const productionStates = ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO', 'PRODUCAO_CONCLUIDA'];
+    if (productionStates.includes(currentStatusAtual)) {
+      return 'AGUARDANDO_LOJA';
+    }
+    
+    const lojaStates = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'LOJA_OK'];
+    if (lojaStates.includes(currentStatusAtual)) return null;
+    
+    return null;
+  }
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -127,7 +174,7 @@ Deno.serve(async (req) => {
 
       for (const venda of vendasArray) {
         try {
-          const statusApi = venda.situacao_texto || '';
+          const statusApi = (venda.situacao_texto || '').trim();
           const apiVendaId = String(venda.id_venda);
 
           const { data: existente } = await supabase
@@ -204,7 +251,7 @@ Deno.serve(async (req) => {
   }
 });
 
-// ── Process existing order: detect changes, diff items ──
+// ── Process existing order: detect changes, diff items, RECONCILE status ──
 
 async function processarExistente(
   supabase: any,
@@ -215,15 +262,41 @@ async function processarExistente(
 ) {
   let hadChanges = false;
 
+  // ── STATUS_API change → reconcile status_atual ──
   if (existente.status_api !== statusApi) {
+    // Check for active complementary OPs (sequencia > 1)
+    const { data: activeOps } = await supabase
+      .from('ordens_producao')
+      .select('id, sequencia')
+      .eq('pedido_id', existente.id)
+      .gt('sequencia', 1)
+      .not('status', 'in', '("CONCLUIDA","CANCELADA")');
+
+    const hasActiveComplementaryOp = (activeOps || []).length > 0;
+
+    // Update status_api
     await supabase.from('pedidos').update({ status_api: statusApi }).eq('id', existente.id);
     hadChanges = true;
 
+    // Reconcile status_atual
+    const newStatusAtual = reconcileStatusAtual(statusApi, existente.status_atual, hasActiveComplementaryOp);
+    if (newStatusAtual) {
+      await supabase.from('pedidos').update({ status_atual: newStatusAtual }).eq('id', existente.id);
+      await supabase.from('pedido_historico').insert({
+        pedido_id: existente.id,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: existente.status_atual,
+        status_novo: newStatusAtual,
+        observacao: `Status reconciliado automaticamente: Simplifica mudou para "${statusApi}". ${existente.status_atual} → ${newStatusAtual}.`,
+      });
+    }
+
+    // Alert if Finalizado but was in production
     if (statusApi === 'Finalizado' && ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO'].includes(existente.status_atual)) {
       await supabase.from('pedido_historico').insert({
         pedido_id: existente.id,
         tipo_acao: 'COMENTARIO',
-        observacao: `⚠️ ALERTA: Simplifica marcou como Finalizado mas produção interna ainda está em ${existente.status_atual}.`,
+        observacao: `⚠️ ALERTA: Simplifica marcou como Finalizado mas produção interna estava em ${existente.status_atual}.`,
       });
     }
   }
@@ -337,8 +410,8 @@ function detectItemChanges(dbItens: any[], apiItens: any[]): ItemChange {
     }
   }
 
-  for (const [apiId, dbItem] of dbMap) {
-    if (!apiMap.has(apiId)) {
+  for (const [, dbItem] of dbMap) {
+    if (!apiMap.has(dbItem.api_item_id)) {
       result.hasChanges = true;
       result.removed.push({ descricao: dbItem.descricao_produto, qtd: dbItem.quantidade, raw: dbItem });
     }
@@ -503,9 +576,8 @@ async function inserirNovoPedido(
     await supabase.from('pedido_itens').insert(itensData);
   }
 
-  // Create production orders only for PRODUCAO flow
+  // Create production orders only for 'Em Produção'
   if (shouldCreateOPs) {
-    // Group items by type and create one order per type
     const itensByTipo: Record<string, any[]> = {};
     for (const item of (Array.isArray(itens) ? itens : [])) {
       const tipo = classificarProduto(item.nm_produto || '', item.nm_categoria || '', item.nm_referencia || '');
@@ -543,9 +615,8 @@ async function inserirNovoPedido(
 
       sequencia++;
     }
-  }
 
-  if (shouldCreateOPs) {
+    // After creating OPs, set status to EM_PRODUCAO
     await supabase.from('pedidos').update({ status_atual: 'EM_PRODUCAO' }).eq('id', pedido.id);
   }
 
