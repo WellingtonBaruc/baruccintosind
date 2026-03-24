@@ -81,7 +81,7 @@ export default function PainelDia() {
     const { data: ordensRaw } = await supabase
       .from('ordens_producao')
       .select(`
-        id, status, tipo_produto, sequencia, data_programacao, programado_para_hoje,
+        id, status, tipo_produto, sequencia, data_programacao, programado_para_hoje, programado_inicio_data, programado_conclusao_data,
         pedidos!inner(
           id, numero_pedido, api_venda_id, cliente_nome, status_atual,
           data_venda_api, data_previsao_entrega, valor_liquido
