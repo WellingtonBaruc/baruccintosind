@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Settings2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { PcpCalendarData, subtrairDiasUteis, contarDiasUteis, isDiaUtil } from '@/lib/pcpCalendario';
 import {
   calcularStatusPcp,
