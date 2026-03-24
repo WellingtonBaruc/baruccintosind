@@ -1,69 +1,76 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, Scissors, AlertTriangle, ChevronRight } from 'lucide-react';
-import { agruparParaCorte, CutGroupItem, STATUS_PRAZO_CONFIG, TIPO_PRODUTO_LABELS } from '@/lib/pcp';
+import { Loader2, Scissors, AlertTriangle, ChevronRight, Printer } from 'lucide-react';
+import { agruparParaCorte, CutGroupItem, TIPO_PRODUTO_LABELS } from '@/lib/pcp';
 
 const PERFIS_PCP = ['supervisor_producao', 'gestor', 'admin'];
+
+const TIPO_KEYWORDS: Record<string, string[]> = {
+  SINTETICO: ['CINTO SINTETICO', 'TIRA SINTETICO', 'CINTO SINTÉTICO', 'TIRA SINTÉTICO'],
+  TECIDO: ['CINTO TECIDO', 'TIRA TECIDO'],
+};
+
+function matchesTipo(descricao: string, tipo: string): boolean {
+  const upper = (descricao || '').toUpperCase();
+  return (TIPO_KEYWORDS[tipo] || []).some(kw => upper.includes(kw));
+}
 
 export default function PCP() {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [cutGroups, setCutGroups] = useState<ReturnType<typeof agruparParaCorte>>([]);
-  const [leadTimeStats, setLeadTimeStats] = useState<{ atrasados: number; atencao: number; noPrazo: number }>({ atrasados: 0, atencao: 0, noPrazo: 0 });
+  const [allItems, setAllItems] = useState<CutGroupItem[]>([]);
+  const [leadTimeStats, setLeadTimeStats] = useState({ atrasados: 0, atencao: 0, noPrazo: 0 });
+  const [filterTipo, setFilterTipo] = useState('all');
   const [filterLargura, setFilterLargura] = useState('all');
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { setFilterLargura('all'); }, [filterTipo]);
 
   const fetchData = async () => {
-    // Get all SINTETICO orders that have a Corte step in EM_ANDAMENTO or PENDENTE
     const { data: ordens } = await supabase
       .from('ordens_producao')
       .select('id, pedido_id, tipo_produto, pedidos!inner(numero_pedido, api_venda_id, cliente_nome, status_prazo, status_atual, data_venda_api, lead_time_preparacao_dias)')
-      .eq('tipo_produto', 'SINTETICO')
+      .in('tipo_produto', ['SINTETICO', 'TECIDO'])
       .in('status', ['EM_ANDAMENTO', 'AGUARDANDO'])
       .eq('pedidos.status_atual', 'EM_PRODUCAO');
 
-    if (!ordens || ordens.length === 0) {
-      setLoading(false);
-      return;
-    }
+    if (!ordens?.length) { setLoading(false); return; }
 
-    // Get etapas de Corte pendentes ou em andamento
     const ordemIds = ordens.map(o => o.id);
     const { data: etapasCorte } = await supabase
       .from('op_etapas')
       .select('id, ordem_id')
       .in('ordem_id', ordemIds)
-      .eq('nome_etapa', 'Corte')
+      .in('nome_etapa', ['Corte', 'Conferência'])
       .in('status', ['EM_ANDAMENTO', 'PENDENTE']);
 
-    if (!etapasCorte || etapasCorte.length === 0) {
-      setLoading(false);
-      return;
-    }
+    if (!etapasCorte?.length) { setLoading(false); return; }
 
-    const pedidoIds = [...new Set(ordens.map(o => o.pedido_id))];
+    const ordensComEtapa = new Set(etapasCorte.map(e => e.ordem_id));
+    const ordensFiltered = ordens.filter(o => ordensComEtapa.has(o.id));
+
+    const pedidoIds = [...new Set(ordensFiltered.map(o => o.pedido_id))];
     const { data: itens } = await supabase
       .from('pedido_itens')
       .select('id, pedido_id, descricao_produto, referencia_produto, observacao_producao, quantidade')
       .in('pedido_id', pedidoIds);
 
-    // Build pedido lookup from ordens
-    const pedidoMap = new Map<string, { numero_venda: string | null; data_venda: string | null; lead_time_dias: number | null }>();
-    for (const o of ordens) {
+    // Map pedido+tipo → info
+    const pedidoTipoMap = new Map<string, { numero_venda: string | null; data_venda: string | null; lead_time_dias: number | null }>();
+    for (const o of ordensFiltered) {
       const p = o.pedidos as any;
-      if (p && !pedidoMap.has(o.pedido_id)) {
-        pedidoMap.set(o.pedido_id, {
+      const key = `${o.pedido_id}|${o.tipo_produto}`;
+      if (p && !pedidoTipoMap.has(key)) {
+        pedidoTipoMap.set(key, {
           numero_venda: p.api_venda_id || p.numero_pedido,
           data_venda: p.data_venda_api,
           lead_time_dias: p.lead_time_preparacao_dias,
@@ -71,46 +78,76 @@ export default function PCP() {
       }
     }
 
-    // Filter only SINTETICO items
-    const sinteticoItens: CutGroupItem[] = (itens || [])
-      .filter(i => {
-        const upper = (i.descricao_produto || '').toUpperCase();
-        return upper.includes('CINTO SINTETICO') || upper.includes('TIRA SINTETICO') || upper.includes('CINTO SINTÉTICO') || upper.includes('TIRA SINTÉTICO');
-      })
-      .map(i => {
-        const info = pedidoMap.get(i.pedido_id);
-        return {
-          id: i.id,
-          descricao: i.descricao_produto,
-          referencia: i.referencia_produto,
-          observacao_producao: i.observacao_producao,
-          quantidade: i.quantidade,
-          numero_venda: info?.numero_venda || null,
-          data_venda: info?.data_venda || null,
-          lead_time_dias: info?.lead_time_dias || null,
-        };
-      });
+    const cutItems: CutGroupItem[] = [];
+    for (const [key, info] of pedidoTipoMap) {
+      const [pedidoId, tipo] = key.split('|');
+      for (const i of (itens || []).filter(it => it.pedido_id === pedidoId)) {
+        if (matchesTipo(i.descricao_produto, tipo)) {
+          cutItems.push({
+            id: i.id,
+            descricao: i.descricao_produto,
+            referencia: i.referencia_produto,
+            observacao_producao: i.observacao_producao,
+            quantidade: i.quantidade,
+            numero_venda: info.numero_venda,
+            data_venda: info.data_venda,
+            lead_time_dias: info.lead_time_dias,
+            tipo_produto: tipo,
+          });
+        }
+      }
+    }
 
-    setCutGroups(agruparParaCorte(sinteticoItens));
+    setAllItems(cutItems);
 
-    // Lead time stats
     const [r1, r2, r3] = await Promise.all([
       supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('status_prazo', 'ATRASADO').in('status_atual', ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO']),
       supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('status_prazo', 'ATENCAO').in('status_atual', ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO']),
       supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('status_prazo', 'NO_PRAZO').in('status_atual', ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO']),
     ]);
     setLeadTimeStats({ atrasados: r1.count || 0, atencao: r2.count || 0, noPrazo: r3.count || 0 });
-
     setLoading(false);
+  };
+
+  // Derived data
+  const filteredItems = useMemo(() =>
+    filterTipo === 'all' ? allItems : allItems.filter(i => i.tipo_produto === filterTipo),
+  [allItems, filterTipo]);
+
+  const cutGroups = useMemo(() => agruparParaCorte(filteredItems), [filteredItems]);
+  const larguras = useMemo(() => [...new Set(cutGroups.map(g => g.largura))].sort(), [cutGroups]);
+  const filteredGroups = filterLargura === 'all' ? cutGroups : cutGroups.filter(g => g.largura === filterLargura);
+  const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
+
+  const handlePrint = () => {
+    const tipoLabel = filterTipo === 'all' ? 'Todos' : TIPO_PRODUTO_LABELS[filterTipo] || filterTipo;
+    const rows = filteredGroups.map(g => {
+      const itensHtml = g.itens.map(i =>
+        `${i.descricao} ×${i.quantidade}${i.numero_venda ? ' <span style="color:#666">#' + i.numero_venda + '</span>' : ''}${i.data_venda ? ' <span style="color:#999">' + format(parseISO(i.data_venda), 'dd/MM') + '</span>' : ''}${i.lead_time_dias != null ? ' <span style="color:#999">' + i.lead_time_dias + 'd</span>' : ''}`
+      ).join('<br>');
+      return `<tr><td>${g.largura}</td><td>${g.material}</td><td>${g.tamanho}</td><td>${g.cor}</td><td style="text-align:right;font-weight:bold">${g.quantidadeTotal}</td><td style="font-size:11px">${itensHtml}</td></tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html><head><title>Corte - ${tipoLabel}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;padding:15mm}
+    h1{font-size:16px;margin-bottom:4px}.meta{color:#666;font-size:11px;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;vertical-align:top}
+    th{background:#f0f0f0;font-size:11px;text-transform:uppercase}@media print{body{padding:10mm}}</style>
+    </head><body><h1>Agrupamento de Corte — ${tipoLabel}${filterLargura !== 'all' ? ' — ' + filterLargura : ''}</h1>
+    <p class="meta">${filteredGroups.length} grupos • ${totalPecas} peças • ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+    <table><thead><tr><th>Largura</th><th>Material</th><th>Tamanho</th><th>Cor</th><th style="text-align:right">Qtd</th><th>Itens</th></tr></thead>
+    <tbody>${rows}</tbody></table></body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 300);
   };
 
   if (!profile || !PERFIS_PCP.includes(profile.perfil)) {
     return <Navigate to="/dashboard" replace />;
   }
-
-  const larguras = [...new Set(cutGroups.map(g => g.largura))].sort();
-  const filteredGroups = filterLargura === 'all' ? cutGroups : cutGroups.filter(g => g.largura === filterLargura);
-  const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -146,25 +183,41 @@ export default function PCP() {
 
       {/* Cut grouping */}
       <Card className="border-border/60 shadow-sm">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between gap-4 flex-wrap">
           <div>
             <CardTitle className="text-base flex items-center gap-2">
               <Scissors className="h-4 w-4" />
-              Agrupamento de Corte — Sintéticos
+              Agrupamento de Corte
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">{filteredGroups.length} grupos • {totalPecas} peças total</p>
           </div>
-          <Select value={filterLargura} onValueChange={setFilterLargura}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Largura" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {larguras.map(l => (
-                <SelectItem key={l} value={l}>{l}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={filterTipo} onValueChange={setFilterTipo}>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="SINTETICO">Sintético</SelectItem>
+                <SelectItem value="TECIDO">Tecido</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterLargura} onValueChange={setFilterLargura}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Largura" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {larguras.map(l => (
+                  <SelectItem key={l} value={l}>{l}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={handlePrint} disabled={filteredGroups.length === 0}>
+              <Printer className="h-4 w-4 mr-1" />
+              PDF
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
