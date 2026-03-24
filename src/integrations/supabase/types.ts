@@ -797,6 +797,47 @@ export type Database = {
           },
         ]
       }
+      pedido_item_obs_corte: {
+        Row: {
+          criado_em: string
+          criado_por: string | null
+          id: string
+          lido: boolean
+          lido_em: string | null
+          lido_por: string | null
+          observacao: string
+          pedido_item_id: string
+        }
+        Insert: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          lido?: boolean
+          lido_em?: string | null
+          lido_por?: string | null
+          observacao: string
+          pedido_item_id: string
+        }
+        Update: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          lido?: boolean
+          lido_em?: string | null
+          lido_por?: string | null
+          observacao?: string
+          pedido_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_item_obs_corte_pedido_item_id_fkey"
+            columns: ["pedido_item_id"]
+            isOneToOne: false
+            referencedRelation: "pedido_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedido_itens: {
         Row: {
           api_item_id: string | null

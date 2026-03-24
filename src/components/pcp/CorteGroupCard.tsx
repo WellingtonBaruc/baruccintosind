@@ -10,9 +10,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2 } from 'lucide-react';
-import { CutGroup, TIPO_PRODUTO_LABELS } from '@/lib/pcp';
+import { CutGroup, TIPO_PRODUTO_LABELS, ObsCorte } from '@/lib/pcp';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 interface CorteRegistro {
   id: string;
@@ -46,6 +47,7 @@ function groupKey(tipo: string, g: CutGroup) {
 }
 
 export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLarguraChange, larguras }: CorteGroupCardProps) {
+  const { profile } = useAuth();
   const [search, setSearch] = useState('');
   const [registros, setRegistros] = useState<Map<string, CorteRegistro>>(new Map());
   const [operadores, setOperadores] = useState<Operador[]>([]);
@@ -53,6 +55,7 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   const [novoOperadorNome, setNovoOperadorNome] = useState('');
   const [savingOperador, setSavingOperador] = useState(false);
   const [actionLoading, setActionLoading] = useState<Set<string>>(new Set());
+  const [markingRead, setMarkingRead] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchRegistros();
@@ -151,6 +154,22 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
       await fetchOperadores();
     } catch { toast.error('Erro ao cadastrar operador'); }
     setSavingOperador(false);
+  };
+
+  const handleMarcarCiente = async (obsId: string) => {
+    if (!profile) return;
+    setMarkingRead(prev => new Set(prev).add(obsId));
+    try {
+      await supabase.from('pedido_item_obs_corte').update({
+        lido: true,
+        lido_em: new Date().toISOString(),
+        lido_por: profile.id,
+      }).eq('id', obsId);
+      toast.success('Observação marcada como lida');
+      // Trigger parent refresh would be ideal, but for now we update locally
+      // The parent PCP.tsx will refresh on next load
+    } catch { toast.error('Erro ao marcar como lida'); }
+    setMarkingRead(prev => { const n = new Set(prev); n.delete(obsId); return n; });
   };
 
   const searchedGroups = useMemo(() => {
@@ -331,29 +350,74 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                           <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group">
                             <ChevronRight className="h-3 w-3 transition-transform group-data-[state=open]:rotate-90" />
                             <span>{group.itens.length} {group.itens.length === 1 ? 'item' : 'itens'}</span>
+                            {(() => {
+                              const unreadCount = group.itens.reduce((acc, item) => {
+                                const unread = (item.obs_corte || []).filter(o => !o.lido).length;
+                                return acc + unread;
+                              }, 0);
+                              if (unreadCount > 0) {
+                                return (
+                                  <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold animate-pulse">
+                                    {unreadCount}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                           </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-1.5 space-y-1 pl-4.5">
-                            {group.itens.map(item => (
-                              <div key={item.id} className="text-xs flex items-baseline gap-2 flex-wrap">
-                                <span className="text-muted-foreground">{item.descricao}</span>
-                                <span className="font-medium">×{item.quantidade}</span>
-                                {item.numero_venda && (
-                                  <span className="text-primary/80 font-mono text-[10px]">#{item.numero_venda}</span>
-                                )}
-                                {item.data_venda && (
-                                  <span className="text-muted-foreground/70 text-[10px]">{format(parseISO(item.data_venda), 'dd/MM')}</span>
-                                )}
-                                {item.lead_time_dias != null && (
-                                  <span className="text-muted-foreground/70 text-[10px]">{item.lead_time_dias}d</span>
-                                )}
-                                {item.referencia && <span className="text-muted-foreground/70 text-[10px]">({item.referencia})</span>}
-                                {item.observacao_producao && (
-                                  <div className="mt-0.5 bg-warning/10 border border-warning/20 rounded px-1.5 py-0.5 text-warning text-[10px]">
-                                    {item.observacao_producao}
+                          <CollapsibleContent className="mt-1.5 space-y-1.5 pl-4.5">
+                            {group.itens.map(item => {
+                              const obsCorteList = item.obs_corte || [];
+                              const hasUnread = obsCorteList.some(o => !o.lido);
+                              return (
+                                <div key={item.id} className={`text-xs rounded-md p-1.5 ${hasUnread ? 'bg-destructive/5 border border-destructive/20' : ''}`}>
+                                  <div className="flex items-baseline gap-2 flex-wrap">
+                                    <span className="text-muted-foreground">{item.descricao}</span>
+                                    <span className="font-medium">×{item.quantidade}</span>
+                                    {item.numero_venda && (
+                                      <span className="text-primary/80 font-mono text-[10px]">#{item.numero_venda}</span>
+                                    )}
+                                    {item.data_venda && (
+                                      <span className="text-muted-foreground/70 text-[10px]">{format(parseISO(item.data_venda), 'dd/MM')}</span>
+                                    )}
+                                    {item.lead_time_dias != null && (
+                                      <span className="text-muted-foreground/70 text-[10px]">{item.lead_time_dias}d</span>
+                                    )}
+                                    {item.referencia && <span className="text-muted-foreground/70 text-[10px]">({item.referencia})</span>}
                                   </div>
-                                )}
-                              </div>
-                            ))}
+                                  {item.observacao_producao && (
+                                    <div className="mt-0.5 bg-warning/10 border border-warning/20 rounded px-1.5 py-0.5 text-warning text-[10px]">
+                                      {item.observacao_producao}
+                                    </div>
+                                  )}
+                                  {obsCorteList.map(obs => (
+                                    <div key={obs.id} className={`mt-1 rounded px-2 py-1.5 text-[10px] flex items-start justify-between gap-2 ${obs.lido ? 'bg-muted/40 border border-border/50' : 'bg-destructive/10 border border-destructive/30'}`}>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1 mb-0.5">
+                                          <Scissors className={`h-3 w-3 shrink-0 ${obs.lido ? 'text-muted-foreground' : 'text-destructive'}`} />
+                                          <span className={`font-semibold ${obs.lido ? 'text-muted-foreground' : 'text-destructive'}`}>
+                                            {obs.lido ? 'Obs. Corte (lida)' : '⚠️ Obs. Corte'}
+                                          </span>
+                                          <span className="text-muted-foreground/60 ml-auto">{format(parseISO(obs.criado_em), 'dd/MM HH:mm')}</span>
+                                        </div>
+                                        <p className={obs.lido ? 'text-muted-foreground' : 'text-foreground font-medium'}>{obs.observacao}</p>
+                                      </div>
+                                      {!obs.lido && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-6 text-[9px] px-2 shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10"
+                                          onClick={() => handleMarcarCiente(obs.id)}
+                                          disabled={markingRead.has(obs.id)}
+                                        >
+                                          {markingRead.has(obs.id) ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : 'Ciente'}
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })}
                           </CollapsibleContent>
                         </Collapsible>
                       </TableCell>

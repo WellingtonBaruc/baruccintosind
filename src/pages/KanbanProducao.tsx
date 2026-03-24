@@ -17,7 +17,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
-import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star } from 'lucide-react';
+import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star, Scissors } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface KanbanCard {
@@ -140,6 +140,11 @@ export default function KanbanProducao() {
   // Detail sheet
   const [detailSheet, setDetailSheet] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean; pedido: any | null }>({ open: false, card: null, items: [], loading: false, pedido: null });
   const [showFivelaKpiList, setShowFivelaKpiList] = useState(false);
+
+  // Obs para Corte
+  const [obsCorteModal, setObsCorteModal] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean }>({ open: false, card: null, items: [], loading: false });
+  const [obsCorteTexts, setObsCorteTexts] = useState<Map<string, string>>(new Map());
+  const [savingObsCorte, setSavingObsCorte] = useState(false);
 
   const openDetailSheet = async (card: KanbanCard) => {
     setDetailSheet({ open: true, card, items: [], loading: true, pedido: null });
@@ -594,7 +599,46 @@ export default function KanbanProducao() {
   };
 
 
-  // --- Preparação Sub-etapas (inline expandable) ---
+  // --- Obs para Corte ---
+  const openObsCorteModal = async (card: KanbanCard) => {
+    setObsCorteModal({ open: true, card, items: [], loading: true });
+    setObsCorteTexts(new Map());
+    const { data: items } = await supabase
+      .from('pedido_itens')
+      .select('id, descricao_produto, referencia_produto, quantidade')
+      .eq('pedido_id', card.pedido_id)
+      .order('descricao_produto');
+
+    // Filter only TECIDO items
+    const tecidoItems = (items || []).filter(i => {
+      const upper = (i.descricao_produto || '').toUpperCase();
+      return upper.includes('CINTO TECIDO') || upper.includes('TIRA TECIDO');
+    });
+
+    setObsCorteModal(prev => ({ ...prev, items: tecidoItems, loading: false }));
+  };
+
+  const saveObsCorte = async () => {
+    if (!profile || !obsCorteModal.card) return;
+    const entries = Array.from(obsCorteTexts.entries()).filter(([, text]) => text.trim());
+    if (entries.length === 0) { toast.error('Preencha pelo menos uma observação'); return; }
+
+    setSavingObsCorte(true);
+    try {
+      const inserts = entries.map(([itemId, text]) => ({
+        pedido_item_id: itemId,
+        observacao: text.trim(),
+        criado_por: profile.id,
+      }));
+      const { error } = await supabase.from('pedido_item_obs_corte').insert(inserts);
+      if (error) throw error;
+      toast.success(`${entries.length} observação(ões) enviada(s) ao Corte`);
+      setObsCorteModal({ open: false, card: null, items: [], loading: false });
+      setObsCorteTexts(new Map());
+    } catch { toast.error('Erro ao salvar observações'); }
+    setSavingObsCorte(false);
+  };
+
   const togglePrepExpand = async (card: KanbanCard) => {
     const isExpanded = expandedPrepCards.has(card.id);
     if (isExpanded) {
@@ -1162,7 +1206,19 @@ export default function KanbanProducao() {
                                   );
                                 })()}
 
-                                {/* Unified "Enviar para o Comercial" button for ALL concluded cards */}
+                                {/* Obs para Corte — only TECIDO in Conferência */}
+                                {col === 'Conferência' && card.tipo_produto === 'TECIDO' && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="w-full mt-2 h-7 text-[10px] gap-1 border-destructive/50 text-destructive hover:bg-destructive/10"
+                                    onClick={(e) => { e.stopPropagation(); openObsCorteModal(card); }}
+                                  >
+                                    <Scissors className="h-3 w-3" />
+                                    Obs para Corte
+                                  </Button>
+                                )}
+
                                 {inConcluido && canSendToComercial(card) && (
                                   <Button size="sm" className="w-full mt-2 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => handleEnviarParaComercial(card)}>
                                     <ArrowRight className="h-3 w-3 mr-1" /> Enviar para o Comercial
@@ -1278,6 +1334,49 @@ export default function KanbanProducao() {
         </DialogContent>
       </Dialog>
 
+
+      {/* Obs para Corte modal */}
+      <Dialog open={obsCorteModal.open} onOpenChange={o => !o && setObsCorteModal({ open: false, card: null, items: [], loading: false })}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scissors className="h-4 w-4 text-destructive" />
+              Observação para o Corte — #{obsCorteModal.card?.api_venda_id}
+            </DialogTitle>
+            <DialogDescription>Adicione observações por item de tecido. O Corte receberá um alerta vermelho para cada observação.</DialogDescription>
+          </DialogHeader>
+          {obsCorteModal.loading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+          ) : obsCorteModal.items.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">Nenhum item de tecido encontrado nesta venda.</p>
+          ) : (
+            <div className="space-y-4 max-h-[400px] overflow-y-auto">
+              {obsCorteModal.items.map((item: any) => (
+                <div key={item.id} className="rounded-lg border p-3 space-y-2">
+                  <div>
+                    <p className="text-sm font-medium">{item.descricao_produto}</p>
+                    {item.referencia_produto && <p className="text-[10px] text-muted-foreground">Ref: {item.referencia_produto}</p>}
+                    <p className="text-[10px] text-muted-foreground">Qtd: {item.quantidade}</p>
+                  </div>
+                  <Textarea
+                    placeholder="Observação para o Corte..."
+                    value={obsCorteTexts.get(item.id) || ''}
+                    onChange={e => setObsCorteTexts(prev => new Map(prev).set(item.id, e.target.value))}
+                    className="text-sm min-h-[60px]"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setObsCorteModal({ open: false, card: null, items: [], loading: false })}>Cancelar</Button>
+            <Button onClick={saveObsCorte} disabled={savingObsCorte || obsCorteModal.items.length === 0} className="gap-1">
+              {savingObsCorte ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Scissors className="h-3.5 w-3.5" />}
+              Enviar ao Corte
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Loss registration dialog */}
       <Dialog open={lossDialog.open} onOpenChange={o => !o && setLossDialog({ open: false, card: null })}>
