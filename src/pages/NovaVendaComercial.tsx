@@ -68,7 +68,7 @@ export default function NovaVendaComercial() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
-
+  const [vendaCriada, setVendaCriada] = useState<{ numeroPedido: string } | null>(null);
   // Tipo de fluxo
   const [tipoFluxo, setTipoFluxo] = useState<'PRODUCAO' | 'PRONTA_ENTREGA'>('PRODUCAO');
 
