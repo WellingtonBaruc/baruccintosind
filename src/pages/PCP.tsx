@@ -26,6 +26,8 @@ export default function PCP() {
   const [leadTimeStats, setLeadTimeStats] = useState({ atrasados: 0, atencao: 0, noPrazo: 0 });
   const [filterLarguraSint, setFilterLarguraSint] = useState('all');
   const [filterLarguraTec, setFilterLarguraTec] = useState('all');
+  const [janelaDiasSint, setJanelaDiasSint] = useState<number | null>(null);
+  const [janelaDiasTec, setJanelaDiasTec] = useState<number | null>(null);
 
   useEffect(() => { fetchData(); }, []);
 
