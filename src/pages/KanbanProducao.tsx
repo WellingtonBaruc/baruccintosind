@@ -356,7 +356,8 @@ export default function KanbanProducao() {
     const allowedDestIdx = allowedColumns.indexOf(destCol);
 
     if (allowedDestIdx !== allowedSrcIdx + 1) { toast.error('Só é possível avançar uma etapa por vez.'); return; }
-    if (!isSupervisor) { toast.error('Apenas supervisores podem arrastar cards.'); return; }
+    const canDrag = isSupervisor || profile?.perfil === 'operador_producao';
+    if (!canDrag) { toast.error('Sem permissão para mover cards.'); return; }
 
     // Tecido going to Concluído — confirm cross-pipeline transfer
     if (destCol === 'Concluído' && card.tipo_produto === 'TECIDO') {
