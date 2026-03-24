@@ -105,6 +105,7 @@ export default function VerificacaoLoja() {
   const isVerificando = pedido.status_atual === 'LOJA_VERIFICANDO';
   const isAguardandoOp = pedido.status_atual === 'AGUARDANDO_OP_COMPLEMENTAR';
   const isAguardandoAlmox = pedido.status_atual === 'AGUARDANDO_ALMOXARIFADO';
+  const isPendenteFinalizacao = pedido.status_atual === 'LOJA_PENDENTE_FINALIZACAO';
   const allSolicitacoesAtendidas = solicitacoes.length > 0 && solicitacoes.every(s => s.status === 'ATENDIDA' || s.status === 'ATENDIDO');
 
   const handleToggleConferido = async (itemId: string, checked: boolean) => {
@@ -304,7 +305,7 @@ export default function VerificacaoLoja() {
     setActionLoading(false);
   };
 
-  const canFinalizar = (isAguardandoOp || isAguardandoAlmox) && opComplementarDone && allSolicitacoesAtendidas;
+  const canFinalizar = isPendenteFinalizacao || ((isAguardandoOp || isAguardandoAlmox) && opComplementarDone && allSolicitacoesAtendidas);
 
   return (
     <div className="animate-fade-in space-y-6 max-w-4xl">
@@ -586,7 +587,7 @@ export default function VerificacaoLoja() {
       )}
 
       {/* Finalizar after OP + almox resolved */}
-      {(isAguardandoOp || isAguardandoAlmox) && (
+      {(isAguardandoOp || isAguardandoAlmox || isPendenteFinalizacao) && (
         <Card className="border-border/60 shadow-sm">
           <CardContent className="pt-6">
             {canFinalizar ? (

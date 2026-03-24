@@ -16,7 +16,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 const PERFIS_LOJA = ['loja', 'admin', 'gestor'];
-const STATUS_LOJA = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO'] as const;
+const STATUS_LOJA = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO', 'LOJA_PENDENTE_FINALIZACAO'] as const;
 const STATUS_POS_LOJA = ['AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL', 'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'AGUARDANDO_PRODUCAO', 'EM_PRODUCAO', 'PRODUCAO_CONCLUIDA', 'LOJA_OK', 'AGUARDANDO_CIENCIA_COMERCIAL'];
 
 interface PedidoLoja {
@@ -136,6 +136,9 @@ export default function FilaLoja() {
   };
 
   const canSendToComercial = (p: PedidoLoja) => {
+    if (p.status_atual === 'LOJA_PENDENTE_FINALIZACAO') {
+      return true;
+    }
     if (p.status_atual === 'AGUARDANDO_OP_COMPLEMENTAR') {
       return p.op_concluida === true;
     }
