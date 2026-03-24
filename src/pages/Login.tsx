@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Factory, Loader2 } from 'lucide-react';
+import { getAppVersion } from '@/hooks/useVersionCheck';
 
 export default function Login() {
   const { signIn, profile, loading: authLoading } = useAuth();
@@ -85,6 +86,7 @@ export default function Login() {
             </form>
           </CardContent>
         </Card>
+        <p className="text-center text-[10px] text-muted-foreground/40 mt-4">v{getAppVersion().slice(-6)}</p>
       </div>
     </div>
   );
