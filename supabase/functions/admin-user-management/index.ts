@@ -161,11 +161,25 @@ Deno.serve(async (req) => {
       return json({ error: 'Você não pode excluir o próprio usuário.' }, 400);
     }
 
-    const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId);
-    if (authDeleteError) throw authDeleteError;
+    // Nullify FK references in related tables before deleting
+    await adminClient.from('pedido_historico').update({ usuario_id: null }).eq('usuario_id', userId);
+    await adminClient.from('op_etapas').update({ operador_id: null }).eq('operador_id', userId);
+    await adminClient.from('ordens_producao').update({ supervisor_id: null }).eq('supervisor_id', userId);
+    await adminClient.from('pedido_financeiro').update({ confirmado_por: null }).eq('confirmado_por', userId);
+    await adminClient.from('pedido_logistica').update({ responsavel_envio_id: null }).eq('responsavel_envio_id', userId);
+    await adminClient.from('ordem_perdas').update({ registrado_por: null }).eq('registrado_por', userId);
+    await adminClient.from('ordem_perdas').update({ confirmado_por: null }).eq('confirmado_por', userId);
+    await adminClient.from('solicitacoes_almoxarifado').update({ solicitado_por: null }).eq('solicitado_por', userId);
+    await adminClient.from('solicitacoes_almoxarifado').update({ atendido_por: null }).eq('atendido_por', userId);
+    await adminClient.from('op_etapa_montagem_operadores').delete().eq('operador_id', userId);
 
+    // Delete profile row first (before auth, since usuarios.id references auth.users.id ON DELETE CASCADE)
     const { error: profileDeleteError } = await adminClient.from('usuarios').delete().eq('id', userId);
     if (profileDeleteError) throw profileDeleteError;
+
+    // Now delete auth user
+    const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId);
+    if (authDeleteError) throw authDeleteError;
 
     return json({ success: true, userId });
   } catch (error) {
