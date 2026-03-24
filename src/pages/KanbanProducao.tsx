@@ -1335,6 +1335,49 @@ export default function KanbanProducao() {
       </Dialog>
 
 
+      {/* Obs para Corte modal */}
+      <Dialog open={obsCorteModal.open} onOpenChange={o => !o && setObsCorteModal({ open: false, card: null, items: [], loading: false })}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scissors className="h-4 w-4 text-destructive" />
+              Observação para o Corte — #{obsCorteModal.card?.api_venda_id}
+            </DialogTitle>
+            <DialogDescription>Adicione observações por item de tecido. O Corte receberá um alerta vermelho para cada observação.</DialogDescription>
+          </DialogHeader>
+          {obsCorteModal.loading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+          ) : obsCorteModal.items.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">Nenhum item de tecido encontrado nesta venda.</p>
+          ) : (
+            <div className="space-y-4 max-h-[400px] overflow-y-auto">
+              {obsCorteModal.items.map((item: any) => (
+                <div key={item.id} className="rounded-lg border p-3 space-y-2">
+                  <div>
+                    <p className="text-sm font-medium">{item.descricao_produto}</p>
+                    {item.referencia_produto && <p className="text-[10px] text-muted-foreground">Ref: {item.referencia_produto}</p>}
+                    <p className="text-[10px] text-muted-foreground">Qtd: {item.quantidade}</p>
+                  </div>
+                  <Textarea
+                    placeholder="Observação para o Corte..."
+                    value={obsCorteTexts.get(item.id) || ''}
+                    onChange={e => setObsCorteTexts(prev => new Map(prev).set(item.id, e.target.value))}
+                    className="text-sm min-h-[60px]"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setObsCorteModal({ open: false, card: null, items: [], loading: false })}>Cancelar</Button>
+            <Button onClick={saveObsCorte} disabled={savingObsCorte || obsCorteModal.items.length === 0} className="gap-1">
+              {savingObsCorte ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Scissors className="h-3.5 w-3.5" />}
+              Enviar ao Corte
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Loss registration dialog */}
       <Dialog open={lossDialog.open} onOpenChange={o => !o && setLossDialog({ open: false, card: null })}>
         <DialogContent>
