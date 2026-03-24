@@ -154,6 +154,12 @@ export default function FilaLoja() {
       p.cliente_nome.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || p.status_atual === statusFilter;
     return matchSearch && matchStatus;
+  }).sort((a, b) => {
+    // LOJA_PENDENTE_FINALIZACAO always on top
+    const aIsPending = a.status_atual === 'LOJA_PENDENTE_FINALIZACAO' ? 0 : 1;
+    const bIsPending = b.status_atual === 'LOJA_PENDENTE_FINALIZACAO' ? 0 : 1;
+    if (aIsPending !== bIsPending) return aIsPending - bIsPending;
+    return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
   });
 
   return (
