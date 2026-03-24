@@ -1001,6 +1001,12 @@ export default function KanbanProducao() {
                                   </Badge>
                                 )}
 
+                                {card.corte_ok && (
+                                  <Badge className="mt-1.5 text-[10px] bg-blue-500 text-white border-blue-600 font-bold">
+                                    Corte OK
+                                  </Badge>
+                                )}
+
                                 {card.tipo_produto === 'SINTETICO' && card.fivelas_recebidas && (
                                   <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
                                     Fivela pronta ✓
