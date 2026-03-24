@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { STATUS_PEDIDO_CONFIG, iniciarVerificacaoLoja } from '@/lib/producao';
+import { STATUS_PEDIDO_CONFIG, iniciarVerificacaoLoja, finalizarVerificacaoLoja } from '@/lib/producao';
 import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Search, Clock, Package, Eye, CheckCircle2 } from 'lucide-react';
+import { Loader2, Search, Clock, Package, Eye, CheckCircle2, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -29,6 +29,9 @@ interface PedidoLoja {
   criado_em: string;
   valor_liquido: number;
   qtd_itens?: number;
+  fivelas_separadas?: boolean;
+  op_concluida?: boolean;
+  almox_atendido?: boolean;
 }
 
 export default function FilaLoja() {
@@ -38,6 +41,7 @@ export default function FilaLoja() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sendingId, setSendingId] = useState<string | null>(null);
 
   useEffect(() => { fetchPedidos(); }, []);
 
@@ -49,13 +53,53 @@ export default function FilaLoja() {
       .order('criado_em', { ascending: true });
 
     if (data) {
-      const withItens = await Promise.all(
-        data.map(async (p: any) => {
+      const pedidoIds = data.map((p: any) => p.id);
+
+      // Fetch item counts, OP statuses, and solicitações in parallel
+      const [itensResult, ordensResult, solicitacoesResult] = await Promise.all([
+        Promise.all(data.map(async (p: any) => {
           const { count } = await supabase.from('pedido_itens').select('*', { count: 'exact', head: true }).eq('pedido_id', p.id);
-          return { ...p, qtd_itens: count || 0 };
-        })
-      );
-      setPedidos(withItens);
+          return { id: p.id, count: count || 0 };
+        })),
+        supabase.from('ordens_producao').select('pedido_id, status').in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
+        supabase.from('solicitacoes_almoxarifado').select('pedido_id, status').in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
+      ]);
+
+      const itensMap: Record<string, number> = {};
+      itensResult.forEach(r => { itensMap[r.id] = r.count; });
+
+      // Check if all OPs for each pedido are CONCLUIDA
+      const opMap: Record<string, boolean> = {};
+      if (ordensResult.data) {
+        const grouped: Record<string, string[]> = {};
+        ordensResult.data.forEach((o: any) => {
+          if (!grouped[o.pedido_id]) grouped[o.pedido_id] = [];
+          grouped[o.pedido_id].push(o.status);
+        });
+        for (const [pid, statuses] of Object.entries(grouped)) {
+          opMap[pid] = statuses.length > 0 && statuses.every(s => s === 'CONCLUIDA');
+        }
+      }
+
+      // Check if all solicitações for each pedido are ATENDIDA
+      const almoxMap: Record<string, boolean> = {};
+      if (solicitacoesResult.data) {
+        const grouped: Record<string, string[]> = {};
+        solicitacoesResult.data.forEach((s: any) => {
+          if (!grouped[s.pedido_id]) grouped[s.pedido_id] = [];
+          grouped[s.pedido_id].push(s.status);
+        });
+        for (const [pid, statuses] of Object.entries(grouped)) {
+          almoxMap[pid] = statuses.length > 0 && statuses.every(s => s === 'ATENDIDA');
+        }
+      }
+
+      setPedidos(data.map((p: any) => ({
+        ...p,
+        qtd_itens: itensMap[p.id] || 0,
+        op_concluida: opMap[p.id] || false,
+        almox_atendido: almoxMap[p.id] !== undefined ? almoxMap[p.id] : true, // no solicitações = ok
+      })));
     }
     setLoading(false);
   };
@@ -72,6 +116,28 @@ export default function FilaLoja() {
     } catch {
       toast.error('Erro ao iniciar verificação.');
     }
+  };
+
+  const handleEnviarComercial = async (pedido: PedidoLoja) => {
+    setSendingId(pedido.id);
+    try {
+      await finalizarVerificacaoLoja(pedido.id, profile.id);
+      toast.success('Pedido encaminhado para o comercial!');
+      fetchPedidos();
+    } catch {
+      toast.error('Erro ao enviar para comercial.');
+    }
+    setSendingId(null);
+  };
+
+  const canSendToComercial = (p: PedidoLoja) => {
+    if (p.status_atual === 'AGUARDANDO_OP_COMPLEMENTAR') {
+      return p.op_concluida === true;
+    }
+    if (p.status_atual === 'AGUARDANDO_ALMOXARIFADO') {
+      return p.almox_atendido === true;
+    }
+    return false;
   };
 
   const filtered = pedidos.filter(p => {
@@ -130,6 +196,7 @@ export default function FilaLoja() {
               <TableBody>
                 {filtered.map(p => {
                   const cfg = STATUS_PEDIDO_CONFIG[p.status_atual] || { label: p.status_atual, color: 'bg-muted text-muted-foreground' };
+                  const showSendButton = canSendToComercial(p);
                   return (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.api_venda_id || p.numero_pedido}</TableCell>
@@ -143,13 +210,27 @@ export default function FilaLoja() {
                         {p.valor_liquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <Badge className={`font-normal ${cfg.color}`}>{cfg.label}</Badge>
-                          {(p as any).fivelas_separadas && (
-                            <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px]" variant="outline">
-                              <CheckCircle2 className="h-3 w-3 mr-0.5" /> Fivelas ✓
-                            </Badge>
-                          )}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <Badge className={`font-normal ${cfg.color}`}>{cfg.label}</Badge>
+                          </div>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {p.fivelas_separadas && (
+                              <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px]" variant="outline">
+                                <CheckCircle2 className="h-3 w-3 mr-0.5" /> Fivelas ✓
+                              </Badge>
+                            )}
+                            {p.status_atual === 'AGUARDANDO_OP_COMPLEMENTAR' && p.op_concluida && (
+                              <Badge className="bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30 text-[10px]" variant="outline">
+                                <CheckCircle2 className="h-3 w-3 mr-0.5" /> OP Concluída ✓
+                              </Badge>
+                            )}
+                            {p.status_atual === 'AGUARDANDO_ALMOXARIFADO' && p.almox_atendido && (
+                              <Badge className="bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30 text-[10px]" variant="outline">
+                                <CheckCircle2 className="h-3 w-3 mr-0.5" /> Almox Atendido ✓
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
@@ -159,15 +240,31 @@ export default function FilaLoja() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        {p.status_atual === 'AGUARDANDO_LOJA' ? (
-                          <Button size="sm" onClick={() => handleIniciarVerificacao(p.id)}>
-                            Iniciar verificação
-                          </Button>
-                        ) : (
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/loja/verificar/${p.id}`)}>
-                            <Eye className="h-3.5 w-3.5 mr-1" /> Ver
-                          </Button>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {p.status_atual === 'AGUARDANDO_LOJA' ? (
+                            <Button size="sm" onClick={() => handleIniciarVerificacao(p.id)}>
+                              Iniciar verificação
+                            </Button>
+                          ) : showSendButton ? (
+                            <Button
+                              size="sm"
+                              className="bg-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/90 text-white"
+                              onClick={() => handleEnviarComercial(p)}
+                              disabled={sendingId === p.id}
+                            >
+                              {sendingId === p.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                              ) : (
+                                <Send className="h-3.5 w-3.5 mr-1" />
+                              )}
+                              Enviar ao Comercial
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="outline" onClick={() => navigate(`/loja/verificar/${p.id}`)}>
+                              <Eye className="h-3.5 w-3.5 mr-1" /> Ver
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
