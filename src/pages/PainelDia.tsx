@@ -32,6 +32,9 @@ export default function PainelDia() {
   const [projecao, setProjecao] = useState<CapacidadeDia[]>([]);
   const [capacidadeHoje, setCapacidadeHoje] = useState({ sintetico: 0, tecido: 0, total: 0 });
   const [showCapDialog, setShowCapDialog] = useState(false);
+  const [progDialog, setProgDialog] = useState<{ open: boolean; pedido: PedidoPainelDia | null; tipo: 'inicio' | 'conclusao' }>({ open: false, pedido: null, tipo: 'inicio' });
+  const [calData, setCalData] = useState<PcpCalendarData | null>(null);
+  const [capPadrao, setCapPadrao] = useState({ sintetico: 30, tecido: 20, total: 50 });
 
   const hoje = new Date().toISOString().slice(0, 10);
 
