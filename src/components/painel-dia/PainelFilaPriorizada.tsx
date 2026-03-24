@@ -154,11 +154,11 @@ export default function PainelFilaPriorizada({ pedidos, onProgramarInicio, onPro
                         {/* Botão Iniciar */}
                         {isProgramadoInicio ? (
                           <Badge className="text-[10px] bg-blue-500/15 text-blue-700 border-blue-300 gap-0.5">
-                            <CheckCircle className="h-3 w-3" /> Início
+                            <CheckCircle className="h-3 w-3" /> {format(new Date(p.programado_inicio_data! + 'T00:00:00'), 'dd/MM')}
                           </Badge>
                         ) : (
                           onProgramarInicio && (
-                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-blue-600 hover:bg-blue-50" onClick={() => onProgramarInicio(p)} title="Programar início hoje">
+                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-blue-600 hover:bg-blue-50" onClick={() => onProgramarInicio(p)} title="Programar início">
                               <CalendarPlus className="h-3 w-3 mr-0.5" /> Início
                             </Button>
                           )
