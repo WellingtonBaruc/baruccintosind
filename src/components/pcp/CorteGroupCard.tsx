@@ -295,8 +295,12 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   }, [filteredUnsorted, sortCol, sortDir, registros, hideCompleted]);
 
   const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
+  const totalConcluido = filteredGroups.filter(g => getGroupStatus(g) === 'CONCLUIDO').reduce((sum, g) => sum + g.quantidadeTotal, 0);
+  const totalFaltando = totalPecas - totalConcluido;
+  const percentual = totalPecas > 0 ? Math.round((totalConcluido / totalPecas) * 100) : 0;
   const totalItens = filteredGroups.reduce((sum, g) => sum + g.itens.length, 0);
   const totalGrupos = filteredGroups.length;
+  const totalGruposConcluidos = filteredGroups.filter(g => getGroupStatus(g) === 'CONCLUIDO').length;
 
   const toggleSort = (col: string) => {
     if (sortCol === col) {
