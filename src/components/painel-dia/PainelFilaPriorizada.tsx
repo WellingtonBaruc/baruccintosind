@@ -120,8 +120,8 @@ export default function PainelFilaPriorizada({ pedidos, onProgramarInicio, onPro
               {filtered.slice(0, 50).map((p, i) => {
                 const statusCfg = STATUS_PCP_CONFIG[p.status_pcp];
                 const etiqCfg = ETIQUETA_CONFIG[p.etiqueta];
-                const isProgramadoInicio = hoje && p.programado_inicio_data === hoje;
-                const isProgramadoConclusao = hoje && p.programado_conclusao_data === hoje;
+                const isProgramadoInicio = !!p.programado_inicio_data;
+                const isProgramadoConclusao = !!p.programado_conclusao_data;
                 const isProgramado = isProgramadoInicio || isProgramadoConclusao;
 
                 return (
