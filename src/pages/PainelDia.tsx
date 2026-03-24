@@ -295,25 +295,29 @@ export default function PainelDia() {
   const cargaTotal = tipoAnalytics.reduce((s, t) => s + t.carga, 0);
   const saldoTotal = capacidadeHoje.total - cargaProgramada;
 
-  const handleProgramarInicio = async (pedido: PedidoPainelDia) => {
-    const novasCarga = cargaProgramada + pedido.quantidade_itens;
-    if (novasCarga > capacidadeHoje.total) {
-      toast.warning(`Atenção: capacidade excedida! (${novasCarga}/${capacidadeHoje.total})`);
-    }
-    await supabase.from('ordens_producao').update({
-      programado_inicio_data: hoje,
-      programado_para_hoje: true,
-      data_programacao: hoje,
-    } as any).eq('id', pedido.id);
-    toast.success(`${pedido.api_venda_id || pedido.numero_pedido} programado para iniciar hoje`);
-    fetchData();
+  const handleProgramarInicio = (pedido: PedidoPainelDia) => {
+    setProgDialog({ open: true, pedido, tipo: 'inicio' });
   };
 
-  const handleProgramarConclusao = async (pedido: PedidoPainelDia) => {
-    await supabase.from('ordens_producao').update({
-      programado_conclusao_data: hoje,
-    } as any).eq('id', pedido.id);
-    toast.success(`${pedido.api_venda_id || pedido.numero_pedido} programado para concluir hoje`);
+  const handleProgramarConclusao = (pedido: PedidoPainelDia) => {
+    setProgDialog({ open: true, pedido, tipo: 'conclusao' });
+  };
+
+  const handleConfirmProgramacao = async (pedido: PedidoPainelDia, data: string, tipo: 'inicio' | 'conclusao') => {
+    const isHoje = data === hoje;
+    if (tipo === 'inicio') {
+      await supabase.from('ordens_producao').update({
+        programado_inicio_data: data,
+        programado_para_hoje: isHoje,
+        data_programacao: data,
+      } as any).eq('id', pedido.id);
+      toast.success(`${pedido.api_venda_id || pedido.numero_pedido} programado para iniciar em ${data.split('-').reverse().join('/')}`);
+    } else {
+      await supabase.from('ordens_producao').update({
+        programado_conclusao_data: data,
+      } as any).eq('id', pedido.id);
+      toast.success(`${pedido.api_venda_id || pedido.numero_pedido} programado para concluir em ${data.split('-').reverse().join('/')}`);
+    }
     fetchData();
   };
 
