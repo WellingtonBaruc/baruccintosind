@@ -10,7 +10,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays, Package, Layers, Hash, ArrowUp, ArrowDown, ArrowUpDown, EyeOff } from 'lucide-react';
+import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays, Package, Layers, Hash, ArrowUp, ArrowDown, ArrowUpDown, EyeOff, CheckCircle2, CircleDot } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 import { CutGroup, TIPO_PRODUTO_LABELS, ObsCorte } from '@/lib/pcp';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
