@@ -70,7 +70,7 @@ export default function FilaProducao() {
         pedidos!inner(numero_pedido, cliente_nome, valor_liquido, criado_em, status_prazo, data_previsao_entrega, api_venda_id, status_api),
         pipeline_producao(nome)
       `)
-      .neq('pedidos.status_api', 'Finalizado')
+      .eq('pedidos.status_api', 'Em Produção')
       .order('criado_em', { ascending: false });
 
     if (data) {
@@ -193,8 +193,7 @@ export default function FilaProducao() {
     return new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime();
   });
 
-  const emProducaoCount = filtered.filter(o => o.pedidos.status_api === 'Em Produção').length;
-  const pedidoEnviadoCount = filtered.filter(o => o.pedidos.status_api === 'Pedido Enviado').length;
+  const emProducaoCount = filtered.length;
   const atrasadoCount = filtered.filter(o => (o.pedidos.status_prazo || 'NO_PRAZO') === 'ATRASADO').length;
   const atencaoCount = filtered.filter(o => (o.pedidos.status_prazo || 'NO_PRAZO') === 'ATENCAO').length;
   const noPrazoCount = filtered.filter(o => (o.pedidos.status_prazo || 'NO_PRAZO') === 'NO_PRAZO').length;
@@ -238,8 +237,6 @@ export default function FilaProducao() {
           </div>
           <div className="rounded-lg border border-border/60 bg-card px-4 py-2.5 text-sm flex items-center gap-3">
             <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-blue-500" />{emProducaoCount} Em Produção</span>
-            <span className="text-muted-foreground">·</span>
-            <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-orange-500" />{pedidoEnviadoCount} Pedido Enviado</span>
           </div>
           <div className="rounded-lg border border-border/60 bg-card px-4 py-2.5 text-sm flex items-center gap-3">
             <span className="flex items-center gap-1">🔴 {atrasadoCount} Atrasados</span>
