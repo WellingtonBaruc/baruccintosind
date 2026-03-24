@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2 } from 'lucide-react';
+import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays } from 'lucide-react';
 import { CutGroup, TIPO_PRODUTO_LABELS, ObsCorte } from '@/lib/pcp';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -40,13 +40,23 @@ interface CorteGroupCardProps {
   filterLargura: string;
   onFilterLarguraChange: (v: string) => void;
   larguras: string[];
+  janelaDias: number | null;
+  onJanelaDiasChange: (v: number | null) => void;
 }
+
+const JANELA_OPTIONS: { label: string; value: string }[] = [
+  { label: 'Padrão', value: 'padrao' },
+  { label: 'Mesmo dia', value: '0' },
+  { label: '2 dias', value: '2' },
+  { label: '3 dias', value: '3' },
+  { label: '5 dias', value: '5' },
+];
 
 function groupKey(tipo: string, g: CutGroup) {
-  return `${tipo}|${g.largura}|${g.material}|${g.tamanho}|${g.cor}`;
+  return `${tipo}|${g.largura}|${g.material}|${g.tamanho}|${g.cor}${g.faixa_data ? '|' + g.faixa_data : ''}`;
 }
 
-export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLarguraChange, larguras }: CorteGroupCardProps) {
+export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLarguraChange, larguras, janelaDias, onJanelaDiasChange }: CorteGroupCardProps) {
   const { profile } = useAuth();
   const [search, setSearch] = useState('');
   const [registros, setRegistros] = useState<Map<string, CorteRegistro>>(new Map());
@@ -190,22 +200,27 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   const filteredGroups = filterLargura === 'all' ? searchedGroups : searchedGroups.filter(g => g.largura === filterLargura);
   const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
 
+  const isDateMode = janelaDias != null;
+
   const handlePrint = () => {
     const rows = filteredGroups.map(g => {
       const itensHtml = g.itens.map(i =>
         `${i.descricao} ×${i.quantidade}${i.numero_venda ? ' <span style="color:#666">#' + i.numero_venda + '</span>' : ''}${i.data_venda ? ' <span style="color:#999">' + format(parseISO(i.data_venda), 'dd/MM') + '</span>' : ''}${i.lead_time_dias != null ? ' <span style="color:#999">' + i.lead_time_dias + 'd</span>' : ''}`
       ).join('<br>');
-      return `<tr><td>${g.largura}</td><td>${g.material}</td><td>${g.tamanho}</td><td>${g.cor}</td><td style="text-align:right;font-weight:bold">${g.quantidadeTotal}</td><td style="font-size:11px">${itensHtml}</td></tr>`;
+      const faixaTd = isDateMode ? `<td style="font-weight:bold;white-space:nowrap">${g.faixa_data || 'SEM DATA'}</td>` : '';
+      return `<tr><td>${g.largura}</td><td>${g.material}</td><td>${g.tamanho}</td><td>${g.cor}</td>${faixaTd}<td style="text-align:right;font-weight:bold">${g.quantidadeTotal}</td><td style="font-size:11px">${itensHtml}</td></tr>`;
     }).join('');
 
+    const janelaLabel = isDateMode ? ` — Agrupado por ${janelaDias === 0 ? 'mesmo dia' : janelaDias + ' dias'}` : '';
+    const faixaTh = isDateMode ? '<th>Faixa Data</th>' : '';
     const html = `<!DOCTYPE html><html><head><title>Corte - ${title}</title>
     <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;padding:15mm}
     h1{font-size:16px;margin-bottom:4px}.meta{color:#666;font-size:11px;margin-bottom:10px}
     table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;vertical-align:top}
     th{background:#f0f0f0;font-size:11px;text-transform:uppercase}@media print{body{padding:10mm}}</style>
-    </head><body><h1>Agrupamento de Corte — ${title}${filterLargura !== 'all' ? ' — ' + filterLargura : ''}</h1>
+    </head><body><h1>Agrupamento de Corte — ${title}${filterLargura !== 'all' ? ' — ' + filterLargura : ''}${janelaLabel}</h1>
     <p class="meta">${filteredGroups.length} grupos • ${totalPecas} peças • ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
-    <table><thead><tr><th>Largura</th><th>Material</th><th>Tamanho</th><th>Cor</th><th style="text-align:right">Qtd</th><th>Itens</th></tr></thead>
+    <table><thead><tr><th>Largura</th><th>Material</th><th>Tamanho</th><th>Cor</th>${faixaTh}<th style="text-align:right">Qtd</th><th>Itens</th></tr></thead>
     <tbody>${rows}</tbody></table></body></html>`;
 
     const w = window.open('', '_blank');
@@ -252,6 +267,20 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                 ))}
               </SelectContent>
             </Select>
+            <Select
+              value={janelaDias != null ? String(janelaDias) : 'padrao'}
+              onValueChange={v => onJanelaDiasChange(v === 'padrao' ? null : Number(v))}
+            >
+              <SelectTrigger className="w-[140px]">
+                <CalendarDays className="h-3.5 w-3.5 mr-1 shrink-0" />
+                <SelectValue placeholder="Agrup. data" />
+              </SelectTrigger>
+              <SelectContent>
+                {JANELA_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" size="sm" onClick={handlePrint} disabled={filteredGroups.length === 0}>
               <Printer className="h-4 w-4 mr-1" />
               PDF
@@ -269,6 +298,7 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                   <TableHead>Material</TableHead>
                   <TableHead>Tamanho</TableHead>
                   <TableHead>Cor</TableHead>
+                  {isDateMode && <TableHead>Faixa Data</TableHead>}
                   <TableHead className="text-right">Qtd Total</TableHead>
                   <TableHead>Operador</TableHead>
                   <TableHead>Status</TableHead>
@@ -291,6 +321,14 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                       <TableCell className="text-sm">{group.material}</TableCell>
                       <TableCell className="text-sm">{group.tamanho}</TableCell>
                       <TableCell className="text-sm">{group.cor}</TableCell>
+                      {isDateMode && (
+                        <TableCell>
+                          <Badge variant="outline" className={`font-mono text-[10px] ${group.faixa_data === 'SEM DATA' ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary border-primary/30'}`}>
+                            <CalendarDays className="h-3 w-3 mr-1" />
+                            {group.faixa_data || 'SEM DATA'}
+                          </Badge>
+                        </TableCell>
+                      )}
                       <TableCell className="text-right font-semibold tabular-nums">{group.quantidadeTotal}</TableCell>
                       <TableCell>
                         <Button

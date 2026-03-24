@@ -26,6 +26,8 @@ export default function PCP() {
   const [leadTimeStats, setLeadTimeStats] = useState({ atrasados: 0, atencao: 0, noPrazo: 0 });
   const [filterLarguraSint, setFilterLarguraSint] = useState('all');
   const [filterLarguraTec, setFilterLarguraTec] = useState('all');
+  const [janelaDiasSint, setJanelaDiasSint] = useState<number | null>(null);
+  const [janelaDiasTec, setJanelaDiasTec] = useState<number | null>(null);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -110,8 +112,8 @@ export default function PCP() {
   const sinteticoItems = useMemo(() => allItems.filter(i => i.tipo_produto === 'SINTETICO'), [allItems]);
   const tecidoItems = useMemo(() => allItems.filter(i => i.tipo_produto === 'TECIDO'), [allItems]);
 
-  const sinteticoGroups = useMemo(() => agruparParaCorte(sinteticoItems), [sinteticoItems]);
-  const tecidoGroups = useMemo(() => agruparParaCorte(tecidoItems), [tecidoItems]);
+  const sinteticoGroups = useMemo(() => agruparParaCorte(sinteticoItems, janelaDiasSint), [sinteticoItems, janelaDiasSint]);
+  const tecidoGroups = useMemo(() => agruparParaCorte(tecidoItems, janelaDiasTec), [tecidoItems, janelaDiasTec]);
 
   const largurasSint = useMemo(() => [...new Set(sinteticoGroups.map(g => g.largura))].sort(), [sinteticoGroups]);
   const largurasTec = useMemo(() => [...new Set(tecidoGroups.map(g => g.largura))].sort(), [tecidoGroups]);
@@ -165,6 +167,8 @@ export default function PCP() {
             filterLargura={filterLarguraSint}
             onFilterLarguraChange={setFilterLarguraSint}
             larguras={largurasSint}
+            janelaDias={janelaDiasSint}
+            onJanelaDiasChange={setJanelaDiasSint}
           />
           <CorteGroupCard
             title="Corte — Tecido"
@@ -173,6 +177,8 @@ export default function PCP() {
             filterLargura={filterLarguraTec}
             onFilterLarguraChange={setFilterLarguraTec}
             larguras={largurasTec}
+            janelaDias={janelaDiasTec}
+            onJanelaDiasChange={setJanelaDiasTec}
           />
         </div>
       )}
