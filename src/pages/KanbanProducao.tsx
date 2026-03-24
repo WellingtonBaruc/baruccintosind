@@ -1086,6 +1086,25 @@ export default function KanbanProducao() {
                                   </DropdownMenu>
                                 )}
 
+                                {profile?.perfil === 'operador_producao' && !inConcluido && col !== 'Aguardando Início' && !card.operador_id && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="w-full mt-2 h-8 text-xs"
+                                    onClick={async () => {
+                                      await supabase
+                                        .from('op_etapas')
+                                        .update({ operador_id: profile.id } as any)
+                                        .eq('id', card.id)
+                                        .is('operador_id', null);
+                                      toast.success('Tarefa assumida com sucesso');
+                                      fetchCards();
+                                    }}
+                                  >
+                                    <User className="h-3 w-3 mr-1" /> Assumir tarefa
+                                  </Button>
+                                )}
+
                                 {profile?.perfil === 'operador_producao' && card.operador_id === profile.id && !inConcluido && col !== 'Aguardando Início' && (
                                   <Button size="sm" className="w-full mt-2 h-8 text-xs" onClick={() => advanceCard(card, `Concluído pelo operador ${profile.nome}`)}>
                                     <CheckCircle2 className="h-3 w-3 mr-1" /> Confirmar conclusão
