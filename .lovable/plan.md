@@ -1,35 +1,27 @@
 
 
-## Diagnóstico: Cards Duplicados no Kanban Produção
+## Problem
 
-### Causa Raiz
+The "Enviar para o Comercial" button appears on cards in the "Concluído" column, but clicking it fails with "Ainda existem ordens em andamento para este pedido." This happens because a card can land in the "Concluído" column when its current etapa is "Produção Finalizada" — even though the `ordens_producao.status` is still `EM_ANDAMENTO`, not `CONCLUIDA`.
 
-O sistema exibe **um card por Ordem de Produção (OP)**, não por venda. Quando uma venda tem múltiplas OPs (ex: TECIDO seq1 + SINTÉTICO seq2), ambas aparecem no Kanban como cards separados com o mesmo número de venda.
+The validation at line 744 checks `allOrdens?.every(o => o.status === 'CONCLUIDA')`, which fails for these cases.
 
-**Vendas afetadas atualmente:**
-- 3085410, 3090872, 3093749, 3094415 → TECIDO (Concluído) + SINTÉTICO (Em Andamento)
-- 3095255, 3095425, 3097292 → Duas OPs SINTÉTICO
-- 3099077 → TECIDO + OUTROS
+## Solution
 
-### Solução Proposta
+Update `handleEnviarParaComercial` to treat orders whose last etapa is "Produção Finalizada" (or equivalent) as effectively concluded, rather than strictly requiring `status === 'CONCLUIDA'`.
 
-**1. Ocultar ordens CONCLUÍDA quando existe OP ativa no mesmo pedido**
+### Changes in `src/pages/KanbanProducao.tsx`
 
-Se um pedido tem uma OP seq1 CONCLUÍDA e uma OP seq2 ainda ativa, esconder a OP concluída do Kanban. O card da OP ativa já mostra o badge "OP 2", então o contexto se mantém.
+1. **Relax the all-concluded check**: Instead of only checking `ordens_producao.status === 'CONCLUIDA'`, also fetch each order's etapas and consider an order "done" if its current active etapa maps to the "Concluído" column (i.e., etapa name is "Produção Finalizada" or ordem status is "CONCLUIDA").
 
-**2. Melhorar a diferenciação visual das OPs complementares**
+2. **Auto-mark ordem as CONCLUIDA**: When the card's etapa is "Produção Finalizada" but ordem status hasn't been updated yet, automatically update the ordem status to `CONCLUIDA` and mark remaining etapas as `CONCLUIDA` before transitioning to comercial. This keeps data consistent.
 
-Para OPs que legitimamente aparecem juntas (ambas ativas), tornar o badge "OP" mais proeminente:
-- Badge maior e colorido (azul) com o texto "OP Complementar"
-- Mostrar o tipo de produto da OP principal como referência
+### Implementation detail
 
-### Arquivo alterado
-- `src/pages/KanbanProducao.tsx` — Ajuste na lógica de filtragem (`visibleEtapas` / `ordemMap`) para ocultar ordens concluídas quando há OP ativa, e melhoria visual nos badges de OP.
-
-### Detalhes Técnicos
-
-Na função `fetchCards`, após construir o `kanbanCards`, adicionar filtro:
-- Agrupar cards por `pedido_id`
-- Se um pedido tem cards em "Concluído" E cards em colunas ativas, remover os de "Concluído"
-- Manter badge "OP X" mais visível nos cards restantes
+In `handleEnviarParaComercial`:
+- Fetch all ordens for the pedido along with their etapas
+- For each ordem not yet `CONCLUIDA`, check if its current etapa maps to "Concluído" column
+- If so, auto-conclude that ordem (update status + etapas)
+- If any ordem is genuinely still in progress (not in final etapa), show the error
+- Otherwise proceed with the comercial transition
 
