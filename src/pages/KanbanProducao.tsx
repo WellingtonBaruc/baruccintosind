@@ -826,6 +826,9 @@ export default function KanbanProducao() {
   const isConcluido = (card: KanbanCard) => card.ordem_status === 'CONCLUIDA';
 
   const getConcluidoBadge = (card: KanbanCard) => {
+    if (card.pedido_status === 'LOJA_PENDENTE_FINALIZACAO') {
+      return { label: '🏪 Enviado à Loja', cls: 'bg-amber-500/15 text-amber-600 border-amber-500/30' };
+    }
     if (card.pedido_status === 'AGUARDANDO_FINANCEIRO' || card.pedido_status === 'VALIDADO_FINANCEIRO' || card.pedido_status === 'LIBERADO_LOGISTICA') {
       return { label: '💰 Aguardando Financeiro', cls: 'bg-amber-500/15 text-amber-600 border-amber-500/30' };
     }
@@ -841,19 +844,75 @@ export default function KanbanProducao() {
     return { label: 'Concluído', cls: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30' };
   };
 
+  const isOpComplementar = (card: KanbanCard) => card.ordem_sequencia_op > 1;
+
   const canSendToComercial = (card: KanbanCard) => {
+    if (isOpComplementar(card)) return false; // OP complementar usa botão "Enviar para Loja"
     const alreadySent = ['AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL', 
       'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA',
       'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO',
-      'AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO', 'LOJA_OK'].includes(card.pedido_status);
+      'AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO', 'LOJA_OK', 'LOJA_PENDENTE_FINALIZACAO'].includes(card.pedido_status);
     const hasPermission = isSupervisor || profile?.perfil === 'operador_producao';
     return !alreadySent && hasPermission;
+  };
+
+  const canSendToLoja = (card: KanbanCard) => {
+    if (!isOpComplementar(card)) return false;
+    const alreadySent = ['LOJA_PENDENTE_FINALIZACAO', 'AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL',
+      'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA',
+      'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'LOJA_OK'].includes(card.pedido_status);
+    const hasPermission = isSupervisor || profile?.perfil === 'operador_producao';
+    return !alreadySent && hasPermission;
+  };
+
+  const handleEnviarParaLoja = async (card: KanbanCard) => {
+    if (!profile) return;
+    try {
+      // Conclude this OP if not yet
+      const { data: allOrdens } = await supabase
+        .from('ordens_producao')
+        .select('id, status, tipo_produto, op_etapas(id, nome_etapa, status, ordem_sequencia)')
+        .eq('pedido_id', card.pedido_id);
+
+      if (allOrdens) {
+        for (const ordem of allOrdens) {
+          if (ordem.status === 'CONCLUIDA') continue;
+          const etapas = (ordem as any).op_etapas as Array<{ id: string; nome_etapa: string; status: string; ordem_sequencia: number }> || [];
+          const sorted = [...etapas].sort((a, b) => a.ordem_sequencia - b.ordem_sequencia);
+          const activeEtapa = sorted.find(e => e.status === 'EM_ANDAMENTO') || sorted[sorted.length - 1];
+          const effectiveColumn = activeEtapa
+            ? mapEtapaToColumn(activeEtapa.nome_etapa, activeEtapa.status, ordem.status, ordem.tipo_produto || undefined)
+            : null;
+
+          if (effectiveColumn === 'Concluído' || sorted.every(e => e.status === 'CONCLUIDA')) {
+            await supabase.from('ordens_producao').update({ status: 'CONCLUIDA' }).eq('id', ordem.id);
+            const pendingEtapas = etapas.filter(e => e.status !== 'CONCLUIDA');
+            for (const pe of pendingEtapas) {
+              await supabase.from('op_etapas').update({ status: 'CONCLUIDA', concluido_em: new Date().toISOString() }).eq('id', pe.id);
+            }
+          }
+        }
+      }
+
+      await supabase.from('pedidos').update({ status_atual: 'LOJA_PENDENTE_FINALIZACAO' }).eq('id', card.pedido_id);
+      await supabase.from('pedido_historico').insert({
+        pedido_id: card.pedido_id,
+        usuario_id: profile.id,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: card.pedido_status,
+        status_novo: 'LOJA_PENDENTE_FINALIZACAO',
+        observacao: `OP complementar concluída. Enviado para Loja finalizar por ${profile.nome}.`,
+      });
+      toast.success(`Pedido #${card.api_venda_id} enviado para a Loja`);
+      fetchCards();
+    } catch {
+      toast.error('Erro ao enviar para a Loja');
+    }
   };
 
   const handleEnviarParaComercial = async (card: KanbanCard) => {
     if (!profile) return;
     try {
-      // Fetch all orders with their etapas to check effective completion
       const { data: allOrdens } = await supabase
         .from('ordens_producao')
         .select('id, status, tipo_produto, op_etapas(id, nome_etapa, status, ordem_sequencia)')
@@ -864,21 +923,16 @@ export default function KanbanProducao() {
         return;
       }
 
-      // For each ordem not yet CONCLUIDA, check if it's effectively done
       for (const ordem of allOrdens) {
         if (ordem.status === 'CONCLUIDA') continue;
-
         const etapas = (ordem as any).op_etapas as Array<{ id: string; nome_etapa: string; status: string; ordem_sequencia: number }> || [];
-        // Find the current active or last etapa
         const sorted = [...etapas].sort((a, b) => a.ordem_sequencia - b.ordem_sequencia);
         const activeEtapa = sorted.find(e => e.status === 'EM_ANDAMENTO') || sorted[sorted.length - 1];
-        
         const effectiveColumn = activeEtapa 
           ? mapEtapaToColumn(activeEtapa.nome_etapa, activeEtapa.status, ordem.status, ordem.tipo_produto || undefined)
           : null;
 
         if (effectiveColumn === 'Concluído' || sorted.every(e => e.status === 'CONCLUIDA')) {
-          // Auto-conclude this ordem and its pending etapas
           await supabase.from('ordens_producao').update({ status: 'CONCLUIDA' }).eq('id', ordem.id);
           const pendingEtapas = etapas.filter(e => e.status !== 'CONCLUIDA');
           for (const pe of pendingEtapas) {
@@ -1243,6 +1297,11 @@ export default function KanbanProducao() {
                                   </Button>
                                 )}
 
+                                {inConcluido && canSendToLoja(card) && (
+                                  <Button size="sm" className="w-full mt-2 h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white" onClick={() => handleEnviarParaLoja(card)}>
+                                    <ArrowRight className="h-3 w-3 mr-1" /> Enviar para Loja
+                                  </Button>
+                                )}
                                 {inConcluido && canSendToComercial(card) && (
                                   <Button size="sm" className="w-full mt-2 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => handleEnviarParaComercial(card)}>
                                     <ArrowRight className="h-3 w-3 mr-1" /> Enviar para o Comercial
