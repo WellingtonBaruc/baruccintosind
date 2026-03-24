@@ -388,18 +388,18 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
                               return (
                                 <div key={item.id} className={`text-xs rounded-md p-1.5 ${itemBg}`}>
                                   <div className="flex items-baseline gap-2 flex-wrap">
-                                    <span className="text-muted-foreground">{item.descricao}</span>
-                                    <span className="font-medium">×{item.quantidade}</span>
+                                    <span className="font-bold text-foreground">{item.descricao}</span>
+                                    <span className="font-semibold text-foreground/90">×{item.quantidade}</span>
                                     {item.numero_venda && (
-                                      <span className="text-primary/80 font-mono text-[10px]">#{item.numero_venda}</span>
+                                      <span className="text-primary font-semibold font-mono text-[10px]">#{item.numero_venda}</span>
                                     )}
                                     {item.data_venda && (
-                                      <span className="text-muted-foreground/70 text-[10px]">{format(parseISO(item.data_venda), 'dd/MM')}</span>
+                                      <span className="text-foreground/70 font-semibold text-[10px]">{format(parseISO(item.data_venda), 'dd/MM')}</span>
                                     )}
                                     {item.lead_time_dias != null && (
-                                      <span className="text-muted-foreground/70 text-[10px]">{item.lead_time_dias}d</span>
+                                      <span className="text-foreground/70 font-semibold text-[10px]">{item.lead_time_dias}d</span>
                                     )}
-                                    {item.referencia && <span className="text-muted-foreground/70 text-[10px]">({item.referencia})</span>}
+                                    {item.referencia && <span className="text-foreground/70 font-semibold text-[10px]">({item.referencia})</span>}
                                   </div>
                                   {item.observacao_producao && (
                                     <div className="mt-0.5 bg-warning/10 border border-warning/20 rounded px-1.5 py-0.5 text-warning text-[10px]">
