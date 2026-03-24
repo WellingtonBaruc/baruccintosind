@@ -190,9 +190,24 @@ export default function PainelDia() {
       return pedidoPainel;
     });
 
+    // Deduplicate by pedido (numero_pedido) — keep entry with highest priority status
+    const STATUS_PRIORITY: Record<string, number> = {
+      ATRASADO: 6, EM_RISCO: 5, CONCLUIR_HOJE: 4, PROGRAMADO_HOJE: 3,
+      EM_PRODUCAO_PRAZO: 2, NAO_INICIADO: 1, CONCLUIDO: 0,
+    };
+    const pedidoMap = new Map<string, PedidoPainelDia>();
+    for (const p of pedidosList) {
+      const key = p.numero_pedido;
+      const existing = pedidoMap.get(key);
+      if (!existing || (STATUS_PRIORITY[p.status_pcp] || 0) > (STATUS_PRIORITY[existing.status_pcp] || 0)) {
+        pedidoMap.set(key, p);
+      }
+    }
+    const pedidosDedup = Array.from(pedidoMap.values());
+
     // Identify bottleneck type
     const tipoAtrasos: Record<string, number[]> = {};
-    for (const p of pedidosList) {
+    for (const p of pedidosDedup) {
       if (p.dias_atraso > 0 && p.tipo_produto) {
         if (!tipoAtrasos[p.tipo_produto]) tipoAtrasos[p.tipo_produto] = [];
         tipoAtrasos[p.tipo_produto].push(p.dias_atraso);
@@ -206,17 +221,17 @@ export default function PainelDia() {
     }
 
     // Calculate priority scores
-    for (const p of pedidosList) {
+    for (const p of pedidosDedup) {
       p.score_prioridade = calcularScorePrioridade(p, gargaloTipo);
     }
 
     // Sort by score descending
-    pedidosList.sort((a, b) => b.score_prioridade - a.score_prioridade);
+    pedidosDedup.sort((a, b) => b.score_prioridade - a.score_prioridade);
 
     // Build type analytics
     const tipoStats: Record<string, TipoAnalytics> = {};
     for (const tipo of ['SINTETICO', 'TECIDO']) {
-      const tipoPedidos = pedidosList.filter(p => p.tipo_produto === tipo);
+      const tipoPedidos = pedidosDedup.filter(p => p.tipo_produto === tipo);
       tipoStats[tipo] = {
         tipo,
         tipoLabel: TIPO_PRODUTO_LABELS[tipo] || tipo,
@@ -239,7 +254,7 @@ export default function PainelDia() {
       hojeDate, 8, cal, capPadrao, capacidadesDiarias, cargasPorDia,
     );
 
-    setPedidos(pedidosList);
+    setPedidos(pedidosDedup);
     setTipoAnalytics(Object.values(tipoStats));
     setProjecao(proj);
     setLoading(false);
