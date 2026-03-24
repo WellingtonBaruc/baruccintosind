@@ -278,14 +278,49 @@ export default function PainelDia() {
     );
   }
 
-  const iniciarHoje = pedidos.filter(p => p.status_pcp === 'PROGRAMADO_HOJE');
-  const concluirHoje = pedidos.filter(p => p.status_pcp === 'CONCLUIR_HOJE');
+  const iniciarHoje = pedidos.filter(p => p.programado_inicio_data === hoje || p.status_pcp === 'PROGRAMADO_HOJE');
+  const concluirHoje = pedidos.filter(p => p.programado_conclusao_data === hoje || p.status_pcp === 'CONCLUIR_HOJE');
   const atrasados = pedidos.filter(p => p.status_pcp === 'ATRASADO');
   const emRisco = pedidos.filter(p => p.status_pcp === 'EM_RISCO');
   const criticos = [...atrasados, ...emRisco].sort((a, b) => b.score_prioridade - a.score_prioridade);
 
+  const programadosHoje = pedidos.filter(p => p.programado_inicio_data === hoje || p.programado_conclusao_data === hoje);
+  const cargaProgramada = programadosHoje.reduce((s, p) => s + p.quantidade_itens, 0);
   const cargaTotal = tipoAnalytics.reduce((s, t) => s + t.carga, 0);
-  const saldoTotal = capacidadeHoje.total - cargaTotal;
+  const saldoTotal = capacidadeHoje.total - cargaProgramada;
+
+  const handleProgramarInicio = async (pedido: PedidoPainelDia) => {
+    const novasCarga = cargaProgramada + pedido.quantidade_itens;
+    if (novasCarga > capacidadeHoje.total) {
+      toast.warning(`Atenção: capacidade excedida! (${novasCarga}/${capacidadeHoje.total})`);
+    }
+    await supabase.from('ordens_producao').update({
+      programado_inicio_data: hoje,
+      programado_para_hoje: true,
+      data_programacao: hoje,
+    } as any).eq('id', pedido.id);
+    toast.success(`${pedido.api_venda_id || pedido.numero_pedido} programado para iniciar hoje`);
+    fetchData();
+  };
+
+  const handleProgramarConclusao = async (pedido: PedidoPainelDia) => {
+    await supabase.from('ordens_producao').update({
+      programado_conclusao_data: hoje,
+    } as any).eq('id', pedido.id);
+    toast.success(`${pedido.api_venda_id || pedido.numero_pedido} programado para concluir hoje`);
+    fetchData();
+  };
+
+  const handleDesprogramar = async (pedido: PedidoPainelDia) => {
+    await supabase.from('ordens_producao').update({
+      programado_inicio_data: null,
+      programado_conclusao_data: null,
+      programado_para_hoje: false,
+      data_programacao: null,
+    } as any).eq('id', pedido.id);
+    toast.success('Programação removida');
+    fetchData();
+  };
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -314,7 +349,7 @@ export default function PainelDia() {
         atrasados={atrasados.length}
         emRisco={emRisco.length}
         capacidadeDia={capacidadeHoje.total}
-        cargaDia={cargaTotal}
+        cargaDia={cargaProgramada}
         saldoDia={saldoTotal}
       />
 
@@ -326,13 +361,23 @@ export default function PainelDia() {
         iniciarHoje={iniciarHoje}
         concluirHoje={concluirHoje}
         criticos={criticos}
+        onDesprogramar={handleDesprogramar}
+        hoje={hoje}
       />
 
       {/* Capacidade x Carga */}
       <PainelCapacidadeCarga projecao={projecao} />
 
       {/* Fila Priorizada */}
-      <PainelFilaPriorizada pedidos={pedidos.filter(p => p.status_pcp !== 'CONCLUIDO')} />
+      <PainelFilaPriorizada
+        pedidos={pedidos.filter(p => p.status_pcp !== 'CONCLUIDO')}
+        onProgramarInicio={handleProgramarInicio}
+        onProgramarConclusao={handleProgramarConclusao}
+        onDesprogramar={handleDesprogramar}
+        hoje={hoje}
+        capacidadeTotal={capacidadeHoje.total}
+        cargaProgramada={cargaProgramada}
+      />
 
       {/* Capacity Dialog */}
       <CapacidadeDialog open={showCapDialog} onClose={() => { setShowCapDialog(false); fetchData(); }} dataHoje={hoje} />
