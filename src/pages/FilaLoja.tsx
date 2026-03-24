@@ -16,8 +16,8 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 const PERFIS_LOJA = ['loja', 'admin', 'gestor'];
-const STATUS_LOJA = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO', 'LOJA_PENDENTE_FINALIZACAO'] as const;
-const STATUS_POS_LOJA = ['AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL', 'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'AGUARDANDO_PRODUCAO', 'EM_PRODUCAO', 'PRODUCAO_CONCLUIDA', 'LOJA_OK', 'AGUARDANDO_CIENCIA_COMERCIAL'];
+const STATUS_LOJA = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO', 'LOJA_PENDENTE_FINALIZACAO', 'AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL'] as const;
+const STATUS_POS_LOJA = ['AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'AGUARDANDO_PRODUCAO', 'EM_PRODUCAO', 'PRODUCAO_CONCLUIDA', 'LOJA_OK', 'AGUARDANDO_CIENCIA_COMERCIAL'];
 
 interface PedidoLoja {
   id: string;
@@ -155,10 +155,15 @@ export default function FilaLoja() {
     const matchStatus = statusFilter === 'all' || p.status_atual === statusFilter;
     return matchSearch && matchStatus;
   }).sort((a, b) => {
-    // LOJA_PENDENTE_FINALIZACAO always on top
-    const aIsPending = a.status_atual === 'LOJA_PENDENTE_FINALIZACAO' ? 0 : 1;
-    const bIsPending = b.status_atual === 'LOJA_PENDENTE_FINALIZACAO' ? 0 : 1;
-    if (aIsPending !== bIsPending) return aIsPending - bIsPending;
+    // Priority: LOJA_PENDENTE_FINALIZACAO (0) > active loja (1) > commercial tracking (2)
+    const priority = (s: string) => {
+      if (s === 'LOJA_PENDENTE_FINALIZACAO') return 0;
+      if (s === 'AGUARDANDO_COMERCIAL' || s === 'VALIDADO_COMERCIAL') return 2;
+      return 1;
+    };
+    const aPri = priority(a.status_atual);
+    const bPri = priority(b.status_atual);
+    if (aPri !== bPri) return aPri - bPri;
     return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
   });
 
@@ -245,6 +250,11 @@ export default function FilaLoja() {
                           {p.status_atual === 'LOJA_PENDENTE_FINALIZACAO' && (
                             <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/30 text-[10px] font-semibold animate-pulse" variant="outline">
                               ⚡ Aguardando Finalização
+                            </Badge>
+                          )}
+                          {(p.status_atual === 'AGUARDANDO_COMERCIAL' || p.status_atual === 'VALIDADO_COMERCIAL') && (
+                            <Badge className="bg-blue-500/15 text-blue-700 border-blue-500/30 text-[10px]" variant="outline">
+                              📤 {p.status_atual === 'VALIDADO_COMERCIAL' ? 'Validado Comercial' : 'Aguardando Comercial'}
                             </Badge>
                           )}
                           <div className="flex items-center gap-1 flex-wrap">
