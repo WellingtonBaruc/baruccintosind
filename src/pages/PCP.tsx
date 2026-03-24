@@ -167,6 +167,8 @@ export default function PCP() {
             filterLargura={filterLarguraSint}
             onFilterLarguraChange={setFilterLarguraSint}
             larguras={largurasSint}
+            janelaDias={janelaDiasSint}
+            onJanelaDiasChange={setJanelaDiasSint}
           />
           <CorteGroupCard
             title="Corte — Tecido"
@@ -175,6 +177,8 @@ export default function PCP() {
             filterLargura={filterLarguraTec}
             onFilterLarguraChange={setFilterLarguraTec}
             larguras={largurasTec}
+            janelaDias={janelaDiasTec}
+            onJanelaDiasChange={setJanelaDiasTec}
           />
         </div>
       )}
