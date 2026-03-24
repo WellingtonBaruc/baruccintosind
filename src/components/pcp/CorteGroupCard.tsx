@@ -10,7 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays, Package, Layers, Hash } from 'lucide-react';
+import { Scissors, ChevronRight, Printer, Search, Play, Square, User, Plus, Loader2, CalendarDays, Package, Layers, Hash, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { CutGroup, TIPO_PRODUTO_LABELS, ObsCorte } from '@/lib/pcp';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -70,6 +70,9 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
   const [savingOperador, setSavingOperador] = useState(false);
   const [actionLoading, setActionLoading] = useState<Set<string>>(new Set());
   const [markingRead, setMarkingRead] = useState<Set<string>>(new Set());
+  // Sorting
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   // Manual OP modal
   const [manualModal, setManualModal] = useState(false);
   const [manualForm, setManualForm] = useState({ descricao: '', quantidade: '', dataInicio: '', dataFim: '', observacao: '' });
@@ -251,10 +254,42 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
       .filter(Boolean) as CutGroup[];
   }, [groups, search]);
 
-  const filteredGroups = filterLargura === 'all' ? searchedGroups : searchedGroups.filter(g => g.largura === filterLargura);
+  const filteredUnsorted = filterLargura === 'all' ? searchedGroups : searchedGroups.filter(g => g.largura === filterLargura);
+
+  const filteredGroups = useMemo(() => {
+    if (!sortCol) return filteredUnsorted;
+    return [...filteredUnsorted].sort((a, b) => {
+      let cmp = 0;
+      switch (sortCol) {
+        case 'largura': cmp = a.largura.localeCompare(b.largura); break;
+        case 'material': cmp = a.material.localeCompare(b.material); break;
+        case 'tamanho': cmp = a.tamanho.localeCompare(b.tamanho); break;
+        case 'cor': cmp = a.cor.localeCompare(b.cor); break;
+        case 'qtd': cmp = a.quantidadeTotal - b.quantidadeTotal; break;
+        default: cmp = 0;
+      }
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
+  }, [filteredUnsorted, sortCol, sortDir]);
+
   const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
   const totalItens = filteredGroups.reduce((sum, g) => sum + g.itens.length, 0);
   const totalGrupos = filteredGroups.length;
+
+  const toggleSort = (col: string) => {
+    if (sortCol === col) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else { setSortCol(null); setSortDir('asc'); }
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortCol !== col) return <ArrowUpDown className="h-3 w-3 text-muted-foreground/50" />;
+    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3 text-primary" /> : <ArrowDown className="h-3 w-3 text-primary" />;
+  };
 
   const isDateMode = janelaDias != null;
 
@@ -383,12 +418,22 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Largura</TableHead>
-                  <TableHead>Material</TableHead>
-                  <TableHead>Tamanho</TableHead>
-                  <TableHead>Cor</TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('largura')}>
+                    <span className="flex items-center gap-1">Largura <SortIcon col="largura" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('material')}>
+                    <span className="flex items-center gap-1">Material <SortIcon col="material" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('tamanho')}>
+                    <span className="flex items-center gap-1">Tamanho <SortIcon col="tamanho" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('cor')}>
+                    <span className="flex items-center gap-1">Cor <SortIcon col="cor" /></span>
+                  </TableHead>
                   {isDateMode && <TableHead>Faixa Data</TableHead>}
-                  <TableHead className="text-right">Qtd Total</TableHead>
+                  <TableHead className="text-right cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('qtd')}>
+                    <span className="flex items-center gap-1 justify-end">Qtd Total <SortIcon col="qtd" /></span>
+                  </TableHead>
                   <TableHead>Operador</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Itens</TableHead>
