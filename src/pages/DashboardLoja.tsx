@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Package, Clock, CheckCircle, AlertTriangle, Wrench, Box } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
@@ -22,6 +22,9 @@ interface PedidoLoja {
   criado_em: string;
   valor_liquido: number;
   qtd_itens: number;
+  data_venda_api: string | null;
+  data_previsao_entrega: string | null;
+  observacao_api: string | null;
 }
 
 export default function DashboardLoja() {
@@ -120,10 +123,19 @@ export default function DashboardLoja() {
                   </div>
                   <Badge className={`font-normal ${cfg.color}`}>{cfg.label}</Badge>
                 </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                   <span className="flex items-center gap-1"><Package className="h-3.5 w-3.5" /> {p.qtd_itens} itens</span>
                   <span>{p.valor_liquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                  <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {formatDistanceToNow(new Date(p.criado_em), { locale: ptBR, addSuffix: true })}</span>
+                  {p.data_venda_api && (
+                    <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> Venda: {format(new Date(p.data_venda_api + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                  )}
+                  {p.data_previsao_entrega ? (
+                    <span className={`flex items-center gap-1 ${p.observacao_api?.includes('[IMPORTADO SEM DATA PREVISTA]') ? 'text-destructive font-medium' : ''}`}>
+                      📅 Entrega: {format(new Date(p.data_previsao_entrega + 'T12:00:00'), 'dd/MM/yyyy')}
+                    </span>
+                  ) : (
+                    <span className="text-destructive font-medium">⚠ Sem previsão</span>
+                  )}
                 </div>
                 {p.status_atual === 'AGUARDANDO_LOJA' ? (
                   <Button className="w-full min-h-[48px]" onClick={() => handleIniciarVerificacao(p.id)}>
