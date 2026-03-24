@@ -156,6 +156,22 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
     setSavingOperador(false);
   };
 
+  const handleMarcarCiente = async (obsId: string) => {
+    if (!profile) return;
+    setMarkingRead(prev => new Set(prev).add(obsId));
+    try {
+      await supabase.from('pedido_item_obs_corte').update({
+        lido: true,
+        lido_em: new Date().toISOString(),
+        lido_por: profile.id,
+      }).eq('id', obsId);
+      toast.success('Observação marcada como lida');
+      // Trigger parent refresh would be ideal, but for now we update locally
+      // The parent PCP.tsx will refresh on next load
+    } catch { toast.error('Erro ao marcar como lida'); }
+    setMarkingRead(prev => { const n = new Set(prev); n.delete(obsId); return n; });
+  };
+
   const searchedGroups = useMemo(() => {
     if (!search.trim()) return groups;
     const term = search.trim().toLowerCase();
