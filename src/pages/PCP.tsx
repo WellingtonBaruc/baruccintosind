@@ -57,25 +57,37 @@ export default function PCP() {
   const [reportData, setReportData] = useState<any>(null);
   const [loadingReport, setLoadingReport] = useState(false);
 
-  // Debounced realtime refresh
+  // Debounced realtime refresh — flags track which data needs refreshing
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const debouncedRefresh = useCallback((fetchFn: () => void) => {
+  const pendingRef = useRef({ data: false, manual: false, daily: false });
+
+  const scheduleRefresh = useCallback((flags: { data?: boolean; manual?: boolean; daily?: boolean }) => {
+    if (flags.data) pendingRef.current.data = true;
+    if (flags.manual) pendingRef.current.manual = true;
+    if (flags.daily) pendingRef.current.daily = true;
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(fetchFn, 400);
+    debounceRef.current = setTimeout(() => {
+      const p = pendingRef.current;
+      if (p.data) fetchData();
+      if (p.manual) fetchManualOPs();
+      if (p.daily) fetchDailyStats();
+      pendingRef.current = { data: false, manual: false, daily: false };
+    }, 400);
   }, []);
 
   useEffect(() => {
     fetchData();
     fetchManualOPs();
 
-    // Realtime: listen to tables relevant to Setor Corte
+    // Realtime: listen to all tables relevant to Setor Corte
     const channel = supabase
       .channel('pcp-corte-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => debouncedRefresh(fetchData))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_itens' }, () => debouncedRefresh(fetchData))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_obs_corte' }, () => debouncedRefresh(fetchData))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pcp_corte_registro' }, () => debouncedRefresh(() => { fetchData(); fetchDailyStats(); }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pcp_corte_manual' }, () => debouncedRefresh(fetchManualOPs))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => scheduleRefresh({ data: true }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_itens' }, () => scheduleRefresh({ data: true }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordens_producao' }, () => scheduleRefresh({ data: true }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_obs_corte' }, () => scheduleRefresh({ data: true }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pcp_corte_registro' }, () => scheduleRefresh({ data: true, daily: true }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pcp_corte_manual' }, () => scheduleRefresh({ manual: true }))
       .subscribe();
 
     return () => {
