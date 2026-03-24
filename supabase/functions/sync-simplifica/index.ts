@@ -543,10 +543,11 @@ async function inserirNovoPedido(
 
       sequencia++;
     }
+  }
 
-    if (shouldCreateOPs) {
-      await supabase.from('pedidos').update({ status_atual: 'EM_PRODUCAO' }).eq('id', pedido.id);
-    }
+  if (shouldCreateOPs) {
+    await supabase.from('pedidos').update({ status_atual: 'EM_PRODUCAO' }).eq('id', pedido.id);
+  }
 
   await supabase.from('pedido_historico').insert({
     pedido_id: pedido.id,
