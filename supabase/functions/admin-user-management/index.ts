@@ -84,6 +84,8 @@ Deno.serve(async (req) => {
       const senha = String(body?.senha ?? '');
       const perfil = String(body?.perfil ?? '');
       const setor = normalizeText(body?.setor) || null;
+      const kanbanProducaoAcesso = body?.kanban_producao_acesso !== false;
+      const kanbanVendaAcesso = body?.kanban_venda_acesso !== false;
 
       if (!nome || !email || senha.length < 6 || !PERFIS.has(perfil)) {
         return json({ error: 'Dados inválidos para criar usuário.' }, 400);
@@ -106,6 +108,8 @@ Deno.serve(async (req) => {
         email,
         perfil,
         setor,
+        kanban_producao_acesso: kanbanProducaoAcesso,
+        kanban_venda_acesso: kanbanVendaAcesso,
       });
 
       if (insertError) {
@@ -122,6 +126,8 @@ Deno.serve(async (req) => {
       const email = normalizeEmail(body?.email);
       const perfil = String(body?.perfil ?? '');
       const setor = normalizeText(body?.setor) || null;
+      const kanbanProducaoAcesso = body?.kanban_producao_acesso !== false;
+      const kanbanVendaAcesso = body?.kanban_venda_acesso !== false;
 
       if (!userId || !nome || !email || !PERFIS.has(perfil)) {
         return json({ error: 'Dados inválidos para atualizar usuário.' }, 400);
@@ -137,7 +143,7 @@ Deno.serve(async (req) => {
 
       const { error: profileUpdateError } = await adminClient
         .from('usuarios')
-        .update({ nome, email, perfil, setor })
+        .update({ nome, email, perfil, setor, kanban_producao_acesso: kanbanProducaoAcesso, kanban_venda_acesso: kanbanVendaAcesso })
         .eq('id', userId);
 
       if (profileUpdateError) throw profileUpdateError;
