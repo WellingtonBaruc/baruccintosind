@@ -457,7 +457,7 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Progress value={percentual} className="h-2.5 flex-1 bg-destructive/15" />
+              <Progress value={percentual} className="h-2.5 flex-1 bg-destructive/15 [&>div]:bg-[hsl(var(--success))]" />
               <span className="text-sm font-bold tabular-nums text-foreground whitespace-nowrap">{percentual}%</span>
               <span className="text-xs text-muted-foreground whitespace-nowrap">({totalGruposConcluidos}/{totalGrupos} grupos)</span>
             </div>
