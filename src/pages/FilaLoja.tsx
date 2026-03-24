@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Search, Clock, Package, Eye, CheckCircle2, Send } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow, format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import LojaKpiCards, { type LojaKpiData } from '@/components/loja/LojaKpiCards';
 
 const PERFIS_LOJA = ['loja', 'admin', 'gestor'];
 const STATUS_LOJA = ['AGUARDANDO_LOJA', 'LOJA_VERIFICANDO', 'AGUARDANDO_OP_COMPLEMENTAR', 'AGUARDANDO_ALMOXARIFADO', 'LOJA_PENDENTE_FINALIZACAO', 'AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL'] as const;
