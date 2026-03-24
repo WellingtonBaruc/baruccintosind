@@ -32,6 +32,7 @@ interface KanbanCard {
   operador_nome: string;
   api_venda_id: string;
   cliente_nome: string;
+  vendedor_nome: string | null;
   tipo_produto: string;
   quantidade: number;
   status_prazo: string;
@@ -166,7 +167,7 @@ export default function KanbanProducao() {
           usuarios(nome),
           ordens_producao!inner(
             id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao, tem_fivela_coberta, fivela_coberta_status, programado_inicio_data, programado_conclusao_data,
-            pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas, observacao_api)
+            pedidos!inner(api_venda_id, cliente_nome, vendedor_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas, observacao_api)
           )
         `)
         .in('status', ['EM_ANDAMENTO', 'CONCLUIDA', 'PENDENTE']),
@@ -299,6 +300,7 @@ export default function KanbanProducao() {
         operador_nome: (e.usuarios as any)?.nome || '',
         api_venda_id: e.ordens_producao.pedidos.api_venda_id || '—',
         cliente_nome: e.ordens_producao.pedidos.cliente_nome,
+        vendedor_nome: (e.ordens_producao.pedidos as any).vendedor_nome || null,
         tipo_produto: tipoProduto,
         quantidade: qtdMap.get(pedidoId) || 0,
         status_prazo: dynamicPrazo,
@@ -1055,6 +1057,12 @@ export default function KanbanProducao() {
                                     <Eye className="h-3 w-3 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100" />
                                   </p>
                                   <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.cliente_nome}</p>
+                                  {card.vendedor_nome && (
+                                    <p className="text-[10px] text-muted-foreground/70 truncate flex items-center gap-0.5">
+                                      <User className="h-2.5 w-2.5 inline" />
+                                      {card.vendedor_nome}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="px-3 py-2">
                                 <div className="flex items-center gap-1.5 mt-2 flex-wrap">

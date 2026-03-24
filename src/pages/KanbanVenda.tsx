@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, ShoppingBag, DollarSign, Truck, ArrowRight, Package, CheckCircle2, Eye } from 'lucide-react';
+import { Search, Loader2, ShoppingBag, DollarSign, Truck, ArrowRight, Package, CheckCircle2, Eye, User } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -35,6 +35,7 @@ interface VendaCard {
   observacao_financeiro: string | null;
   observacao_logistica: string | null;
   codigo_rastreio: string | null;
+  vendedor_nome: string | null;
 }
 
 interface ColumnDef {
@@ -161,7 +162,7 @@ export default function KanbanVenda() {
     const allStatuses = COLUMNS.flatMap(c => c.statuses) as any[];
     const { data } = await supabase
       .from('pedidos')
-      .select('id, numero_pedido, api_venda_id, cliente_nome, valor_liquido, status_atual, status_prazo, data_previsao_entrega, data_venda_api, criado_em, atualizado_em, forma_pagamento, forma_envio, cliente_endereco, observacao_comercial, observacao_financeiro, observacao_logistica, codigo_rastreio')
+      .select('id, numero_pedido, api_venda_id, cliente_nome, valor_liquido, status_atual, status_prazo, data_previsao_entrega, data_venda_api, criado_em, atualizado_em, forma_pagamento, forma_envio, cliente_endereco, observacao_comercial, observacao_financeiro, observacao_logistica, codigo_rastreio, vendedor_nome')
       .in('status_atual', allStatuses)
       .order('atualizado_em', { ascending: true });
 
@@ -410,6 +411,12 @@ export default function KanbanVenda() {
 
                         <CardContent className="p-2.5 space-y-1.5">
                           <p className="text-xs font-medium truncate">{card.cliente_nome}</p>
+                          {card.vendedor_nome && (
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <User className="h-2.5 w-2.5" />
+                              <span className="truncate">{card.vendedor_nome}</span>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">Valor:</span>
                             <span className="font-semibold tabular-nums">{fmt(card.valor_liquido)}</span>
