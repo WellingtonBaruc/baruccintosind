@@ -361,6 +361,8 @@ export type Database = {
           observacao: string | null
           pedido_id: string
           pipeline_id: string
+          programado_conclusao_data: string | null
+          programado_inicio_data: string | null
           programado_para_hoje: boolean | null
           sequencia: number
           status: Database["public"]["Enums"]["status_ordem"]
@@ -381,6 +383,8 @@ export type Database = {
           observacao?: string | null
           pedido_id: string
           pipeline_id: string
+          programado_conclusao_data?: string | null
+          programado_inicio_data?: string | null
           programado_para_hoje?: boolean | null
           sequencia?: number
           status?: Database["public"]["Enums"]["status_ordem"]
@@ -401,6 +405,8 @@ export type Database = {
           observacao?: string | null
           pedido_id?: string
           pipeline_id?: string
+          programado_conclusao_data?: string | null
+          programado_inicio_data?: string | null
           programado_para_hoje?: boolean | null
           sequencia?: number
           status?: Database["public"]["Enums"]["status_ordem"]
