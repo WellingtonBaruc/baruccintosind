@@ -153,7 +153,7 @@ export default function KanbanProducao() {
           id, ordem_id, nome_etapa, ordem_sequencia, operador_id, status,
           usuarios(nome),
           ordens_producao!inner(
-            id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao, tem_fivela_coberta, fivela_coberta_status,
+            id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao, tem_fivela_coberta, fivela_coberta_status, programado_inicio_data, programado_conclusao_data,
             pedidos!inner(api_venda_id, cliente_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas)
           )
         `)
