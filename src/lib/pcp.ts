@@ -9,6 +9,14 @@ export interface CutGroup {
   quantidadeTotal: number;
 }
 
+export interface ObsCorte {
+  id: string;
+  observacao: string;
+  criado_em: string;
+  lido: boolean;
+  lido_em: string | null;
+}
+
 export interface CutGroupItem {
   id: string;
   descricao: string;
@@ -19,6 +27,7 @@ export interface CutGroupItem {
   data_venda?: string | null;
   lead_time_dias?: number | null;
   tipo_produto?: string | null;
+  obs_corte?: ObsCorte[];
 }
 
 // Extract attributes from product name for cut grouping

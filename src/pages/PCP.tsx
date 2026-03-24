@@ -42,10 +42,24 @@ export default function PCP() {
     const ordensFiltered = ordens;
 
     const pedidoIds = [...new Set(ordensFiltered.map(o => o.pedido_id))];
-    const { data: itens } = await supabase
-      .from('pedido_itens')
-      .select('id, pedido_id, descricao_produto, referencia_produto, observacao_producao, quantidade')
-      .in('pedido_id', pedidoIds);
+    const [itensRes, obsCorteRes] = await Promise.all([
+      supabase
+        .from('pedido_itens')
+        .select('id, pedido_id, descricao_produto, referencia_produto, observacao_producao, quantidade')
+        .in('pedido_id', pedidoIds),
+      supabase
+        .from('pedido_item_obs_corte')
+        .select('id, pedido_item_id, observacao, criado_em, lido, lido_em')
+    ]);
+    const itens = itensRes.data;
+
+    // Map obs_corte by pedido_item_id
+    const obsCorteMap = new Map<string, { id: string; observacao: string; criado_em: string; lido: boolean; lido_em: string | null }[]>();
+    for (const obs of (obsCorteRes.data || [])) {
+      const list = obsCorteMap.get(obs.pedido_item_id) || [];
+      list.push({ id: obs.id, observacao: obs.observacao, criado_em: obs.criado_em, lido: obs.lido, lido_em: obs.lido_em });
+      obsCorteMap.set(obs.pedido_item_id, list);
+    }
 
     const pedidoTipoMap = new Map<string, { numero_venda: string | null; data_venda: string | null; lead_time_dias: number | null }>();
     for (const o of ordensFiltered) {
@@ -75,6 +89,7 @@ export default function PCP() {
             data_venda: info.data_venda,
             lead_time_dias: info.lead_time_dias,
             tipo_produto: tipo,
+            obs_corte: obsCorteMap.get(i.id) || [],
           });
         }
       }
