@@ -81,29 +81,28 @@ export function calcularStatusPcp(
   const inicioIdeal = pedido.data_inicio_ideal;
   const conclusaoIdeal = pedido.data_conclusao_ideal;
 
-  // Atrasado: past delivery date
-  if (conclusaoIdeal && conclusaoIdeal < hoje && !emProducao) return 'ATRASADO';
+  // Atrasado: past delivery date (regardless of production status)
   if (pedido.data_previsao_entrega && pedido.data_previsao_entrega < hoje) return 'ATRASADO';
 
-  // Concluir hoje
+  // Concluir hoje: delivery is today
+  if (pedido.data_previsao_entrega === hoje && emProducao) return 'CONCLUIR_HOJE';
   if (conclusaoIdeal === hoje && emProducao) return 'CONCLUIR_HOJE';
 
-  // Em risco: should have started but hasn't, or conclusion is tomorrow
-  if (inicioIdeal && inicioIdeal < hoje && !emProducao) return 'EM_RISCO';
-  if (conclusaoIdeal && conclusaoIdeal <= hoje && emProducao) return 'CONCLUIR_HOJE';
-
-  // Programado hoje
+  // Programado hoje: should start today
   if (inicioIdeal === hoje && !emProducao) return 'PROGRAMADO_HOJE';
+
+  // Em risco: should have started but hasn't
+  if (inicioIdeal && inicioIdeal < hoje && !emProducao) return 'EM_RISCO';
+
+  // Em risco: delivery within 2 days
+  if (pedido.data_previsao_entrega) {
+    const diffMs = new Date(pedido.data_previsao_entrega + 'T00:00:00').getTime() - new Date(hoje + 'T00:00:00').getTime();
+    const diffDias = Math.ceil(diffMs / 86400000);
+    if (diffDias <= 2 && diffDias >= 1 && !emProducao) return 'EM_RISCO';
+  }
 
   // Em produção no prazo
   if (emProducao) return 'EM_PRODUCAO_PRAZO';
-
-  // Em risco: delivery within 2 days
-  if (conclusaoIdeal) {
-    const diffMs = new Date(conclusaoIdeal + 'T00:00:00').getTime() - new Date(hoje + 'T00:00:00').getTime();
-    const diffDias = Math.ceil(diffMs / 86400000);
-    if (diffDias <= 2 && diffDias >= 0) return 'EM_RISCO';
-  }
 
   return 'NAO_INICIADO';
 }
