@@ -186,40 +186,72 @@ export default function KanbanVenda() {
     const nextStatus = NEXT_STATUS[card.status_atual];
     if (!nextStatus) return;
 
-    await supabase.from('pedidos').update({ status_atual: nextStatus } as any).eq('id', card.id);
-    await supabase.from('pedido_historico').insert({
-      pedido_id: card.id,
-      usuario_id: profile!.id,
-      tipo_acao: 'TRANSICAO',
-      status_anterior: card.status_atual,
-      status_novo: nextStatus,
-      observacao: `${profile!.nome} moveu o pedido para ${STATUS_LABELS[nextStatus] || nextStatus}.`,
-    });
-    toast.success(`Pedido ${card.api_venda_id || card.numero_pedido} movido!`);
-    fetchCards();
+    try {
+      const { error: updateError } = await supabase.from('pedidos').update({ status_atual: nextStatus } as any).eq('id', card.id);
+      if (updateError) {
+        console.error('Erro ao avançar pedido:', updateError);
+        toast.error(`Erro ao avançar pedido: ${updateError.message}`);
+        return;
+      }
+
+      const { error: histError } = await supabase.from('pedido_historico').insert({
+        pedido_id: card.id,
+        usuario_id: profile!.id,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: card.status_atual,
+        status_novo: nextStatus,
+        observacao: `${profile!.nome} moveu o pedido para ${STATUS_LABELS[nextStatus] || nextStatus}.`,
+      });
+      if (histError) {
+        console.error('Erro ao registrar histórico:', histError);
+      }
+
+      toast.success(`Pedido ${card.api_venda_id || card.numero_pedido} movido!`);
+      fetchCards();
+    } catch (err) {
+      console.error('Erro inesperado ao avançar:', err);
+      toast.error('Erro inesperado ao avançar o pedido.');
+    }
   };
 
   const handleValidarComercial = async (formaPagamento: string, formaEnvio: string) => {
     const card = validarDialog.card;
     if (!card) return;
 
-    await supabase.from('pedidos').update({
-      status_atual: 'VALIDADO_COMERCIAL',
-      forma_pagamento: formaPagamento,
-      forma_envio: formaEnvio,
-    } as any).eq('id', card.id);
+    try {
+      const { error: updateError } = await supabase.from('pedidos').update({
+        status_atual: 'VALIDADO_COMERCIAL',
+        forma_pagamento: formaPagamento,
+        forma_envio: formaEnvio,
+      } as any).eq('id', card.id);
 
-    await supabase.from('pedido_historico').insert({
-      pedido_id: card.id,
-      usuario_id: profile!.id,
-      tipo_acao: 'TRANSICAO',
-      status_anterior: card.status_atual,
-      status_novo: 'VALIDADO_COMERCIAL',
-      observacao: `Validação comercial por ${profile!.nome}. Pagamento: ${formaPagamento}. Envio: ${formaEnvio}.`,
-    });
+      if (updateError) {
+        console.error('Erro ao validar comercial:', updateError);
+        toast.error(`Erro ao validar comercial: ${updateError.message}`);
+        return;
+      }
 
-    toast.success(`Pedido ${card.api_venda_id || card.numero_pedido} validado pelo Comercial!`);
-    fetchCards();
+      const { error: histError } = await supabase.from('pedido_historico').insert({
+        pedido_id: card.id,
+        usuario_id: profile!.id,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: card.status_atual,
+        status_novo: 'VALIDADO_COMERCIAL',
+        observacao: `Validação comercial por ${profile!.nome}. Pagamento: ${formaPagamento}. Envio: ${formaEnvio}.`,
+      });
+
+      if (histError) {
+        console.error('Erro ao registrar histórico:', histError);
+        toast.error(`Erro ao registrar histórico: ${histError.message}`);
+        return;
+      }
+
+      toast.success(`Pedido ${card.api_venda_id || card.numero_pedido} validado pelo Comercial!`);
+      fetchCards();
+    } catch (err) {
+      console.error('Erro inesperado na validação comercial:', err);
+      toast.error('Erro inesperado ao validar comercial.');
+    }
   };
 
   const handleCiente = async (card: VendaCard) => {
@@ -254,7 +286,7 @@ export default function KanbanVenda() {
   const isAdmin = profile && ['admin', 'gestor'].includes(profile.perfil);
   const canAdvance = (colKey: string) => {
     if (isAdmin) return true;
-    if (profile?.perfil === 'comercial' && (colKey === 'comercial' || colKey === 'vendas_entregues')) return true;
+    if (profile?.perfil === 'comercial' && (colKey === 'comercial' || colKey === 'validado_comercial' || colKey === 'vendas_entregues')) return true;
     if (profile?.perfil === 'financeiro' && (colKey === 'financeiro' || colKey === 'validado_comercial')) return true;
     if (profile?.perfil === 'logistica' && (colKey === 'validado_financeiro' || colKey === 'logistica')) return true;
     return false;
