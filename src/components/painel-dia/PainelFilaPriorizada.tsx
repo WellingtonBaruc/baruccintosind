@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TIPO_PRODUTO_BADGE, TIPO_PRODUTO_LABELS } from '@/lib/pcp';
 import { STATUS_PCP_CONFIG, ETIQUETA_CONFIG, type PedidoPainelDia } from '@/lib/pcpPainelDia';
-import { ListOrdered, ArrowUpDown, CalendarPlus, CalendarCheck, X, AlertTriangle } from 'lucide-react';
+import { ListOrdered, ArrowUpDown, CalendarPlus, CalendarCheck, X, AlertTriangle, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
 
@@ -150,31 +150,38 @@ export default function PainelFilaPriorizada({ pedidos, onProgramarInicio, onPro
                     <td className="py-2 text-center tabular-nums">{p.quantidade_itens}</td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{p.score_prioridade}</td>
                     <td className="py-2 text-center">
-                      {isProgramado ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <Badge className="text-[10px] bg-primary/15 text-primary border-primary/30">
-                            {isProgramadoInicio ? 'Início' : 'Conclusão'}
+                      <div className="flex items-center justify-center gap-1">
+                        {/* Botão Iniciar */}
+                        {isProgramadoInicio ? (
+                          <Badge className="text-[10px] bg-blue-500/15 text-blue-700 border-blue-300 gap-0.5">
+                            <CheckCircle className="h-3 w-3" /> Início
                           </Badge>
-                          {onDesprogramar && (
-                            <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive" onClick={() => onDesprogramar(p)}>
-                              <X className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center gap-1">
-                          {onProgramarInicio && p.status_atual === 'AGUARDANDO_PRODUCAO' && (
+                        ) : (
+                          onProgramarInicio && (
                             <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-blue-600 hover:bg-blue-50" onClick={() => onProgramarInicio(p)} title="Programar início hoje">
                               <CalendarPlus className="h-3 w-3 mr-0.5" /> Início
                             </Button>
-                          )}
-                          {onProgramarConclusao && p.status_atual === 'EM_PRODUCAO' && (
-                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-orange-600 hover:bg-orange-50" onClick={() => onProgramarConclusao(p)} title="Programar conclusão hoje">
+                          )
+                        )}
+                        {/* Botão Concluir */}
+                        {isProgramadoConclusao ? (
+                          <Badge className="text-[10px] bg-emerald-500/15 text-emerald-700 border-emerald-300 gap-0.5">
+                            <CheckCircle className="h-3 w-3" /> Conclusão
+                          </Badge>
+                        ) : (
+                          onProgramarConclusao && (
+                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-emerald-600 hover:bg-emerald-50" onClick={() => onProgramarConclusao(p)} title="Programar conclusão hoje">
                               <CalendarCheck className="h-3 w-3 mr-0.5" /> Conclusão
                             </Button>
-                          )}
-                        </div>
-                      )}
+                          )
+                        )}
+                        {/* Desprogramar */}
+                        {isProgramado && onDesprogramar && (
+                          <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive" onClick={() => onDesprogramar(p)}>
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
