@@ -254,10 +254,42 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
       .filter(Boolean) as CutGroup[];
   }, [groups, search]);
 
-  const filteredGroups = filterLargura === 'all' ? searchedGroups : searchedGroups.filter(g => g.largura === filterLargura);
+  const filteredUnsorted = filterLargura === 'all' ? searchedGroups : searchedGroups.filter(g => g.largura === filterLargura);
+
+  const filteredGroups = useMemo(() => {
+    if (!sortCol) return filteredUnsorted;
+    return [...filteredUnsorted].sort((a, b) => {
+      let cmp = 0;
+      switch (sortCol) {
+        case 'largura': cmp = a.largura.localeCompare(b.largura); break;
+        case 'material': cmp = a.material.localeCompare(b.material); break;
+        case 'tamanho': cmp = a.tamanho.localeCompare(b.tamanho); break;
+        case 'cor': cmp = a.cor.localeCompare(b.cor); break;
+        case 'qtd': cmp = a.quantidadeTotal - b.quantidadeTotal; break;
+        default: cmp = 0;
+      }
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
+  }, [filteredUnsorted, sortCol, sortDir]);
+
   const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
   const totalItens = filteredGroups.reduce((sum, g) => sum + g.itens.length, 0);
   const totalGrupos = filteredGroups.length;
+
+  const toggleSort = (col: string) => {
+    if (sortCol === col) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else { setSortCol(null); setSortDir('asc'); }
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortCol !== col) return <ArrowUpDown className="h-3 w-3 text-muted-foreground/50" />;
+    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3 text-primary" /> : <ArrowDown className="h-3 w-3 text-primary" />;
+  };
 
   const isDateMode = janelaDias != null;
 
