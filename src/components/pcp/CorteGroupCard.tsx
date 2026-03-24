@@ -258,21 +258,40 @@ export function CorteGroupCard({ title, tipo, groups, filterLargura, onFilterLar
 
   const filteredUnsorted = filterLargura === 'all' ? searchedGroups : searchedGroups.filter(g => g.largura === filterLargura);
 
+  const STATUS_PRIORITY: Record<string, number> = { PENDENTE: 0, INICIADO: 1, CONCLUIDO: 2 };
+
+  const getGroupStatus = (g: CutGroup): string => {
+    if (g.is_manual) return (g as any)._manual_status || 'PENDENTE';
+    const key = groupKey(tipo, g);
+    return registros.get(key)?.status || 'PENDENTE';
+  };
+
   const filteredGroups = useMemo(() => {
-    if (!sortCol) return filteredUnsorted;
-    return [...filteredUnsorted].sort((a, b) => {
-      let cmp = 0;
-      switch (sortCol) {
-        case 'largura': cmp = a.largura.localeCompare(b.largura); break;
-        case 'material': cmp = a.material.localeCompare(b.material); break;
-        case 'tamanho': cmp = a.tamanho.localeCompare(b.tamanho); break;
-        case 'cor': cmp = a.cor.localeCompare(b.cor); break;
-        case 'qtd': cmp = a.quantidadeTotal - b.quantidadeTotal; break;
-        default: cmp = 0;
+    let list = hideCompleted
+      ? filteredUnsorted.filter(g => getGroupStatus(g) !== 'CONCLUIDO')
+      : filteredUnsorted;
+
+    return [...list].sort((a, b) => {
+      // Status priority first: PENDENTE < INICIADO < CONCLUIDO
+      const sa = STATUS_PRIORITY[getGroupStatus(a)] ?? 0;
+      const sb = STATUS_PRIORITY[getGroupStatus(b)] ?? 0;
+      if (sa !== sb) return sa - sb;
+
+      // Then user-chosen column sort
+      if (sortCol) {
+        let cmp = 0;
+        switch (sortCol) {
+          case 'largura': cmp = a.largura.localeCompare(b.largura); break;
+          case 'material': cmp = a.material.localeCompare(b.material); break;
+          case 'tamanho': cmp = a.tamanho.localeCompare(b.tamanho); break;
+          case 'cor': cmp = a.cor.localeCompare(b.cor); break;
+          case 'qtd': cmp = a.quantidadeTotal - b.quantidadeTotal; break;
+        }
+        if (cmp !== 0) return sortDir === 'desc' ? -cmp : cmp;
       }
-      return sortDir === 'desc' ? -cmp : cmp;
+      return 0;
     });
-  }, [filteredUnsorted, sortCol, sortDir]);
+  }, [filteredUnsorted, sortCol, sortDir, registros, hideCompleted]);
 
   const totalPecas = filteredGroups.reduce((sum, g) => sum + g.quantidadeTotal, 0);
   const totalItens = filteredGroups.reduce((sum, g) => sum + g.itens.length, 0);
