@@ -1045,6 +1045,12 @@ export default function KanbanProducao() {
                                   </Badge>
                                 )}
 
+                                {card.observacao_api?.includes('[IMPORTADO SEM DATA PREVISTA]') && (
+                                  <Badge className="mt-1.5 text-[10px] bg-destructive/15 text-destructive border-destructive/30">
+                                    📋 Sem data prevista
+                                  </Badge>
+                                )}
+
                                 {card.perdas_pendentes > 0 && (
                                   <Badge className="mt-1.5 text-[10px] bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30">
                                     <AlertTriangle className="h-3 w-3 mr-0.5" />
