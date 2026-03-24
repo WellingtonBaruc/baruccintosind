@@ -180,6 +180,16 @@ export default function FilaLoja() {
     if (aPri !== bPri) return aPri - bPri;
     return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
   });
+  const kpiData: LojaKpiData = {
+    total: pedidos.length,
+    aguardandoLoja: pedidos.filter(p => p.status_atual === 'AGUARDANDO_LOJA').length,
+    aguardandoOp: pedidos.filter(p => p.status_atual === 'AGUARDANDO_OP_COMPLEMENTAR').length,
+    aguardandoAlmox: pedidos.filter(p => p.status_atual === 'AGUARDANDO_ALMOXARIFADO').length,
+    pendenteFinalizacao: pedidos.filter(p => p.status_atual === 'LOJA_PENDENTE_FINALIZACAO').length,
+    enviadasComercial: pedidos.filter(p => p.status_atual === 'AGUARDANDO_COMERCIAL').length,
+    validadasComercial: pedidos.filter(p => p.status_atual === 'VALIDADO_COMERCIAL').length,
+    finalizadasHoje,
+  };
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -187,6 +197,8 @@ export default function FilaLoja() {
         <h1 className="text-2xl font-semibold tracking-tight">Fila da Loja</h1>
         <p className="text-muted-foreground mt-0.5">Pedidos aguardando verificação e expedição.</p>
       </div>
+
+      <LojaKpiCards data={kpiData} onFilterClick={setStatusFilter} />
 
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
