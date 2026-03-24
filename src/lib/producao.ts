@@ -249,7 +249,49 @@ export async function aprovarOrdem(ordemId: string, pedidoId: string, supervisor
 
   const allApproved = allOrdens?.every(o => o.aprovado_em !== null);
 
-  if (allApproved) {
+  // Get current pedido status
+  const { data: pedido } = await supabase
+    .from('pedidos')
+    .select('status_atual, subtipo_pronta_entrega')
+    .eq('id', pedidoId)
+    .single();
+
+  const isLojaFlow = pedido?.status_atual === 'AGUARDANDO_OP_COMPLEMENTAR';
+
+  if (isLojaFlow && allApproved) {
+    // Check if almoxarifado solicitações are also resolved
+    const { data: solicitacoes } = await supabase
+      .from('solicitacoes_almoxarifado')
+      .select('status')
+      .eq('pedido_id', pedidoId);
+
+    const allSolResolved = !solicitacoes || solicitacoes.length === 0 || 
+      solicitacoes.every(s => s.status === 'ATENDIDA' || s.status === 'ATENDIDO');
+
+    if (allSolResolved) {
+      // All resolved — auto-advance to AGUARDANDO_COMERCIAL
+      await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', pedidoId);
+      await supabase.from('pedido_historico').insert({
+        pedido_id: pedidoId,
+        usuario_id: supervisorId,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: 'AGUARDANDO_OP_COMPLEMENTAR',
+        status_novo: 'AGUARDANDO_COMERCIAL',
+        observacao: 'OP complementar aprovada. Pedido encaminhado para comercial automaticamente.',
+      });
+    } else {
+      // OP done but almox pending — move to AGUARDANDO_ALMOXARIFADO
+      await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_ALMOXARIFADO' }).eq('id', pedidoId);
+      await supabase.from('pedido_historico').insert({
+        pedido_id: pedidoId,
+        usuario_id: supervisorId,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: 'AGUARDANDO_OP_COMPLEMENTAR',
+        status_novo: 'AGUARDANDO_ALMOXARIFADO',
+        observacao: 'OP complementar aprovada. Aguardando almoxarifado.',
+      });
+    }
+  } else if (allApproved && !isLojaFlow) {
     await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', pedidoId);
     await supabase.from('pedido_historico').insert({
       pedido_id: pedidoId,

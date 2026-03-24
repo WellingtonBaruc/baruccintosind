@@ -172,12 +172,53 @@ export default function AlmoxarifadoPage() {
         }).in('id', solIds);
       }
 
-      await supabase.from('pedido_historico').insert({
-        pedido_id: venda.pedido_id,
-        usuario_id: profile.id,
-        tipo_acao: 'COMENTARIO' as any,
-        observacao: `Fivelas separadas pelo almoxarifado — ${profile.nome}`,
-      });
+      // Auto-advance pedido status when almox is resolved
+      const { data: pedido } = await supabase
+        .from('pedidos')
+        .select('status_atual')
+        .eq('id', venda.pedido_id)
+        .single();
+
+      if (pedido?.status_atual === 'AGUARDANDO_ALMOXARIFADO') {
+        // Check if OP complementar is also done
+        const { data: ops } = await supabase
+          .from('ordens_producao')
+          .select('status, aprovado_em')
+          .eq('pedido_id', venda.pedido_id)
+          .gt('sequencia', 1);
+
+        const allOpsDone = !ops || ops.length === 0 || ops.every(o => o.aprovado_em !== null);
+
+        if (allOpsDone) {
+          await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', venda.pedido_id);
+          await supabase.from('pedido_historico').insert({
+            pedido_id: venda.pedido_id,
+            usuario_id: profile.id,
+            tipo_acao: 'TRANSICAO' as any,
+            status_anterior: 'AGUARDANDO_ALMOXARIFADO',
+            status_novo: 'AGUARDANDO_COMERCIAL',
+            observacao: 'Fivelas separadas e pendências resolvidas. Pedido encaminhado para comercial automaticamente.',
+          });
+        } else {
+          // Almox done but OP still pending — move to AGUARDANDO_OP_COMPLEMENTAR
+          await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_OP_COMPLEMENTAR' }).eq('id', venda.pedido_id);
+          await supabase.from('pedido_historico').insert({
+            pedido_id: venda.pedido_id,
+            usuario_id: profile.id,
+            tipo_acao: 'TRANSICAO' as any,
+            status_anterior: 'AGUARDANDO_ALMOXARIFADO',
+            status_novo: 'AGUARDANDO_OP_COMPLEMENTAR',
+            observacao: 'Fivelas separadas. Aguardando OP complementar.',
+          });
+        }
+      } else {
+        await supabase.from('pedido_historico').insert({
+          pedido_id: venda.pedido_id,
+          usuario_id: profile.id,
+          tipo_acao: 'COMENTARIO' as any,
+          observacao: `Fivelas separadas pelo almoxarifado — ${profile.nome}`,
+        });
+      }
 
       toast.success(`Separação confirmada — Venda #${venda.api_venda_id}`);
       fetchVendas();
