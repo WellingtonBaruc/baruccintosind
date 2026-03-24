@@ -108,6 +108,18 @@ export default function FilaLoja() {
         almox_atendido: almoxMap[p.id] !== undefined ? almoxMap[p.id] : true, // no solicitações = ok
       })));
     }
+
+    // Fetch finalizadas hoje
+    const todayStart = startOfDay(new Date()).toISOString();
+    const { count: finHoje } = await supabase
+      .from('pedido_historico')
+      .select('*', { count: 'exact', head: true })
+      .eq('tipo_acao', 'TRANSICAO')
+      .eq('status_novo', 'AGUARDANDO_FINANCEIRO')
+      .in('status_anterior', ['VALIDADO_COMERCIAL', 'LOJA_OK', 'LOJA_PENDENTE_FINALIZACAO', 'AGUARDANDO_COMERCIAL'])
+      .gte('criado_em', todayStart);
+    setFinalizadasHoje(finHoje || 0);
+
     setLoading(false);
   };
 
