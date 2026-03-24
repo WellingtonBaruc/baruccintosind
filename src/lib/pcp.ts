@@ -34,6 +34,7 @@ export function extrairAtributosProduto(nome: string) {
   if (upper.includes('MEGA')) material = 'MEGA';
   else if (upper.includes('PERUGIA')) material = 'PERUGIA';
   else if (upper.includes('DUBLADO')) material = 'DUBLADO';
+  else if (upper.includes('TECIDO')) material = 'TERTELO';
 
   // Tamanho
   let tamanho = 'PADRÃO';
