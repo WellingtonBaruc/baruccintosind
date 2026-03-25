@@ -350,9 +350,7 @@ export default function RelatoriosProducao() {
     { label: 'Total Peças', value: totalPecas.toLocaleString('pt-BR'), icon: Package, colorClass: 'text-foreground', bgClass: 'bg-muted' },
     { label: 'Peças Sintético', value: pecasSintetico.toLocaleString('pt-BR'), icon: Package, colorClass: 'text-blue-600', bgClass: 'bg-blue-500/10' },
     { label: 'Peças Tecido', value: pecasTecido.toLocaleString('pt-BR'), icon: Package, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-500/10' },
-    { label: 'Simplifica sem OP', value: `${totalSimplificaSemOP} (${pecasSimplificaSemOP} pçs)`, icon: FileX, colorClass: 'text-amber-600', bgClass: 'bg-amber-500/10' },
     { label: 'Tempo Médio', value: formatDuration(avgProducaoMinutes), icon: TrendingUp, colorClass: 'text-purple-600', bgClass: 'bg-purple-500/10' },
-    { label: 'Atrasados', value: atrasados, icon: AlertTriangle, colorClass: 'text-destructive', bgClass: 'bg-destructive/10' },
   ];
 
   const kpiCardsSecondary = [
