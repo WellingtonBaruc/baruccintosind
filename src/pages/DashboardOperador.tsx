@@ -87,7 +87,7 @@ export default function DashboardOperador() {
     setAtribuidos(items);
 
     // Concluídos hoje
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
     const { data: done } = await supabase
       .from('op_etapas')
       .select('nome_etapa, concluido_em, ordens_producao!inner(pedidos!inner(numero_pedido))')

@@ -330,8 +330,8 @@ export default function FilaMestre() {
     if (tipoFilter !== 'all' && r.tipo_produto !== tipoFilter) return false;
     if (statusFilter !== 'all' && r.status_atual !== statusFilter) return false;
     if (prazoFilter === 'ATRASADO' && r.status_prazo !== 'ATRASADO') return false;
-    if (prazoFilter === 'HOJE' && r.data_previsao_entrega !== new Date().toISOString().slice(0, 10)) return false;
-    if (prazoFilter === 'FUTURO' && (r.status_prazo === 'ATRASADO' || r.data_previsao_entrega === new Date().toISOString().slice(0, 10))) return false;
+    if (prazoFilter === 'HOJE' && r.data_previsao_entrega !== new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })) return false;
+    if (prazoFilter === 'FUTURO' && (r.status_prazo === 'ATRASADO' || r.data_previsao_entrega === new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }))) return false;
     return true;
   });
 
