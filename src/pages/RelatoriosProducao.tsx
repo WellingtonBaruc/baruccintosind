@@ -201,22 +201,44 @@ export default function RelatoriosProducao() {
     return Object.entries(counts).map(([name, value]) => ({ name: name === 'SINTETICO' ? 'Sintético' : name === 'TECIDO' ? 'Tecido' : name === 'FIVELA_COBERTA' ? 'Fivela Coberta' : name, value }));
   }, [filteredOrdens]);
 
-  // Daily production (bar chart - completed per day)
-  const dailyProduction = useMemo(() => {
-    const days: Record<string, number> = {};
+  // Daily production stacked chart (OPs concluídas + Simplifica sem OP, por tipo)
+  const dailyProductionStacked = useMemo(() => {
+    const days: Record<string, { sintetico: number; tecido: number; simplifica_sintetico: number; simplifica_tecido: number; sortKey: string }> = {};
+
+    const ensureDay = (dateStr: string) => {
+      const d = new Date(dateStr);
+      const key = format(d, 'dd/MM');
+      const sortKey = format(d, 'yyyy-MM-dd');
+      if (!days[key]) days[key] = { sintetico: 0, tecido: 0, simplifica_sintetico: 0, simplifica_tecido: 0, sortKey };
+      return key;
+    };
+
+    // 1) OPs finalizadas internamente
     filteredOrdens.filter(o => o.status === 'CONCLUIDA' && o.data_fim_pcp).forEach(o => {
-      const day = format(new Date(o.data_fim_pcp!), 'dd/MM');
-      days[day] = (days[day] || 0) + 1;
+      const key = ensureDay(o.data_fim_pcp!);
+      if (o.tipo_produto === 'SINTETICO') days[key].sintetico++;
+      else if (o.tipo_produto === 'TECIDO') days[key].tecido++;
     });
+
+    // 2) Pedidos finalizados no Simplifica sem OP
+    pedidosSimplifica.forEach(p => {
+      const key = ensureDay(p.atualizado_em);
+      // Without OP we can't determine type precisely, count as simplifica
+      days[key].simplifica_sintetico++;
+    });
+
     return Object.entries(days)
-      .map(([dia, concluidas]) => ({ dia, concluidas }))
-      .sort((a, b) => {
-        const [dA, mA] = a.dia.split('/').map(Number);
-        const [dB, mB] = b.dia.split('/').map(Number);
-        return mA !== mB ? mA - mB : dA - dB;
-      })
+      .map(([dia, d]) => ({
+        dia,
+        sortKey: d.sortKey,
+        sintetico: d.sintetico,
+        tecido: d.tecido,
+        simplifica: d.simplifica_sintetico + d.simplifica_tecido,
+        total: d.sintetico + d.tecido + d.simplifica_sintetico + d.simplifica_tecido,
+      }))
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
       .slice(-14);
-  }, [filteredOrdens]);
+  }, [filteredOrdens, pedidosSimplifica]);
 
   // Time per stage (bar chart)
   const timePerStage = useMemo(() => {
