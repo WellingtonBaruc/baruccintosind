@@ -596,6 +596,31 @@ export default function Integracao() {
         </Card>
       </div>
 
+      {/* Sync expandida */}
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <RefreshCw className="h-4 w-4" /> Sincronização Expandida
+          </CardTitle>
+          <CardDescription>Importa vendas com janela de tempo maior para buscar pedidos antigos que ficaram fora da janela padrão de 2 dias.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <Button onClick={() => handleSyncExpandido(15)} disabled={syncExpandido} variant="outline" size="sm">
+              {syncExpandido ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              15 dias
+            </Button>
+            <Button onClick={() => handleSyncExpandido(30)} disabled={syncExpandido} variant="outline" size="sm">
+              30 dias
+            </Button>
+            <Button onClick={() => handleSyncExpandido(60)} disabled={syncExpandido} variant="outline" size="sm">
+              60 dias
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Use quando vendas antigas não aparecem no sistema. A sync normal busca apenas os últimos 2 dias.</p>
+        </CardContent>
+      </Card>
+
       {/* Historical load + Daily sync */}
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border-border/60 shadow-sm">
