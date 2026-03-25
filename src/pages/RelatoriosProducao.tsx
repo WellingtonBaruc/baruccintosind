@@ -636,10 +636,10 @@ export default function RelatoriosProducao() {
                           <TableCell><Badge variant="outline" className="text-[10px]">{tipoLabel}</Badge></TableCell>
                           <TableCell className="tabular-nums">{o.quantidade}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {o.data_inicio_pcp ? format(new Date(o.data_inicio_pcp), 'dd/MM HH:mm') : '—'}
+                            {o.data_inicio_pcp ? format(toBrasilia(o.data_inicio_pcp), 'dd/MM HH:mm') : '—'}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {o.data_fim_pcp ? format(new Date(o.data_fim_pcp), 'dd/MM HH:mm') : '—'}
+                            {o.data_fim_pcp ? format(toBrasilia(o.data_fim_pcp), 'dd/MM HH:mm') : '—'}
                           </TableCell>
                           <TableCell className="text-sm font-medium tabular-nums">
                             {o.duracao !== null ? formatDuration(o.duracao) : '—'}
