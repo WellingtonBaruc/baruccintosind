@@ -124,7 +124,7 @@ export default function PCP() {
       : { data: [] };
 
     const obsCorteMap = new Map<string, { id: string; observacao: string; criado_em: string; lido: boolean; lido_em: string | null }[]>();
-    for (const obs of (obsCorteRes.data || [])) {
+    for (const obs of (obsCorteData || [])) {
       const list = obsCorteMap.get(obs.pedido_item_id) || [];
       list.push({ id: obs.id, observacao: obs.observacao, criado_em: obs.criado_em, lido: obs.lido, lido_em: obs.lido_em });
       obsCorteMap.set(obs.pedido_item_id, list);
