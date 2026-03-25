@@ -13,6 +13,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, ArrowLeft, Package, Clock, AlertTriangle, CheckCircle2, TrendingUp, BarChart3, Factory, FileX } from 'lucide-react';
 import { format, subDays, subMonths, startOfDay, differenceInMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+// Helper: convert UTC date to Brasília (UTC-3) for display
+function toBrasilia(dateStr: string): Date {
+  const d = new Date(dateStr);
+  return new Date(d.getTime() - 3 * 60 * 60 * 1000);
+}
+
+function formatBrasiliaDay(dateStr: string): { key: string; sortKey: string } {
+  const d = toBrasilia(dateStr);
+  return { key: format(d, 'dd/MM'), sortKey: format(d, 'yyyy-MM-dd') };
+}
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 
 const PERFIS_PRODUCAO = ['admin', 'gestor', 'supervisor_producao'];
@@ -233,31 +244,16 @@ export default function RelatoriosProducao() {
   }, [filteredOrdens]);
 
   // ========== CHART DATA ==========
-  // Daily production stacked: PEÇAS per day (not OP count)
+  // Daily production: only OPs concluídas no Kanban de Produção, PEÇAS per day, Brasília timezone
   const dailyProductionStacked = useMemo(() => {
-    const days: Record<string, { sintetico: number; tecido: number; simplifica: number; sortKey: string }> = {};
+    const days: Record<string, { sintetico: number; tecido: number; sortKey: string }> = {};
 
-    const ensureDay = (dateStr: string) => {
-      const d = new Date(dateStr);
-      const key = format(d, 'dd/MM');
-      const sortKey = format(d, 'yyyy-MM-dd');
-      if (!days[key]) days[key] = { sintetico: 0, tecido: 0, simplifica: 0, sortKey };
-      return key;
-    };
-
-    // 1) OPs finalizadas — count PEÇAS
     filteredOrdens.filter(o => o.status === 'CONCLUIDA' && o.data_fim_pcp).forEach(o => {
-      const key = ensureDay(o.data_fim_pcp!);
+      const { key, sortKey } = formatBrasiliaDay(o.data_fim_pcp!);
+      if (!days[key]) days[key] = { sintetico: 0, tecido: 0, sortKey };
       const pecas = getPecasByPedido[o.pedido_id] || 1;
-      if (o.tipo_produto === 'SINTETICO') days[key].sintetico += pecas;
-      else if (o.tipo_produto === 'TECIDO') days[key].tecido += pecas;
-      else days[key].sintetico += pecas; // fallback
-    });
-
-    // 2) Simplifica sem OP — count PEÇAS
-    pedidosSimplifica.forEach(p => {
-      const key = ensureDay(p.atualizado_em);
-      days[key].simplifica += getPecasByPedido[p.id] || 1;
+      if (o.tipo_produto === 'TECIDO') days[key].tecido += pecas;
+      else days[key].sintetico += pecas;
     });
 
     return Object.entries(days)
@@ -266,12 +262,11 @@ export default function RelatoriosProducao() {
         sortKey: d.sortKey,
         sintetico: d.sintetico,
         tecido: d.tecido,
-        simplifica: d.simplifica,
-        total: d.sintetico + d.tecido + d.simplifica,
+        total: d.sintetico + d.tecido,
       }))
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
       .slice(-14);
-  }, [filteredOrdens, pedidosSimplifica, getPecasByPedido]);
+  }, [filteredOrdens, getPecasByPedido]);
 
   // Production by type (pie) — PEÇAS
   const prodByType = useMemo(() => {
@@ -478,7 +473,7 @@ export default function RelatoriosProducao() {
             <TabsContent value="diario">
               <Card className="border-border/60">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-semibold">Peças Produzidas por Dia — Sintético / Tecido / Simplifica</CardTitle>
+                  <CardTitle className="text-base font-semibold">Peças Concluídas por Dia — Sintético / Tecido</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {dailyProductionStacked.length === 0 ? (
@@ -495,9 +490,8 @@ export default function RelatoriosProducao() {
                             formatter={(value: number, name: string) => [`${value} pçs`, name]}
                           />
                           <Legend />
-                          <Bar dataKey="sintetico" name="Sintético (OP)" stackId="a" fill="hsl(217, 91%, 60%)" radius={[0, 0, 0, 0]} />
-                          <Bar dataKey="tecido" name="Tecido (OP)" stackId="a" fill="hsl(142, 71%, 45%)" radius={[0, 0, 0, 0]} />
-                          <Bar dataKey="simplifica" name="Simplifica (sem OP)" stackId="a" fill="hsl(38, 92%, 50%)" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="sintetico" name="Sintético" stackId="a" fill="hsl(217, 91%, 60%)" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="tecido" name="Tecido" stackId="a" fill="hsl(142, 71%, 45%)" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
 
@@ -509,7 +503,6 @@ export default function RelatoriosProducao() {
                               <TableHead>Data</TableHead>
                               <TableHead className="text-right">Sintético</TableHead>
                               <TableHead className="text-right">Tecido</TableHead>
-                              <TableHead className="text-right">Simplifica</TableHead>
                               <TableHead className="text-right">Total</TableHead>
                               <TableHead className="text-right">% Sint.</TableHead>
                               <TableHead className="text-right">% Tec.</TableHead>
@@ -524,7 +517,6 @@ export default function RelatoriosProducao() {
                                   <TableCell className="font-medium">{d.dia}</TableCell>
                                   <TableCell className="text-right tabular-nums">{d.sintetico}</TableCell>
                                   <TableCell className="text-right tabular-nums">{d.tecido}</TableCell>
-                                  <TableCell className="text-right tabular-nums">{d.simplifica}</TableCell>
                                   <TableCell className="text-right font-bold tabular-nums">{d.total}</TableCell>
                                   <TableCell className="text-right tabular-nums text-muted-foreground">{pctSint}%</TableCell>
                                   <TableCell className="text-right tabular-nums text-muted-foreground">{pctTec}%</TableCell>
@@ -644,10 +636,10 @@ export default function RelatoriosProducao() {
                           <TableCell><Badge variant="outline" className="text-[10px]">{tipoLabel}</Badge></TableCell>
                           <TableCell className="tabular-nums">{o.quantidade}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {o.data_inicio_pcp ? format(new Date(o.data_inicio_pcp), 'dd/MM HH:mm') : '—'}
+                            {o.data_inicio_pcp ? format(toBrasilia(o.data_inicio_pcp), 'dd/MM HH:mm') : '—'}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {o.data_fim_pcp ? format(new Date(o.data_fim_pcp), 'dd/MM HH:mm') : '—'}
+                            {o.data_fim_pcp ? format(toBrasilia(o.data_fim_pcp), 'dd/MM HH:mm') : '—'}
                           </TableCell>
                           <TableCell className="text-sm font-medium tabular-nums">
                             {o.duracao !== null ? formatDuration(o.duracao) : '—'}
