@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { concluirEtapa, iniciarEtapa } from '@/lib/producao';
 import { TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE, extrairAtributosProduto, classificarProduto } from '@/lib/pcp';
@@ -18,7 +18,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
-import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star, Scissors } from 'lucide-react';
+import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star, Scissors, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface KanbanCard {
@@ -111,6 +111,7 @@ type FilterTipo = 'all' | 'SINTETICO' | 'TECIDO' | 'FIVELA_COBERTA';
 
 export default function KanbanProducao() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
 
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -984,7 +985,12 @@ export default function KanbanProducao() {
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Kanban de Produção</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">Kanban de Produção</h1>
+          <Button variant="outline" size="sm" onClick={() => navigate('/relatorios/producao')} className="gap-1.5">
+            <BarChart3 className="h-3.5 w-3.5" /> Relatórios
+          </Button>
+        </div>
         <div className="flex gap-2 items-center flex-wrap">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import DashboardGestao from "./pages/DashboardGestao";
 import FilaMestre from "./pages/FilaMestre";
 import KanbanProducao from "./pages/KanbanProducao";
+import RelatoriosProducao from "./pages/RelatoriosProducao";
 import KanbanVenda from "./pages/KanbanVenda";
 import PainelDia from "./pages/PainelDia";
 import Usuarios from "./pages/Usuarios";
@@ -76,6 +77,7 @@ const App = () => (
 
               {/* Reports */}
               <Route path="/relatorios/abc" element={<CurvaABC />} />
+              <Route path="/relatorios/producao" element={<RelatoriosProducao />} />
               <Route path="/almoxarifado" element={<AlmoxarifadoPage />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
