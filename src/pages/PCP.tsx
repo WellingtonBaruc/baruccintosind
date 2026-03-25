@@ -72,7 +72,7 @@ export default function PCP() {
       if (p.manual) fetchManualOPs();
       if (p.daily) fetchDailyStats();
       pendingRef.current = { data: false, manual: false, daily: false };
-    }, 400);
+    }, 1500);
   }, []);
 
   useEffect(() => {
