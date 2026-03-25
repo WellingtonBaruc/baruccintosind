@@ -215,9 +215,10 @@ export default function PCP() {
   const fetchDailyStats = async () => {
     setLoadingDaily(true);
     const days = parseInt(dailyPeriodo) || 0;
+    const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
     const desde = days === 0
-      ? format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm:ss")
-      : format(startOfDay(subDays(new Date(), days)), "yyyy-MM-dd'T'HH:mm:ss");
+      ? hojeStr + 'T00:00:00'
+      : format(startOfDay(subDays(new Date(hojeStr + 'T00:00:00'), days)), "yyyy-MM-dd'T'HH:mm:ss");
 
     const { data } = await supabase
       .from('pcp_corte_registro')
