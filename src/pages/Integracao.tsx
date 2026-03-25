@@ -56,6 +56,7 @@ export default function Integracao() {
   const [historicLoading, setHistoricLoading] = useState(false);
   const [historicProgress, setHistoricProgress] = useState<string | null>(null);
   const [historicDone, setHistoricDone] = useState<{ date: string; count: number } | null>(null);
+  const [syncExpandido, setSyncExpandido] = useState(false);
   const [lastDailyLog, setLastDailyLog] = useState<LogEntry | null>(null);
   const [resetting, setResetting] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
