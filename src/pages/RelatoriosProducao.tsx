@@ -356,9 +356,8 @@ export default function RelatoriosProducao() {
   ];
 
   const kpiCardsSecondary = [
-    { label: 'OPs Finalizadas', value: opsFinalizadas, icon: CheckCircle2, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-500/10' },
-    { label: 'OPs em Andamento', value: opsEmAndamento, icon: Factory, colorClass: 'text-blue-600', bgClass: 'bg-blue-500/10' },
-    { label: 'Total OPs', value: totalOPs, icon: BarChart3, colorClass: 'text-foreground', bgClass: 'bg-muted' },
+    { label: 'OPs Concluídas', value: opsFinalizadas, icon: CheckCircle2, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-500/10' },
+    { label: 'Simplifica sem OP', value: totalSimplificaSemOP, icon: FileX, colorClass: 'text-amber-600', bgClass: 'bg-amber-500/10' },
   ];
 
   return (
