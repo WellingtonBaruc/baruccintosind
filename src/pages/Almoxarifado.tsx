@@ -345,11 +345,6 @@ export default function AlmoxarifadoPage() {
     }
   };
 
-  /* ── Access control ── */
-  if (!profile || !['admin', 'gestor', 'almoxarifado'].includes(profile.perfil)) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   /* ── Filter & sort ── */
   const filteredVendas = useMemo(() => {
     let list = vendas;
