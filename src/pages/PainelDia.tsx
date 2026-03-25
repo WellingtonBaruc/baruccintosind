@@ -36,7 +36,9 @@ export default function PainelDia() {
   const [calData, setCalData] = useState<PcpCalendarData | null>(null);
   const [capPadrao, setCapPadrao] = useState({ sintetico: 30, tecido: 20, total: 50 });
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = useMemo(() => {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  }, []);
 
   const fetchData = useCallback(async () => {
     // Load calendar data, lead times, and capacity in parallel

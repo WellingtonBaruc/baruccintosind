@@ -25,7 +25,7 @@ export default function RegistroEnvio() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [dataEnvio, setDataEnvio] = useState(new Date().toISOString().slice(0, 10));
+  const [dataEnvio, setDataEnvio] = useState(new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }));
   const [transportadora, setTransportadora] = useState('');
   const [codigoRastreio, setCodigoRastreio] = useState('');
   const [observacao, setObservacao] = useState('');

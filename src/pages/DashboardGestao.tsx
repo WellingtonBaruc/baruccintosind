@@ -40,7 +40,7 @@ export default function DashboardGestao() {
   }, []);
 
   const fetchAll = async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
     const monthStart = today.slice(0, 8) + '01';
 
     // Overview cards

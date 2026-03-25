@@ -12,7 +12,11 @@ function parseDate(d: string): Date {
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // Use sv-SE locale for YYYY-MM-DD format, respecting local time instead of UTC
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function isInPausa(date: Date, pausas: { inicio: string; fim: string }[]): boolean {

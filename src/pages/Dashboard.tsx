@@ -28,7 +28,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     (async () => {
-      const today = new Date().toISOString().slice(0, 10);
+      const { hojeBrasilia } = await import('@/lib/dateUtils');
+      const today = hojeBrasilia();
       const monthStart = today.slice(0, 8) + '01';
       const [r1, r2, r3, r4, r5, r6] = await Promise.all([
         supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('status_atual', 'EM_PRODUCAO'),

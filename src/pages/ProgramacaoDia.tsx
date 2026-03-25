@@ -42,7 +42,7 @@ export default function ProgramacaoDia() {
   const [selectedOperador, setSelectedOperador] = useState('');
 
   const fetchData = useCallback(async () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 
     const { data } = await supabase
       .from('ordens_producao')
@@ -102,7 +102,7 @@ export default function ProgramacaoDia() {
   const totalUnidadesProgramadas = programados.reduce((acc, o) => acc + (o.quantidade_itens || 0), 0);
 
   const handleAdicionarAoDia = async (ordemId: string) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
     await supabase.from('ordens_producao').update({
       programado_para_hoje: true,
       data_programacao: today,

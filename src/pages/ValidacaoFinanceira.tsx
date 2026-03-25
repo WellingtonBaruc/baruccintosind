@@ -24,7 +24,7 @@ export default function ValidacaoFinanceira() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmado, setConfirmado] = useState(false);
-  const [dataConfirmacao, setDataConfirmacao] = useState(new Date().toISOString().slice(0, 10));
+  const [dataConfirmacao, setDataConfirmacao] = useState(new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }));
   const [observacao, setObservacao] = useState('');
   const [bloqueioOpen, setBloqueioOpen] = useState(false);
   const [motivoBloqueio, setMotivoBloqueio] = useState('');
