@@ -58,7 +58,7 @@ function parseNumericValue(val: any): number {
 
 function parseExcelDate(val: any): string | null {
   if (!val) return null;
-  if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString().slice(0, 10);
+  if (val instanceof Date && !isNaN(val.getTime())) return `${val.getFullYear()}-${String(val.getMonth() + 1).padStart(2, '0')}-${String(val.getDate()).padStart(2, '0')}`;
   const s = String(val).trim();
   const parts = s.split('/');
   if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
@@ -66,10 +66,10 @@ function parseExcelDate(val: any): string | null {
   const num = Number(s);
   if (!isNaN(num) && num > 40000 && num < 60000) {
     const d = new Date((num - 25569) * 86400000);
-    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
   const d = new Date(s);
-  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   return null;
 }
 
@@ -292,7 +292,7 @@ export default function ImportPlanilha() {
             5
           );
           const dataPrevista = adicionarDiasUteis(new Date(hoje), maxLeadTime, cal);
-          const dataPrevistaStr = dataPrevista.toISOString().slice(0, 10);
+          const dataPrevistaStr = `${dataPrevista.getFullYear()}-${String(dataPrevista.getMonth() + 1).padStart(2, '0')}-${String(dataPrevista.getDate()).padStart(2, '0')}`;
 
           const dataVendaApi = parseExcelDate(venda.data);
 

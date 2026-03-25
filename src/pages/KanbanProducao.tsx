@@ -779,7 +779,7 @@ export default function KanbanProducao() {
     if (filterMode === 'AMANHA') {
       const amanha = new Date();
       amanha.setDate(amanha.getDate() + 1);
-      const amanhaStr = amanha.toISOString().slice(0, 10);
+      const amanhaStr = amanha.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
       filtered = filtered.filter(c => c.programado_inicio_data === amanhaStr || c.programado_conclusao_data === amanhaStr);
     }
     if (filterMode === 'DATA' && filterDateStr) {

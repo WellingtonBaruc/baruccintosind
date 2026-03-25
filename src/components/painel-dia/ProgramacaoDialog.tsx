@@ -179,7 +179,7 @@ export default function ProgramacaoDialog({ open, onClose, pedido, tipo, cal, ca
 
     while (found.length < 3 && checked < 45) {
       if (isDiaUtil(checkDate, cal)) {
-        const ds = checkDate.toISOString().slice(0, 10);
+        const ds = checkDate.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
         const { cap, carga } = await loadCapacidadeData(ds);
         const saldo = cap[tipoKey] - carga[tipoKey];
 
@@ -217,7 +217,7 @@ export default function ProgramacaoDialog({ open, onClose, pedido, tipo, cal, ca
 
   const handleConfirm = () => {
     if (!selectedDate || !pedido) return;
-    const ds = selectedDate.toISOString().slice(0, 10);
+    const ds = selectedDate.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
     onConfirm(pedido, ds, tipo);
     onClose();
   };
@@ -302,8 +302,8 @@ export default function ProgramacaoDialog({ open, onClose, pedido, tipo, cal, ca
             <span className="text-xs font-medium">Selecionar data</span>
             <div className="flex gap-2 flex-wrap">
               {quickDates.map((qd) => {
-                const qdStr = qd.date.toISOString().slice(0, 10);
-                const isSelected = selectedDate?.toISOString().slice(0, 10) === qdStr;
+                const qdStr = qd.date.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+                const isSelected = selectedDate?.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) === qdStr;
                 return (
                   <Button
                     key={qd.label}
@@ -360,7 +360,7 @@ export default function ProgramacaoDialog({ open, onClose, pedido, tipo, cal, ca
               </span>
               <div className="grid gap-1.5">
                 {sugestoes.map((s) => {
-                  const isSelected = selectedDate?.toISOString().slice(0, 10) === s.data;
+                  const isSelected = selectedDate?.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) === s.data;
                   return (
                     <button
                       key={s.data}

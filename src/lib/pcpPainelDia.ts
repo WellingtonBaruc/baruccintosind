@@ -180,7 +180,7 @@ export function calcularDatasIdeais(
   const dataInicioIdeal = subtrairDiasUteis(entrega, leadTimeDias, cal);
 
   return {
-    dataInicioIdeal: dataInicioIdeal.toISOString().slice(0, 10),
+    dataInicioIdeal: `${dataInicioIdeal.getFullYear()}-${String(dataInicioIdeal.getMonth() + 1).padStart(2, '0')}-${String(dataInicioIdeal.getDate()).padStart(2, '0')}`,
     dataConclusaoIdeal,
   };
 }
@@ -199,7 +199,7 @@ export function gerarProjecaoCapacidade(
 
   while (counted < dias) {
     if (isDiaUtil(current, cal)) {
-      const ds = current.toISOString().slice(0, 10);
+      const ds = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
       const cap = capacidadesDiarias.get(ds) || capacidadePadrao;
       const carga = cargasPorDia.get(ds) || { sintetico: 0, tecido: 0 };
 
