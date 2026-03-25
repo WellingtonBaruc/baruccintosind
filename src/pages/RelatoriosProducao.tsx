@@ -140,10 +140,6 @@ export default function RelatoriosProducao() {
     setLoading(false);
   };
 
-  if (!profile || !PERFIS_PRODUCAO.includes(profile.perfil)) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const filteredOrdens = tipoFilter === 'all' ? ordens : ordens.filter(o => o.tipo_produto === tipoFilter);
 
   // ========== KPI CALCULATIONS ==========
