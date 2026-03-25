@@ -94,8 +94,8 @@ export default function RelatoriosProducao() {
   const [pedidosSimplifica, setPedidosSimplifica] = useState<PedidoSimplifica[]>([]);
   const [periodo, setPeriodo] = useState<PeriodoFilter>('30d');
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('all');
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
+  const [customStart, setCustomStart] = useState<Date | undefined>(undefined);
+  const [customEnd, setCustomEnd] = useState<Date | undefined>(undefined);
 
   const dateRange = useMemo(() => {
     const end = new Date();
@@ -106,9 +106,9 @@ export default function RelatoriosProducao() {
       case '30d': start = subMonths(end, 1); break;
       case '90d': start = subMonths(end, 3); break;
       case 'custom':
-        start = customStart ? new Date(customStart + 'T00:00:00') : subMonths(end, 1);
-        if (customEnd) return { start, end: new Date(customEnd + 'T23:59:59') };
-        return { start, end };
+        start = customStart || subMonths(end, 1);
+        if (customEnd) return { start: startOfDay(start), end: new Date(customEnd.getFullYear(), customEnd.getMonth(), customEnd.getDate(), 23, 59, 59) };
+        return { start: startOfDay(start), end };
       default: start = subMonths(end, 1);
     }
     return { start: startOfDay(start), end };
