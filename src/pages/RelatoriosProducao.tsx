@@ -121,13 +121,21 @@ export default function RelatoriosProducao() {
     const startISO = dateRange.start.toISOString();
     const endISO = dateRange.end.toISOString();
 
-    const [ordensRes, etapasRes, simplificaRes] = await Promise.all([
+    // Fetch orders created OR completed within the date range
+    const [ordensCriadasRes, ordensConcluidasRes, etapasRes, simplificaRes] = await Promise.all([
       supabase
         .from('ordens_producao')
         .select('id, pedido_id, tipo_produto, status, sequencia, criado_em, data_inicio_pcp, data_fim_pcp, programado_inicio_data, programado_conclusao_data, pedidos!inner(api_venda_id, cliente_nome, data_previsao_entrega, status_atual)')
         .gte('criado_em', startISO)
         .lte('criado_em', endISO)
         .order('criado_em', { ascending: false }),
+      supabase
+        .from('ordens_producao')
+        .select('id, pedido_id, tipo_produto, status, sequencia, criado_em, data_inicio_pcp, data_fim_pcp, programado_inicio_data, programado_conclusao_data, pedidos!inner(api_venda_id, cliente_nome, data_previsao_entrega, status_atual)')
+        .eq('status', 'CONCLUIDA')
+        .gte('data_fim_pcp', startISO)
+        .lte('data_fim_pcp', endISO)
+        .order('data_fim_pcp', { ascending: false }),
       supabase
         .from('op_etapas')
         .select('id, ordem_id, nome_etapa, status, iniciado_em, concluido_em')
@@ -140,7 +148,11 @@ export default function RelatoriosProducao() {
         .lte('atualizado_em', endISO),
     ]);
 
-    const ordensData = (ordensRes.data || []) as unknown as OrdemData[];
+    // Merge both queries, deduplicating by id
+    const mergedMap = new Map<string, OrdemData>();
+    (ordensCriadasRes.data || []).forEach((o: any) => mergedMap.set(o.id, o));
+    (ordensConcluidasRes.data || []).forEach((o: any) => mergedMap.set(o.id, o));
+    const ordensData = Array.from(mergedMap.values()) as OrdemData[];
     const etapasData = (etapasRes.data || []) as unknown as EtapaData[];
     const simplificaData = (simplificaRes.data || []) as PedidoSimplifica[];
 
