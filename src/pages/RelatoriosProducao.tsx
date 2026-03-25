@@ -194,10 +194,9 @@ export default function RelatoriosProducao() {
 
   const filteredOrdens = tipoFilter === 'all' ? ordens : ordens.filter(o => o.tipo_produto === tipoFilter);
 
-  // ========== KPI CALCULATIONS ==========
+  // ========== KPI CALCULATIONS (all orders are CONCLUIDA) ==========
   const totalOPs = filteredOrdens.length;
-  const opsFinalizadas = filteredOrdens.filter(o => o.status === 'CONCLUIDA').length;
-  const opsEmAndamento = filteredOrdens.filter(o => o.status === 'EM_ANDAMENTO').length;
+  const opsFinalizadas = totalOPs;
 
   // Total PEÇAS (sum of item quantities across filtered orders)
   const totalPecas = useMemo(() => {
