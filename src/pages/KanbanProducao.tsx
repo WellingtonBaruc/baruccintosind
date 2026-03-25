@@ -1016,9 +1016,11 @@ export default function KanbanProducao() {
       {/* Filter buttons + KPI inline */}
       <div className="flex gap-2 flex-wrap items-center">
         {filterButtons.map(fb => {
-          const count = fb.key === 'all'
-            ? cards.length
-            : cards.filter(c => c.tipo_produto === fb.key).length;
+          const typeCards = fb.key === 'all' ? cards : cards.filter(c => c.tipo_produto === fb.key);
+          const count = typeCards.length;
+          const isSintetico = fb.key === 'SINTETICO';
+          const producaoCount = isSintetico ? typeCards.filter(c => c.ordem_sequencia_op <= 1).length : 0;
+          const opLojaCount = isSintetico ? typeCards.filter(c => c.ordem_sequencia_op > 1).length : 0;
           return (
             <Button
               key={fb.key}
@@ -1029,6 +1031,11 @@ export default function KanbanProducao() {
             >
               {fb.label}
               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${filterTipo === fb.key ? 'border-primary-foreground/30 text-primary-foreground' : ''}`}>{count}</Badge>
+              {isSintetico && (
+                <span className={`text-[9px] ml-0.5 ${filterTipo === fb.key ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                  ({producaoCount} prod · {opLojaCount} OP loja)
+                </span>
+              )}
             </Button>
           );
         })}
