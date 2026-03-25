@@ -44,13 +44,19 @@ export default function DashboardLoja() {
       .order('criado_em', { ascending: true });
 
     if (data) {
-      const withItens = await Promise.all(
-        data.map(async (p: any) => {
-          const { count } = await supabase.from('pedido_itens').select('*', { count: 'exact', head: true }).eq('pedido_id', p.id);
-          return { ...p, qtd_itens: count || 0 };
-        })
-      );
-      setPedidos(withItens);
+      // Batch count items instead of N+1 individual queries
+      const pedidoIds = data.map((p: any) => p.id);
+      const { data: itensData } = await supabase
+        .from('pedido_itens')
+        .select('pedido_id')
+        .in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']);
+      
+      const itensMap: Record<string, number> = {};
+      (itensData || []).forEach((r: any) => {
+        itensMap[r.pedido_id] = (itensMap[r.pedido_id] || 0) + 1;
+      });
+
+      setPedidos(data.map((p: any) => ({ ...p, qtd_itens: itensMap[p.id] || 0 })));
     }
     setLoading(false);
   };

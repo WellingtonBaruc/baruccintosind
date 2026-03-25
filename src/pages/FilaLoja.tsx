@@ -62,18 +62,18 @@ export default function FilaLoja() {
     if (data) {
       const pedidoIds = data.map((p: any) => p.id);
 
-      // Fetch item counts, OP statuses, and solicitações in parallel
+      // Fetch item counts (batch), OP statuses, and solicitações in parallel
       const [itensResult, ordensResult, solicitacoesResult] = await Promise.all([
-        Promise.all(data.map(async (p: any) => {
-          const { count } = await supabase.from('pedido_itens').select('*', { count: 'exact', head: true }).eq('pedido_id', p.id);
-          return { id: p.id, count: count || 0 };
-        })),
+        supabase.from('pedido_itens').select('pedido_id').in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
         supabase.from('ordens_producao').select('pedido_id, status').in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
         supabase.from('solicitacoes_almoxarifado').select('pedido_id, status').in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
       ]);
 
+      // Count items per pedido from batch result
       const itensMap: Record<string, number> = {};
-      itensResult.forEach(r => { itensMap[r.id] = r.count; });
+      (itensResult.data || []).forEach((r: any) => {
+        itensMap[r.pedido_id] = (itensMap[r.pedido_id] || 0) + 1;
+      });
 
       // Check if all OPs for each pedido are CONCLUIDA
       const opMap: Record<string, boolean> = {};
