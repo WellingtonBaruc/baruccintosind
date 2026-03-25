@@ -404,21 +404,63 @@ export default function RelatoriosProducao() {
             <TabsContent value="diario">
               <Card className="border-border/60">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-semibold">OPs Concluídas por Dia</CardTitle>
+                  <CardTitle className="text-base font-semibold">Produção Diária — Sintético / Tecido / Simplifica</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  {dailyProduction.length === 0 ? (
+                <CardContent className="space-y-4">
+                  {dailyProductionStacked.length === 0 ? (
                     <p className="text-center text-muted-foreground text-sm py-8">Sem dados de conclusão no período.</p>
                   ) : (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={dailyProduction}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="dia" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                        <YAxis allowDecimals={false} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                        <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                        <Bar dataKey="concluidas" name="Concluídas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <>
+                      <ResponsiveContainer width="100%" height={340}>
+                        <BarChart data={dailyProductionStacked}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="dia" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                          <YAxis allowDecimals={false} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                          <Tooltip
+                            contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                            formatter={(value: number, name: string) => [value, name]}
+                          />
+                          <Legend />
+                          <Bar dataKey="sintetico" name="Sintético (OP)" stackId="a" fill="hsl(217, 91%, 60%)" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="tecido" name="Tecido (OP)" stackId="a" fill="hsl(142, 71%, 45%)" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="simplifica" name="Simplifica (sem OP)" stackId="a" fill="hsl(38, 92%, 50%)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+
+                      {/* Daily totals and percentages */}
+                      <div className="overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Data</TableHead>
+                              <TableHead className="text-right">Sintético</TableHead>
+                              <TableHead className="text-right">Tecido</TableHead>
+                              <TableHead className="text-right">Simplifica</TableHead>
+                              <TableHead className="text-right">Total</TableHead>
+                              <TableHead className="text-right">% Sint.</TableHead>
+                              <TableHead className="text-right">% Tec.</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {dailyProductionStacked.map(d => {
+                              const pctSint = d.total > 0 ? Math.round((d.sintetico / d.total) * 100) : 0;
+                              const pctTec = d.total > 0 ? Math.round((d.tecido / d.total) * 100) : 0;
+                              return (
+                                <TableRow key={d.dia}>
+                                  <TableCell className="font-medium">{d.dia}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{d.sintetico}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{d.tecido}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{d.simplifica}</TableCell>
+                                  <TableCell className="text-right font-bold tabular-nums">{d.total}</TableCell>
+                                  <TableCell className="text-right tabular-nums text-muted-foreground">{pctSint}%</TableCell>
+                                  <TableCell className="text-right tabular-nums text-muted-foreground">{pctTec}%</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
                   )}
                 </CardContent>
               </Card>
