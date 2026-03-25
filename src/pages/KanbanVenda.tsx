@@ -149,7 +149,7 @@ export default function KanbanVenda() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedFetch = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchCards(), 400);
+    debounceRef.current = setTimeout(() => fetchCards(), 1500);
   }, []);
 
   useEffect(() => {

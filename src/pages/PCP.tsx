@@ -72,7 +72,7 @@ export default function PCP() {
       if (p.manual) fetchManualOPs();
       if (p.daily) fetchDailyStats();
       pendingRef.current = { data: false, manual: false, daily: false };
-    }, 400);
+    }, 1500);
   }, []);
 
   useEffect(() => {
@@ -108,19 +108,23 @@ export default function PCP() {
     if (!ordens?.length) { setLoading(false); return; }
 
     const pedidoIds = [...new Set(ordens.map(o => o.pedido_id))];
-    const [itensRes, obsCorteRes] = await Promise.all([
-      supabase
-        .from('pedido_itens')
-        .select('id, pedido_id, descricao_produto, referencia_produto, observacao_producao, quantidade')
-        .in('pedido_id', pedidoIds),
-      supabase
-        .from('pedido_item_obs_corte')
-        .select('id, pedido_item_id, observacao, criado_em, lido, lido_em')
-    ]);
+    const itensRes = await supabase
+      .from('pedido_itens')
+      .select('id, pedido_id, descricao_produto, referencia_produto, observacao_producao, quantidade')
+      .in('pedido_id', pedidoIds);
     const itens = itensRes.data;
 
+    // Fetch obs_corte only for item IDs we actually have
+    const itemIds = (itens || []).map((i: any) => i.id);
+    const { data: obsCorteData } = itemIds.length > 0
+      ? await supabase
+          .from('pedido_item_obs_corte')
+          .select('id, pedido_item_id, observacao, criado_em, lido, lido_em')
+          .in('pedido_item_id', itemIds)
+      : { data: [] };
+
     const obsCorteMap = new Map<string, { id: string; observacao: string; criado_em: string; lido: boolean; lido_em: string | null }[]>();
-    for (const obs of (obsCorteRes.data || [])) {
+    for (const obs of (obsCorteData || [])) {
       const list = obsCorteMap.get(obs.pedido_item_id) || [];
       list.push({ id: obs.id, observacao: obs.observacao, criado_em: obs.criado_em, lido: obs.lido, lido_em: obs.lido_em });
       obsCorteMap.set(obs.pedido_item_id, list);
@@ -260,13 +264,13 @@ export default function PCP() {
 
     const { data: registros } = await supabase
       .from('pcp_corte_registro')
-      .select('*')
+      .select('operador_id, quantidade_cortada, concluido_em, iniciado_em, tipo_produto, largura, material, tamanho, cor')
       .eq('status', 'CONCLUIDO')
       .gte('concluido_em', desde);
 
     const { data: manuais } = await supabase
       .from('pcp_corte_manual')
-      .select('*')
+      .select('id, tipo_produto, descricao, quantidade, observacao, operador_id, status, concluido_em, data_inicio, data_fim')
       .eq('status', 'CONCLUIDO')
       .gte('concluido_em', desde);
 

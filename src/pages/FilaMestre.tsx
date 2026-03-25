@@ -98,7 +98,7 @@ export default function FilaMestre() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedFetchAll = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchAll(), 400);
+    debounceRef.current = setTimeout(() => fetchAll(), 1500);
   }, []);
 
   useEffect(() => {
