@@ -459,7 +459,7 @@ export default function RelatoriosProducao() {
           </div>
 
           {/* KPI Cards — OPs (secondary) */}
-          <div className="grid gap-3 grid-cols-3 max-w-lg">
+          <div className="grid gap-3 grid-cols-2 max-w-sm">
             {kpiCardsSecondary.map(kpi => {
               const Icon = kpi.icon;
               return (
