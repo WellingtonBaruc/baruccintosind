@@ -108,17 +108,20 @@ export default function PCP() {
     if (!ordens?.length) { setLoading(false); return; }
 
     const pedidoIds = [...new Set(ordens.map(o => o.pedido_id))];
-    const [itensRes, obsCorteRes] = await Promise.all([
-      supabase
-        .from('pedido_itens')
-        .select('id, pedido_id, descricao_produto, referencia_produto, observacao_producao, quantidade')
-        .in('pedido_id', pedidoIds),
-      supabase
-        .from('pedido_item_obs_corte')
-        .select('id, pedido_item_id, observacao, criado_em, lido, lido_em')
-        .in('pedido_item_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
-    ]);
+    const itensRes = await supabase
+      .from('pedido_itens')
+      .select('id, pedido_id, descricao_produto, referencia_produto, observacao_producao, quantidade')
+      .in('pedido_id', pedidoIds);
     const itens = itensRes.data;
+
+    // Fetch obs_corte only for item IDs we actually have
+    const itemIds = (itens || []).map((i: any) => i.id);
+    const { data: obsCorteData } = itemIds.length > 0
+      ? await supabase
+          .from('pedido_item_obs_corte')
+          .select('id, pedido_item_id, observacao, criado_em, lido, lido_em')
+          .in('pedido_item_id', itemIds)
+      : { data: [] };
 
     const obsCorteMap = new Map<string, { id: string; observacao: string; criado_em: string; lido: boolean; lido_em: string | null }[]>();
     for (const obs of (obsCorteRes.data || [])) {
