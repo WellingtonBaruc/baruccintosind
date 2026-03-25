@@ -261,7 +261,7 @@ export default function PCP() {
 
     const { data: registros } = await supabase
       .from('pcp_corte_registro')
-      .select('operador_id, quantidade_cortada, concluido_em, tipo_produto, largura, material, tamanho, cor')
+      .select('operador_id, quantidade_cortada, concluido_em, iniciado_em, tipo_produto, largura, material, tamanho, cor')
       .eq('status', 'CONCLUIDO')
       .gte('concluido_em', desde);
 
