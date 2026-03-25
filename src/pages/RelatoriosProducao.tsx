@@ -473,7 +473,7 @@ export default function RelatoriosProducao() {
             <TabsContent value="diario">
               <Card className="border-border/60">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-semibold">Peças Produzidas por Dia — Sintético / Tecido / Simplifica</CardTitle>
+                  <CardTitle className="text-base font-semibold">Peças Concluídas por Dia — Sintético / Tecido</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {dailyProductionStacked.length === 0 ? (
@@ -490,9 +490,8 @@ export default function RelatoriosProducao() {
                             formatter={(value: number, name: string) => [`${value} pçs`, name]}
                           />
                           <Legend />
-                          <Bar dataKey="sintetico" name="Sintético (OP)" stackId="a" fill="hsl(217, 91%, 60%)" radius={[0, 0, 0, 0]} />
-                          <Bar dataKey="tecido" name="Tecido (OP)" stackId="a" fill="hsl(142, 71%, 45%)" radius={[0, 0, 0, 0]} />
-                          <Bar dataKey="simplifica" name="Simplifica (sem OP)" stackId="a" fill="hsl(38, 92%, 50%)" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="sintetico" name="Sintético" stackId="a" fill="hsl(217, 91%, 60%)" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="tecido" name="Tecido" stackId="a" fill="hsl(142, 71%, 45%)" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
 
@@ -504,7 +503,6 @@ export default function RelatoriosProducao() {
                               <TableHead>Data</TableHead>
                               <TableHead className="text-right">Sintético</TableHead>
                               <TableHead className="text-right">Tecido</TableHead>
-                              <TableHead className="text-right">Simplifica</TableHead>
                               <TableHead className="text-right">Total</TableHead>
                               <TableHead className="text-right">% Sint.</TableHead>
                               <TableHead className="text-right">% Tec.</TableHead>
@@ -519,7 +517,6 @@ export default function RelatoriosProducao() {
                                   <TableCell className="font-medium">{d.dia}</TableCell>
                                   <TableCell className="text-right tabular-nums">{d.sintetico}</TableCell>
                                   <TableCell className="text-right tabular-nums">{d.tecido}</TableCell>
-                                  <TableCell className="text-right tabular-nums">{d.simplifica}</TableCell>
                                   <TableCell className="text-right font-bold tabular-nums">{d.total}</TableCell>
                                   <TableCell className="text-right tabular-nums text-muted-foreground">{pctSint}%</TableCell>
                                   <TableCell className="text-right tabular-nums text-muted-foreground">{pctTec}%</TableCell>
