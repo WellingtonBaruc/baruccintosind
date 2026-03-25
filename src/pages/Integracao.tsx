@@ -56,6 +56,7 @@ export default function Integracao() {
   const [historicLoading, setHistoricLoading] = useState(false);
   const [historicProgress, setHistoricProgress] = useState<string | null>(null);
   const [historicDone, setHistoricDone] = useState<{ date: string; count: number } | null>(null);
+  const [syncExpandido, setSyncExpandido] = useState(false);
   const [lastDailyLog, setLastDailyLog] = useState<LogEntry | null>(null);
   const [resetting, setResetting] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -457,6 +458,39 @@ export default function Integracao() {
     fetchData();
   };
 
+  const handleSyncExpandido = async (dias: number) => {
+    setSyncExpandido(true);
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/sync-simplifica`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || anonKey}`,
+            'apikey': anonKey,
+          },
+          body: JSON.stringify({ tipo: 'MANUAL_EXPANDIDO', dias_override: dias }),
+        }
+      );
+
+      const result = await res.json();
+      if (result.success) {
+        toast.success(`Sync expandida (${dias} dias): ${result.total_inseridos} novos, ${result.total_atualizados} atualizados.`);
+      } else {
+        toast.error(`Erro: ${result.error || 'Erro desconhecido'}`);
+      }
+    } catch (err: any) {
+      toast.error(`Falha: ${err.message}`);
+    }
+    setSyncExpandido(false);
+    fetchData();
+  };
+
   const handleToggleAuto = async (checked: boolean) => {
     if (!config) return;
     await supabase.from('integracao_configuracao').update({ ativa: checked }).eq('id', config.id);
@@ -561,6 +595,31 @@ export default function Integracao() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Sync expandida */}
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <RefreshCw className="h-4 w-4" /> Sincronização Expandida
+          </CardTitle>
+          <CardDescription>Importa vendas com janela de tempo maior para buscar pedidos antigos que ficaram fora da janela padrão de 2 dias.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <Button onClick={() => handleSyncExpandido(15)} disabled={syncExpandido} variant="outline" size="sm">
+              {syncExpandido ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              15 dias
+            </Button>
+            <Button onClick={() => handleSyncExpandido(30)} disabled={syncExpandido} variant="outline" size="sm">
+              30 dias
+            </Button>
+            <Button onClick={() => handleSyncExpandido(60)} disabled={syncExpandido} variant="outline" size="sm">
+              60 dias
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Use quando vendas antigas não aparecem no sistema. A sync normal busca apenas os últimos 2 dias.</p>
+        </CardContent>
+      </Card>
 
       {/* Historical load + Daily sync */}
       <div className="grid gap-6 md:grid-cols-2">

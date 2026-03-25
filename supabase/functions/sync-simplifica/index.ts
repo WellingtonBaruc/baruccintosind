@@ -104,9 +104,13 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceKey);
 
   let tipo = 'MANUAL';
+  let diasOverride: number | null = null;
   try {
     const body = await req.json().catch(() => ({}));
     tipo = body.tipo || 'MANUAL';
+    if (body.dias_override && typeof body.dias_override === 'number' && body.dias_override > 0) {
+      diasOverride = body.dias_override;
+    }
   } catch { /* default */ }
 
   const result: SyncResult = {
@@ -128,7 +132,7 @@ Deno.serve(async (req) => {
       .single();
 
     const isFirstSync = !config?.ultima_sincronizacao;
-    const diasImportacao = isFirstSync ? (config?.dias_importacao_inicial || 15) : 2;
+    const diasImportacao = diasOverride || (isFirstSync ? (config?.dias_importacao_inicial || 15) : 2);
 
     const dataInicio = new Date();
     dataInicio.setDate(dataInicio.getDate() - diasImportacao);
