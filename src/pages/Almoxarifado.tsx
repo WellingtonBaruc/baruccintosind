@@ -1,24 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Navigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Loader2, Search, CheckCircle2, Package, Store, LayoutGrid, ListOrdered } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Loader2, Search, CheckCircle2, Package, Store, Factory,
+  Clock, Play, RefreshCw, Bookmark,
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { format, differenceInCalendarDays } from 'date-fns';
 import {
   requerSeparacaoAlmoxarifado,
   parseItemAttributes,
   type ParsedItemAttributes,
 } from '@/lib/almoxarifado';
-import AlmoxProducaoMode from '@/components/almoxarifado/AlmoxProducaoMode';
 
+/* ── Types ── */
 interface AlmoxItem {
   id: string;
   descricao_produto: string;
@@ -30,6 +34,8 @@ interface AlmoxItem {
   parsed: ParsedItemAttributes;
 }
 
+type SeparacaoStatus = 'A_SEPARAR' | 'EM_SEPARACAO' | 'CONCLUIDO';
+
 interface AlmoxVenda {
   pedido_id: string;
   api_venda_id: string;
@@ -39,23 +45,68 @@ interface AlmoxVenda {
   fivelas_separadas: boolean;
   origem: 'fivela' | 'solicitacao' | 'ambos';
   itens: AlmoxItem[];
+  /** Local separation status for kanban columns */
+  separacao_status: SeparacaoStatus;
+  separacao_iniciada_em?: string;
+  destino_apos_conclusao?: string;
 }
 
+/* ── Helpers ── */
+function calcDiasEntrega(dataEntrega: string | null): number {
+  if (!dataEntrega) return 999;
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const entrega = new Date(dataEntrega + 'T00:00:00');
+  return differenceInCalendarDays(entrega, hoje);
+}
+
+type Urgencia = 'atrasado' | 'urgente' | 'normal';
+function getUrgencia(dias: number): Urgencia {
+  if (dias < 0) return 'atrasado';
+  if (dias <= 3) return 'urgente';
+  return 'normal';
+}
+
+const urgenciaHeaderColors: Record<Urgencia, string> = {
+  atrasado: 'bg-destructive',
+  urgente: 'bg-warning',
+  normal: 'bg-success',
+};
+
+function origemLabel(origem: string): { icon: React.ReactNode; label: string; className: string } {
+  if (origem === 'solicitacao') return {
+    icon: <Store className="h-3 w-3" />,
+    label: 'Loja',
+    className: 'bg-purple-500/15 text-purple-700 border-purple-400/30',
+  };
+  if (origem === 'ambos') return {
+    icon: <Bookmark className="h-3 w-3" />,
+    label: 'Produção + Loja',
+    className: 'bg-blue-500/15 text-blue-700 border-blue-400/30',
+  };
+  return {
+    icon: <Factory className="h-3 w-3" />,
+    label: 'Produção',
+    className: 'bg-emerald-500/15 text-emerald-700 border-emerald-400/30',
+  };
+}
+
+/* ── Main component ── */
 export default function AlmoxarifadoPage() {
   const { profile } = useAuth();
   const [vendas, setVendas] = useState<AlmoxVenda[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('PENDENTE');
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<'cards' | 'producao'>('cards');
+  const [confirmDialog, setConfirmDialog] = useState<AlmoxVenda | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  useEffect(() => { fetchVendas(); }, []);
+  // Local state for in-progress separations (session-only)
+  const [emSeparacaoIds, setEmSeparacaoIds] = useState<Set<string>>(new Set());
+  const [concluidosHoje, setConcluidosHoje] = useState<Map<string, { destino: string }>>(new Map());
 
-  const fetchVendas = async () => {
+  const fetchVendas = useCallback(async () => {
     setLoading(true);
 
     // ── Fonte A: Pedidos "Em Produção" com itens que requerem separação ──
-    // Fetch pedidos 'Em Produção' + 'Pedido Enviado' (for buckle exception)
     const { data: pedidosA } = await supabase
       .from('pedidos')
       .select('id, api_venda_id, cliente_nome, data_previsao_entrega, status_prazo, status_atual, status_api, fivelas_separadas')
@@ -76,14 +127,11 @@ export default function AlmoxarifadoPage() {
     const mapA = new Map<string, AlmoxVenda>();
     for (const p of (pedidosA || [])) {
       const pedidoItens = allItensA.filter(i => i.pedido_id === p.id);
-      // Use new detection: requerSeparacaoAlmoxarifado
       const itensRequerem = pedidoItens.filter(i =>
         requerSeparacaoAlmoxarifado(i.descricao_produto, i.categoria_produto)
       );
       if (itensRequerem.length === 0) continue;
 
-      // REGRA: 'Pedido Enviado' só aparece no Almoxarifado se for venda de fivelas
-      // (todos os itens que requerem separação são fivelas/aviamentos)
       const statusApi = ((p as any).status_api || '').trim();
       if (statusApi === 'Pedido Enviado') {
         const hasFivelas = itensRequerem.some(i => {
@@ -94,13 +142,15 @@ export default function AlmoxarifadoPage() {
         if (!hasFivelas) continue;
       }
 
+      const isSeparado = (p as any).fivelas_separadas || false;
+
       mapA.set(p.id, {
         pedido_id: p.id,
         api_venda_id: p.api_venda_id || '—',
         cliente_nome: p.cliente_nome,
         data_previsao_entrega: p.data_previsao_entrega,
         status_prazo: p.status_prazo,
-        fivelas_separadas: (p as any).fivelas_separadas || false,
+        fivelas_separadas: isSeparado,
         origem: 'fivela',
         itens: itensRequerem.map(i => ({
           id: i.id,
@@ -111,6 +161,7 @@ export default function AlmoxarifadoPage() {
           origem: 'fivela' as const,
           parsed: parseItemAttributes(i.descricao_produto, i.categoria_produto),
         })),
+        separacao_status: isSeparado ? 'CONCLUIDO' : (emSeparacaoIds.has(p.id) ? 'EM_SEPARACAO' : 'A_SEPARAR'),
       });
     }
 
@@ -160,16 +211,35 @@ export default function AlmoxarifadoPage() {
           fivelas_separadas: ped.fivelas_separadas || false,
           origem: 'solicitacao',
           itens: [solItem],
+          separacao_status: emSeparacaoIds.has(sol.pedido_id) ? 'EM_SEPARACAO' : 'A_SEPARAR',
         });
       }
     }
 
     setVendas(Array.from(mapA.values()));
     setLoading(false);
+  }, [emSeparacaoIds]);
+
+  useEffect(() => { fetchVendas(); }, []);
+
+  // Auto-refresh every 30s
+  useEffect(() => {
+    const interval = setInterval(fetchVendas, 30000);
+    return () => clearInterval(interval);
+  }, [fetchVendas]);
+
+  /* ── Actions ── */
+  const handleIniciarSeparacao = (venda: AlmoxVenda) => {
+    setEmSeparacaoIds(prev => new Set(prev).add(venda.pedido_id));
+    setVendas(prev => prev.map(v =>
+      v.pedido_id === venda.pedido_id ? { ...v, separacao_status: 'EM_SEPARACAO' as SeparacaoStatus } : v
+    ));
+    toast.success(`Separação iniciada — #${venda.api_venda_id}`);
   };
 
-  const handleConfirmarSeparacao = async (venda: AlmoxVenda) => {
+  const handleConcluirSeparacao = async (venda: AlmoxVenda) => {
     if (!profile) return;
+    setActionLoading(venda.pedido_id);
     try {
       await supabase.from('pedidos').update({
         fivelas_separadas: true,
@@ -185,15 +255,15 @@ export default function AlmoxarifadoPage() {
         }).in('id', solIds);
       }
 
-      // Auto-advance pedido status when almox is resolved
+      // Determine destination
+      let destino = 'Separação registrada';
       const { data: pedido } = await supabase
         .from('pedidos')
-        .select('status_atual')
+        .select('status_atual, tipo_fluxo, subtipo_pronta_entrega')
         .eq('id', venda.pedido_id)
         .single();
 
       if (pedido?.status_atual === 'AGUARDANDO_ALMOXARIFADO') {
-        // Check if OP complementar is also done
         const { data: ops } = await supabase
           .from('ordens_producao')
           .select('status, aprovado_em')
@@ -203,7 +273,6 @@ export default function AlmoxarifadoPage() {
         const allOpsDone = !ops || ops.length === 0 || ops.every(o => o.aprovado_em !== null);
 
         if (allOpsDone) {
-          // All resolved — return to Loja for finalization (NEVER auto-advance to Comercial)
           await supabase.from('pedidos').update({ status_atual: 'LOJA_PENDENTE_FINALIZACAO' }).eq('id', venda.pedido_id);
           await supabase.from('pedido_historico').insert({
             pedido_id: venda.pedido_id,
@@ -213,8 +282,8 @@ export default function AlmoxarifadoPage() {
             status_novo: 'LOJA_PENDENTE_FINALIZACAO',
             observacao: 'Fivelas separadas e pendências resolvidas. Aguardando finalização pela Loja.',
           });
+          destino = 'Enviado para Loja';
         } else {
-          // Almox done but OP still pending — move to AGUARDANDO_OP_COMPLEMENTAR
           await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_OP_COMPLEMENTAR' }).eq('id', venda.pedido_id);
           await supabase.from('pedido_historico').insert({
             pedido_id: venda.pedido_id,
@@ -224,19 +293,13 @@ export default function AlmoxarifadoPage() {
             status_novo: 'AGUARDANDO_OP_COMPLEMENTAR',
             observacao: 'Fivelas separadas. Aguardando OP complementar.',
           });
+          destino = 'Aguardando OP complementar';
         }
       } else {
-        // Check if this is a pronta entrega / loja flow → return to Loja
-        const { data: pedidoCheck } = await supabase
-          .from('pedidos')
-          .select('tipo_fluxo, subtipo_pronta_entrega, status_atual')
-          .eq('id', venda.pedido_id)
-          .single();
-
-        const isLojaFlow = pedidoCheck?.tipo_fluxo === 'PRONTA_ENTREGA' || !!pedidoCheck?.subtipo_pronta_entrega;
+        const isLojaFlow = pedido?.tipo_fluxo === 'PRONTA_ENTREGA' || !!pedido?.subtipo_pronta_entrega;
         const notAlreadyAdvanced = !['AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL', 'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO',
           'LIBERADO_LOGISTICA', 'EM_SEPARACAO', 'ENVIADO', 'ENTREGUE', 'CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO',
-          'LOJA_PENDENTE_FINALIZACAO', 'AGUARDANDO_CIENCIA_COMERCIAL'].includes(pedidoCheck?.status_atual || '');
+          'LOJA_PENDENTE_FINALIZACAO', 'AGUARDANDO_CIENCIA_COMERCIAL'].includes(pedido?.status_atual || '');
 
         if (isLojaFlow && notAlreadyAdvanced) {
           await supabase.from('pedidos').update({ status_atual: 'LOJA_PENDENTE_FINALIZACAO' }).eq('id', venda.pedido_id);
@@ -244,10 +307,11 @@ export default function AlmoxarifadoPage() {
             pedido_id: venda.pedido_id,
             usuario_id: profile.id,
             tipo_acao: 'TRANSICAO' as any,
-            status_anterior: pedidoCheck?.status_atual || '',
+            status_anterior: pedido?.status_atual || '',
             status_novo: 'LOJA_PENDENTE_FINALIZACAO',
             observacao: `Fivelas separadas pelo almoxarifado. Retornando para Loja finalizar — ${profile.nome}`,
           });
+          destino = 'Enviado para Loja';
         } else {
           await supabase.from('pedido_historico').insert({
             pedido_id: venda.pedido_id,
@@ -255,148 +319,250 @@ export default function AlmoxarifadoPage() {
             tipo_acao: 'COMENTARIO' as any,
             observacao: `Fivelas separadas pelo almoxarifado — ${profile.nome}`,
           });
+          destino = 'Separação registrada';
         }
       }
 
-      toast.success(`Separação confirmada — Venda #${venda.api_venda_id}`);
-      fetchVendas();
+      // Move to concluídos
+      setEmSeparacaoIds(prev => {
+        const next = new Set(prev);
+        next.delete(venda.pedido_id);
+        return next;
+      });
+      setConcluidosHoje(prev => new Map(prev).set(venda.pedido_id, { destino }));
+      setVendas(prev => prev.map(v =>
+        v.pedido_id === venda.pedido_id
+          ? { ...v, separacao_status: 'CONCLUIDO' as SeparacaoStatus, fivelas_separadas: true, destino_apos_conclusao: destino }
+          : v
+      ));
+
+      toast.success(`Separação concluída — #${venda.api_venda_id} → ${destino}`);
     } catch {
-      toast.error('Erro ao confirmar separação');
+      toast.error('Erro ao concluir separação');
+    } finally {
+      setActionLoading(null);
+      setConfirmDialog(null);
     }
   };
 
+  /* ── Filter & sort ── */
+  const filteredVendas = useMemo(() => {
+    let list = vendas;
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(v =>
+        v.api_venda_id.toLowerCase().includes(q) || v.cliente_nome.toLowerCase().includes(q)
+      );
+    }
+    return list.sort((a, b) => {
+      const dA = calcDiasEntrega(a.data_previsao_entrega);
+      const dB = calcDiasEntrega(b.data_previsao_entrega);
+      return dA - dB;
+    });
+  }, [vendas, search]);
+
+  const aSeparar = filteredVendas.filter(v => v.separacao_status === 'A_SEPARAR');
+  const emSeparacao = filteredVendas.filter(v => v.separacao_status === 'EM_SEPARACAO');
+  const concluidos = filteredVendas.filter(v => v.separacao_status === 'CONCLUIDO');
+
+  /* ── KPIs ── */
+  const kpiAtrasados = aSeparar.filter(v => calcDiasEntrega(v.data_previsao_entrega) < 0).length
+    + emSeparacao.filter(v => calcDiasEntrega(v.data_previsao_entrega) < 0).length;
+
+  /* ── Access control ── */
   if (!profile || !['admin', 'gestor', 'almoxarifado'].includes(profile.perfil)) {
     return <Navigate to="/dashboard" replace />;
   }
-
-  const getCardUrgencia = (v: AlmoxVenda) => {
-    if (!v.data_previsao_entrega) return { order: 3, bg: '', text: '' };
-    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-    const entrega = new Date(v.data_previsao_entrega + 'T00:00:00');
-    const dias = Math.ceil((entrega.getTime() - hoje.getTime()) / 86400000);
-    if (dias < 0) return { order: 0, bg: 'bg-[#d32f2f] text-white', text: `${Math.abs(dias)}d atrasado` };
-    if (dias <= 3) return { order: 1, bg: 'bg-[#e65100] text-white', text: dias === 0 ? 'Hoje' : `${dias}d restantes` };
-    return { order: 2, bg: 'bg-[#2e7d32] text-white', text: `${dias}d restantes` };
-  };
-
-  const filtered = vendas.filter(v => {
-    if (filter === 'PENDENTE' && v.fivelas_separadas) return false;
-    if (filter === 'SEPARADO' && !v.fivelas_separadas) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      if (!v.api_venda_id.toLowerCase().includes(q) && !v.cliente_nome.toLowerCase().includes(q)) return false;
-    }
-    return true;
-  }).sort((a, b) => {
-    const uA = getCardUrgencia(a);
-    const uB = getCardUrgencia(b);
-    if (uA.order !== uB.order) return uA.order - uB.order;
-    const dA = a.data_previsao_entrega || '9999-12-31';
-    const dB = b.data_previsao_entrega || '9999-12-31';
-    return dA.localeCompare(dB);
-  });
-
-  const origemBadge = (origem: string) => {
-    if (origem === 'solicitacao') return <Badge variant="outline" className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30"><Store className="h-3 w-3 mr-1" />Solicitação Loja</Badge>;
-    if (origem === 'ambos') return <Badge variant="outline" className="text-[10px] bg-blue-500/15 text-blue-600 border-blue-500/30">Fivelas + Loja</Badge>;
-    return null;
-  };
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
   return (
     <div className="animate-fade-in space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Separação — Almoxarifado</h1>
-        <div className="flex items-center gap-3">
-          <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as 'cards' | 'producao')}>
-            <ToggleGroupItem value="cards" aria-label="Modo Cards" className="gap-1.5 text-xs px-3">
-              <LayoutGrid className="h-3.5 w-3.5" /> Cards
-            </ToggleGroupItem>
-            <ToggleGroupItem value="producao" aria-label="Modo Produção" className="gap-1.5 text-xs px-3">
-              <ListOrdered className="h-3.5 w-3.5" /> Produção
-            </ToggleGroupItem>
-          </ToggleGroup>
-          <Badge variant="outline" className="text-sm py-1 px-3">{filtered.length} vendas</Badge>
+        <h1 className="text-2xl font-semibold tracking-tight">Central de Separação</h1>
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9 h-9" placeholder="Buscar venda ou cliente..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchVendas} className="gap-1.5">
+            <RefreshCw className="h-3.5 w-3.5" /> Atualizar
+          </Button>
         </div>
       </div>
 
-      {viewMode === 'producao' ? (
-        <AlmoxProducaoMode vendas={vendas} onConfirmar={handleConfirmarSeparacao} />
-      ) : (
-        <>
-          <div className="flex gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[180px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Buscar venda ou cliente..." value={search} onChange={e => setSearch(e.target.value)} />
-            </div>
-            <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="PENDENTE">Pendentes</SelectItem>
-                <SelectItem value="SEPARADO">Separados</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard icon={<Package className="h-5 w-5 text-warning" />} label="A Separar" value={aSeparar.length} />
+        <KpiCard icon={<Play className="h-5 w-5 text-primary" />} label="Em Separação" value={emSeparacao.length} />
+        <KpiCard icon={<CheckCircle2 className="h-5 w-5 text-success" />} label="Concluídos Hoje" value={concluidos.length} />
+        <KpiCard icon={<Clock className="h-5 w-5 text-destructive" />} label="Atrasados" value={kpiAtrasados} alert={kpiAtrasados > 0} />
+      </div>
 
-          {filtered.length === 0 ? (
-            <p className="text-center py-12 text-muted-foreground">Nenhuma venda encontrada.</p>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filtered.map(v => {
-                const urg = getCardUrgencia(v);
-                return (
-                <Card key={v.pedido_id} className="shadow-sm overflow-hidden border-border/60">
-                  {/* Cabeçalho colorido */}
-                  <div className={`${!v.fivelas_separadas && urg.bg ? urg.bg : 'bg-muted'} px-4 py-3`}>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg font-bold">{v.api_venda_id}</CardTitle>
-                      {v.fivelas_separadas ? (
-                        <Badge className="bg-white/20 text-inherit border-0 text-xs">
-                          <CheckCircle2 className="h-3 w-3 mr-1" /> Separado
-                        </Badge>
-                      ) : urg.text ? (
-                        <Badge className="bg-white/20 text-inherit border-0 text-xs font-bold">{urg.text}</Badge>
-                      ) : (
-                        <Badge className="bg-white/20 text-inherit border-0 text-xs">Pendente</Badge>
-                      )}
-                    </div>
-                    <p className="text-sm opacity-80">{v.cliente_nome}</p>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      {v.data_previsao_entrega && (
-                        <span className="text-xs opacity-70">
-                          Entrega: {format(new Date(v.data_previsao_entrega + 'T00:00:00'), 'dd/MM/yy')}
-                        </span>
-                      )}
-                      {origemBadge(v.origem)}
-                    </div>
-                  </div>
-                  {/* Corpo branco */}
-                  <CardContent className="bg-card p-4 space-y-3">
-                    <div className="space-y-1.5">
-                      {v.itens.map(item => (
-                        <div key={item.id} className="flex items-center justify-between text-sm py-1 border-b border-border/40 last:border-0">
-                          <span className="font-medium truncate flex-1 text-foreground">{item.descricao_produto}</span>
-                          <span className="font-bold ml-2 shrink-0 text-foreground">{item.quantidade} un</span>
-                        </div>
-                      ))}
-                    </div>
+      {/* 3-column Kanban */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Column: A SEPARAR */}
+        <KanbanColumn title="A Separar" count={aSeparar.length} colorClass="bg-warning/10 border-warning/30">
+          {aSeparar.length === 0 ? (
+            <EmptyColumn text="Nenhum pedido pendente" />
+          ) : aSeparar.map(v => (
+            <AlmoxCard key={v.pedido_id} venda={v} actionLoading={actionLoading}>
+              <Button
+                className="w-full min-h-[44px] gap-2"
+                variant="outline"
+                onClick={() => handleIniciarSeparacao(v)}
+              >
+                <Play className="h-4 w-4" /> Iniciar Separação
+              </Button>
+            </AlmoxCard>
+          ))}
+        </KanbanColumn>
 
-                    {!v.fivelas_separadas && (
-                      <Button className="w-full min-h-[48px]" onClick={() => handleConfirmarSeparacao(v)}>
-                        <Package className="h-4 w-4 mr-2" /> Confirmar separação
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
+        {/* Column: EM SEPARAÇÃO */}
+        <KanbanColumn title="Em Separação" count={emSeparacao.length} colorClass="bg-primary/10 border-primary/30">
+          {emSeparacao.length === 0 ? (
+            <EmptyColumn text="Nenhum pedido em andamento" />
+          ) : emSeparacao.map(v => (
+            <AlmoxCard key={v.pedido_id} venda={v} actionLoading={actionLoading}>
+              <Button
+                className="w-full min-h-[44px] gap-2"
+                onClick={() => setConfirmDialog(v)}
+                disabled={actionLoading === v.pedido_id}
+              >
+                {actionLoading === v.pedido_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                Concluir Separação
+              </Button>
+            </AlmoxCard>
+          ))}
+        </KanbanColumn>
+
+        {/* Column: CONCLUÍDO */}
+        <KanbanColumn title="Concluído" count={concluidos.length} colorClass="bg-success/10 border-success/30">
+          {concluidos.length === 0 ? (
+            <EmptyColumn text="Nenhum concluído hoje" />
+          ) : concluidos.map(v => {
+            const dest = v.destino_apos_conclusao || concluidosHoje.get(v.pedido_id)?.destino || 'Separado';
+            return (
+              <AlmoxCard key={v.pedido_id} venda={v} actionLoading={actionLoading}>
+                <div className="flex items-center gap-2 text-sm font-medium text-success py-2 justify-center">
+                  <CheckCircle2 className="h-4 w-4" />
+                  {dest}
+                </div>
+              </AlmoxCard>
+            );
+          })}
+        </KanbanColumn>
+      </div>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={!!confirmDialog} onOpenChange={() => setConfirmDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar separação?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a concluir a separação do pedido{' '}
+              <strong>#{confirmDialog?.api_venda_id}</strong> ({confirmDialog?.cliente_nome}).
+              <br /><br />
+              Esta ação não pode ser desfeita. Confirme que todos os itens foram separados corretamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDialog && handleConcluirSeparacao(confirmDialog)}
+              disabled={!!actionLoading}
+            >
+              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
+/* ── Sub-components ── */
+
+function KpiCard({ icon, label, value, alert }: { icon: React.ReactNode; label: string; value: number; alert?: boolean }) {
+  return (
+    <div className={`flex items-center gap-3 rounded-lg border p-3 bg-card ${alert ? 'border-destructive/50' : 'border-border'}`}>
+      {icon}
+      <div>
+        <p className="text-2xl font-bold text-foreground">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function KanbanColumn({ title, count, colorClass, children }: {
+  title: string; count: number; colorClass: string; children: React.ReactNode;
+}) {
+  return (
+    <div className={`rounded-lg border ${colorClass} min-h-[300px]`}>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
+        <h2 className="font-semibold text-sm text-foreground">{title}</h2>
+        <Badge variant="secondary" className="text-xs">{count}</Badge>
+      </div>
+      <div className="p-3 space-y-3 max-h-[calc(100vh-320px)] overflow-y-auto">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function EmptyColumn({ text }: { text: string }) {
+  return <p className="text-center py-8 text-sm text-muted-foreground">{text}</p>;
+}
+
+function AlmoxCard({ venda, actionLoading, children }: {
+  venda: AlmoxVenda; actionLoading: string | null; children: React.ReactNode;
+}) {
+  const dias = calcDiasEntrega(venda.data_previsao_entrega);
+  const urgencia = getUrgencia(dias);
+  const orig = origemLabel(venda.origem);
+
+  return (
+    <div className="bg-card rounded-md border border-border shadow-sm overflow-hidden">
+      {/* Colored header strip */}
+      <div className={`${urgenciaHeaderColors[urgencia]} px-3 py-2 text-primary-foreground`}>
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-sm">{venda.api_venda_id}</span>
+          <span className="text-xs font-medium opacity-90">
+            {dias < 0 ? `${Math.abs(dias)}d atrasado` : dias === 0 ? 'Hoje' : `${dias}d`}
+          </span>
+        </div>
+        <p className="text-xs opacity-80 truncate">{venda.cliente_nome}</p>
+      </div>
+
+      {/* Body */}
+      <div className="p-3 space-y-2">
+        {/* Origin badge */}
+        <Badge variant="outline" className={`text-[10px] gap-1 ${orig.className}`}>
+          {orig.icon} {orig.label}
+        </Badge>
+
+        {/* Items */}
+        <div className="space-y-1">
+          {venda.itens.map(item => (
+            <div key={item.id} className="flex items-center justify-between text-sm py-0.5">
+              <span className="text-foreground truncate flex-1">{item.descricao_produto}</span>
+              <span className="font-bold text-foreground ml-2 shrink-0">{item.quantidade}</span>
+            </div>
+          ))}
+        </div>
+
+        {venda.data_previsao_entrega && (
+          <p className="text-[10px] text-muted-foreground">
+            Entrega: {format(new Date(venda.data_previsao_entrega + 'T00:00:00'), 'dd/MM/yy')}
+          </p>
+        )}
+
+        {/* Action slot */}
+        {children}
+      </div>
+    </div>
+  );
+}
