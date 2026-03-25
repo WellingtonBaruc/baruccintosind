@@ -984,8 +984,12 @@ export default function KanbanProducao() {
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Kanban de Produção</h1>
-        <div className="flex gap-2 items-center flex-wrap">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">Kanban de Produção</h1>
+          <Button variant="outline" size="sm" onClick={() => navigate('/relatorios/producao')} className="gap-1.5">
+            <BarChart3 className="h-3.5 w-3.5" /> Relatórios
+          </Button>
+        </div>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar venda ou cliente..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 w-[220px]" />

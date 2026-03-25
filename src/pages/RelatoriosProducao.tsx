@@ -244,6 +244,10 @@ export default function RelatoriosProducao() {
     });
   }, [filteredOrdens, itemCounts]);
 
+  if (!profile || !PERFIS_PRODUCAO.includes(profile.perfil)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const kpiCards = [
     { label: 'Total Peças', value: totalPecas.toLocaleString('pt-BR'), icon: Package, colorClass: 'text-foreground', bgClass: 'bg-muted' },
     { label: 'OPs Finalizadas', value: opsFinalizadas, icon: CheckCircle2, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-500/10' },
