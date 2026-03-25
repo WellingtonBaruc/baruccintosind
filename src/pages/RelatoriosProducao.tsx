@@ -5,14 +5,16 @@ import { supabase } from '@/lib/supabase';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, ArrowLeft, Package, Clock, AlertTriangle, CheckCircle2, TrendingUp, BarChart3, Factory, FileX } from 'lucide-react';
+import { Loader2, ArrowLeft, Package, Clock, AlertTriangle, CheckCircle2, TrendingUp, BarChart3, Factory, FileX, CalendarIcon } from 'lucide-react';
 import { format, subDays, subMonths, startOfDay, differenceInMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 // Helper: convert UTC date to Brasília (UTC-3) for display
 function toBrasilia(dateStr: string): Date {
@@ -92,8 +94,8 @@ export default function RelatoriosProducao() {
   const [pedidosSimplifica, setPedidosSimplifica] = useState<PedidoSimplifica[]>([]);
   const [periodo, setPeriodo] = useState<PeriodoFilter>('30d');
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('all');
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
+  const [customStart, setCustomStart] = useState<Date | undefined>(undefined);
+  const [customEnd, setCustomEnd] = useState<Date | undefined>(undefined);
 
   const dateRange = useMemo(() => {
     const end = new Date();
@@ -104,9 +106,9 @@ export default function RelatoriosProducao() {
       case '30d': start = subMonths(end, 1); break;
       case '90d': start = subMonths(end, 3); break;
       case 'custom':
-        start = customStart ? new Date(customStart + 'T00:00:00') : subMonths(end, 1);
-        if (customEnd) return { start, end: new Date(customEnd + 'T23:59:59') };
-        return { start, end };
+        start = customStart || subMonths(end, 1);
+        if (customEnd) return { start: startOfDay(start), end: new Date(customEnd.getFullYear(), customEnd.getMonth(), customEnd.getDate(), 23, 59, 59) };
+        return { start: startOfDay(start), end };
       default: start = subMonths(end, 1);
     }
     return { start: startOfDay(start), end };
@@ -383,11 +385,31 @@ export default function RelatoriosProducao() {
           <>
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">De</label>
-              <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="w-[150px]" />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !customStart && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customStart ? format(customStart, 'dd/MM/yyyy') : 'Selecionar'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customStart} onSelect={setCustomStart} locale={ptBR} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">Até</label>
-              <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="w-[150px]" />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !customEnd && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customEnd ? format(customEnd, 'dd/MM/yyyy') : 'Selecionar'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customEnd} onSelect={setCustomEnd} locale={ptBR} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
             </div>
           </>
         )}
@@ -541,15 +563,17 @@ export default function RelatoriosProducao() {
                   {prodByType.length === 0 ? (
                     <p className="text-center text-muted-foreground text-sm py-8">Sem dados no período.</p>
                   ) : (
-                    <div className="flex items-center justify-center gap-8 flex-wrap">
-                      <ResponsiveContainer width={280} height={280}>
-                        <PieChart>
-                          <Pie data={prodByType} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                            {prodByType.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                          </Pie>
-                          <Tooltip formatter={(value: number) => [`${value} pçs`]} />
-                        </PieChart>
-                      </ResponsiveContainer>
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-8">
+                      <div className="w-full max-w-[300px]">
+                        <ResponsiveContainer width="100%" aspect={1}>
+                          <PieChart>
+                            <Pie data={prodByType} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="80%" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                              {prodByType.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => [`${value} pçs`]} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
                       <div className="space-y-2">
                         {prodByType.map((d, i) => (
                           <div key={d.name} className="flex items-center gap-2">
