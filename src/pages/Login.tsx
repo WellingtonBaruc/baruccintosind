@@ -5,11 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Factory, Loader2 } from 'lucide-react';
+import { Factory, Loader2, WifiOff, RefreshCw } from 'lucide-react';
 import { getAppVersion } from '@/hooks/useVersionCheck';
 
 export default function Login() {
-  const { signIn, profile, loading: authLoading } = useAuth();
+  const { signIn, profile, loading: authLoading, connectionError, retryConnection } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -46,6 +46,19 @@ export default function Login() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">PRODUÇÃO BARUC</h1>
           <p className="mt-1 text-sm text-muted-foreground">Sistema de Gestão de Produção</p>
         </div>
+
+        {connectionError && (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-center space-y-3">
+            <div className="flex items-center justify-center gap-2 text-destructive">
+              <WifiOff className="h-4 w-4" />
+              <span className="text-sm font-medium">Problema de conexão com o servidor</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={retryConnection} className="gap-2">
+              <RefreshCw className="h-3 w-3" />
+              Tentar novamente
+            </Button>
+          </div>
+        )}
 
         <Card className="shadow-lg shadow-primary/5 border-border/60">
           <CardHeader className="pb-4">
