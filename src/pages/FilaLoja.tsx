@@ -55,7 +55,7 @@ export default function FilaLoja() {
     // Fetch pedidos in loja statuses OR with status_api 'Pedido Enviado' (not yet past loja)
     const { data } = await supabase
       .from('pedidos')
-      .select('*, fivelas_separadas')
+      .select('id, numero_pedido, api_venda_id, cliente_nome, status_atual, tipo_fluxo, subtipo_pronta_entrega, criado_em, valor_liquido, data_venda_api, data_previsao_entrega, observacao_api, fivelas_separadas')
       .or(`status_atual.in.(${STATUS_LOJA.join(',')}),and(status_api.eq.Pedido Enviado,status_atual.not.in.(${STATUS_POS_LOJA.join(',')}))`)
       .order('criado_em', { ascending: true });
 

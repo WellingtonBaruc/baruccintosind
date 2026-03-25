@@ -116,6 +116,7 @@ export default function PCP() {
       supabase
         .from('pedido_item_obs_corte')
         .select('id, pedido_item_id, observacao, criado_em, lido, lido_em')
+        .in('pedido_item_id', pedidoIds.length > 0 ? pedidoIds : ['none']),
     ]);
     const itens = itensRes.data;
 
@@ -260,13 +261,13 @@ export default function PCP() {
 
     const { data: registros } = await supabase
       .from('pcp_corte_registro')
-      .select('*')
+      .select('operador_id, quantidade_cortada, concluido_em, tipo_produto, largura, material, tamanho, cor')
       .eq('status', 'CONCLUIDO')
       .gte('concluido_em', desde);
 
     const { data: manuais } = await supabase
       .from('pcp_corte_manual')
-      .select('*')
+      .select('id, tipo_produto, descricao, quantidade, observacao, operador_id, status, concluido_em, data_inicio, data_fim')
       .eq('status', 'CONCLUIDO')
       .gte('concluido_em', desde);
 
