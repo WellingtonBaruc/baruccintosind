@@ -53,6 +53,12 @@ interface ItemCount {
   total_qty: number;
 }
 
+interface PedidoSimplifica {
+  id: string;
+  atualizado_em: string;
+  status_atual: string;
+}
+
 const PIE_COLORS = ['hsl(217, 91%, 60%)', 'hsl(142, 71%, 45%)', 'hsl(38, 92%, 50%)', 'hsl(280, 67%, 55%)'];
 
 function formatDuration(minutes: number): string {
@@ -72,6 +78,7 @@ export default function RelatoriosProducao() {
   const [ordens, setOrdens] = useState<OrdemData[]>([]);
   const [etapas, setEtapas] = useState<EtapaData[]>([]);
   const [itemCounts, setItemCounts] = useState<ItemCount[]>([]);
+  const [pedidosSimplifica, setPedidosSimplifica] = useState<PedidoSimplifica[]>([]);
   const [periodo, setPeriodo] = useState<PeriodoFilter>('30d');
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('all');
   const [customStart, setCustomStart] = useState('');
@@ -101,7 +108,7 @@ export default function RelatoriosProducao() {
     const startISO = dateRange.start.toISOString();
     const endISO = dateRange.end.toISOString();
 
-    const [ordensRes, etapasRes] = await Promise.all([
+    const [ordensRes, etapasRes, simplificaRes] = await Promise.all([
       supabase
         .from('ordens_producao')
         .select('id, pedido_id, tipo_produto, status, sequencia, criado_em, data_inicio_pcp, data_fim_pcp, programado_inicio_data, programado_conclusao_data, pedidos!inner(api_venda_id, cliente_nome, data_previsao_entrega, status_atual)')
@@ -112,13 +119,24 @@ export default function RelatoriosProducao() {
         .from('op_etapas')
         .select('id, ordem_id, nome_etapa, status, iniciado_em, concluido_em')
         .gte('iniciado_em', startISO),
+      supabase
+        .from('pedidos')
+        .select('id, atualizado_em, status_atual')
+        .eq('status_atual', 'FINALIZADO_SIMPLIFICA')
+        .gte('atualizado_em', startISO)
+        .lte('atualizado_em', endISO),
     ]);
 
     const ordensData = (ordensRes.data || []) as unknown as OrdemData[];
     const etapasData = (etapasRes.data || []) as unknown as EtapaData[];
+    const simplificaData = (simplificaRes.data || []) as PedidoSimplifica[];
+
+    // Filter out simplifica pedidos that already have production orders
+    const pedidoIdsComOP = new Set(ordensData.map(o => o.pedido_id));
+    const simplificaSemOP = simplificaData.filter(p => !pedidoIdsComOP.has(p.id));
 
     // Fetch item counts for the pedido_ids
-    const pedidoIds = [...new Set(ordensData.map(o => o.pedido_id))];
+    const pedidoIds = [...new Set([...ordensData.map(o => o.pedido_id), ...simplificaSemOP.map(p => p.id)])];
     let itemsData: ItemCount[] = [];
     if (pedidoIds.length > 0) {
       const { data: items } = await supabase
@@ -137,6 +155,7 @@ export default function RelatoriosProducao() {
     setOrdens(ordensData);
     setEtapas(etapasData);
     setItemCounts(itemsData);
+    setPedidosSimplifica(simplificaSemOP);
     setLoading(false);
   };
 
@@ -182,22 +201,44 @@ export default function RelatoriosProducao() {
     return Object.entries(counts).map(([name, value]) => ({ name: name === 'SINTETICO' ? 'Sintético' : name === 'TECIDO' ? 'Tecido' : name === 'FIVELA_COBERTA' ? 'Fivela Coberta' : name, value }));
   }, [filteredOrdens]);
 
-  // Daily production (bar chart - completed per day)
-  const dailyProduction = useMemo(() => {
-    const days: Record<string, number> = {};
+  // Daily production stacked chart (OPs concluídas + Simplifica sem OP, por tipo)
+  const dailyProductionStacked = useMemo(() => {
+    const days: Record<string, { sintetico: number; tecido: number; simplifica_sintetico: number; simplifica_tecido: number; sortKey: string }> = {};
+
+    const ensureDay = (dateStr: string) => {
+      const d = new Date(dateStr);
+      const key = format(d, 'dd/MM');
+      const sortKey = format(d, 'yyyy-MM-dd');
+      if (!days[key]) days[key] = { sintetico: 0, tecido: 0, simplifica_sintetico: 0, simplifica_tecido: 0, sortKey };
+      return key;
+    };
+
+    // 1) OPs finalizadas internamente
     filteredOrdens.filter(o => o.status === 'CONCLUIDA' && o.data_fim_pcp).forEach(o => {
-      const day = format(new Date(o.data_fim_pcp!), 'dd/MM');
-      days[day] = (days[day] || 0) + 1;
+      const key = ensureDay(o.data_fim_pcp!);
+      if (o.tipo_produto === 'SINTETICO') days[key].sintetico++;
+      else if (o.tipo_produto === 'TECIDO') days[key].tecido++;
     });
+
+    // 2) Pedidos finalizados no Simplifica sem OP
+    pedidosSimplifica.forEach(p => {
+      const key = ensureDay(p.atualizado_em);
+      // Without OP we can't determine type precisely, count as simplifica
+      days[key].simplifica_sintetico++;
+    });
+
     return Object.entries(days)
-      .map(([dia, concluidas]) => ({ dia, concluidas }))
-      .sort((a, b) => {
-        const [dA, mA] = a.dia.split('/').map(Number);
-        const [dB, mB] = b.dia.split('/').map(Number);
-        return mA !== mB ? mA - mB : dA - dB;
-      })
+      .map(([dia, d]) => ({
+        dia,
+        sortKey: d.sortKey,
+        sintetico: d.sintetico,
+        tecido: d.tecido,
+        simplifica: d.simplifica_sintetico + d.simplifica_tecido,
+        total: d.sintetico + d.tecido + d.simplifica_sintetico + d.simplifica_tecido,
+      }))
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
       .slice(-14);
-  }, [filteredOrdens]);
+  }, [filteredOrdens, pedidosSimplifica]);
 
   // Time per stage (bar chart)
   const timePerStage = useMemo(() => {
@@ -363,21 +404,63 @@ export default function RelatoriosProducao() {
             <TabsContent value="diario">
               <Card className="border-border/60">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-semibold">OPs Concluídas por Dia</CardTitle>
+                  <CardTitle className="text-base font-semibold">Produção Diária — Sintético / Tecido / Simplifica</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  {dailyProduction.length === 0 ? (
+                <CardContent className="space-y-4">
+                  {dailyProductionStacked.length === 0 ? (
                     <p className="text-center text-muted-foreground text-sm py-8">Sem dados de conclusão no período.</p>
                   ) : (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={dailyProduction}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="dia" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                        <YAxis allowDecimals={false} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                        <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                        <Bar dataKey="concluidas" name="Concluídas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <>
+                      <ResponsiveContainer width="100%" height={340}>
+                        <BarChart data={dailyProductionStacked}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="dia" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                          <YAxis allowDecimals={false} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                          <Tooltip
+                            contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                            formatter={(value: number, name: string) => [value, name]}
+                          />
+                          <Legend />
+                          <Bar dataKey="sintetico" name="Sintético (OP)" stackId="a" fill="hsl(217, 91%, 60%)" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="tecido" name="Tecido (OP)" stackId="a" fill="hsl(142, 71%, 45%)" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="simplifica" name="Simplifica (sem OP)" stackId="a" fill="hsl(38, 92%, 50%)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+
+                      {/* Daily totals and percentages */}
+                      <div className="overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Data</TableHead>
+                              <TableHead className="text-right">Sintético</TableHead>
+                              <TableHead className="text-right">Tecido</TableHead>
+                              <TableHead className="text-right">Simplifica</TableHead>
+                              <TableHead className="text-right">Total</TableHead>
+                              <TableHead className="text-right">% Sint.</TableHead>
+                              <TableHead className="text-right">% Tec.</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {dailyProductionStacked.map(d => {
+                              const pctSint = d.total > 0 ? Math.round((d.sintetico / d.total) * 100) : 0;
+                              const pctTec = d.total > 0 ? Math.round((d.tecido / d.total) * 100) : 0;
+                              return (
+                                <TableRow key={d.dia}>
+                                  <TableCell className="font-medium">{d.dia}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{d.sintetico}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{d.tecido}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{d.simplifica}</TableCell>
+                                  <TableCell className="text-right font-bold tabular-nums">{d.total}</TableCell>
+                                  <TableCell className="text-right tabular-nums text-muted-foreground">{pctSint}%</TableCell>
+                                  <TableCell className="text-right tabular-nums text-muted-foreground">{pctTec}%</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
                   )}
                 </CardContent>
               </Card>
