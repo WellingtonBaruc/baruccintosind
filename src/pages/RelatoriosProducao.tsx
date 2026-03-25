@@ -153,7 +153,7 @@ export default function RelatoriosProducao() {
     (ordensCriadasRes.data || []).forEach((o: any) => mergedMap.set(o.id, o));
     (ordensConcluidasRes.data || []).forEach((o: any) => mergedMap.set(o.id, o));
     const ordensData = Array.from(mergedMap.values()) as OrdemData[];
-    const etapasData = (etapasRes.data || []) as unknown as EtapaData[];
+    const simplificaData = (simplificaRes.data || []) as PedidoSimplifica[];
 
     const pedidoIdsComOP = new Set(ordensData.map(o => o.pedido_id));
     const simplificaSemOP = simplificaData.filter(p => !pedidoIdsComOP.has(p.id));
