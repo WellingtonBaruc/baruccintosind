@@ -563,24 +563,43 @@ export default function RelatoriosProducao() {
                   {prodByType.length === 0 ? (
                     <p className="text-center text-muted-foreground text-sm py-8">Sem dados no período.</p>
                   ) : (
-                    <div className="flex flex-col md:flex-row items-center justify-center gap-8">
-                      <div className="w-full max-w-[300px]">
-                        <ResponsiveContainer width="100%" aspect={1}>
+                    <div className="flex flex-col items-center gap-6">
+                      <div className="w-full max-w-[420px]">
+                        <ResponsiveContainer width="100%" height={320}>
                           <PieChart>
-                            <Pie data={prodByType} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="80%" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                            <Pie
+                              data={prodByType}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={110}
+                              innerRadius={50}
+                              paddingAngle={3}
+                              label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                              labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
+                            >
                               {prodByType.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                             </Pie>
-                            <Tooltip formatter={(value: number) => [`${value} pçs`]} />
+                            <Tooltip formatter={(value: number) => [`${value} pçs`]} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
-                      <div className="space-y-2">
-                        {prodByType.map((d, i) => (
-                          <div key={d.name} className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                            <span className="text-sm">{d.name}: <span className="font-bold">{d.value} pçs</span></span>
-                          </div>
-                        ))}
+                      <div className="flex flex-wrap justify-center gap-4">
+                        {prodByType.map((d, i) => {
+                          const total = prodByType.reduce((s, x) => s + x.value, 0);
+                          const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
+                          return (
+                            <div key={d.name} className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
+                              <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">{d.name}:</span>{' '}
+                                <span className="font-bold">{d.value} pçs</span>{' '}
+                                <span className="text-muted-foreground">({pct}%)</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
