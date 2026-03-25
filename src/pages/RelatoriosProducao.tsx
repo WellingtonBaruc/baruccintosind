@@ -108,7 +108,7 @@ export default function RelatoriosProducao() {
     const startISO = dateRange.start.toISOString();
     const endISO = dateRange.end.toISOString();
 
-    const [ordensRes, etapasRes] = await Promise.all([
+    const [ordensRes, etapasRes, simplificaRes] = await Promise.all([
       supabase
         .from('ordens_producao')
         .select('id, pedido_id, tipo_produto, status, sequencia, criado_em, data_inicio_pcp, data_fim_pcp, programado_inicio_data, programado_conclusao_data, pedidos!inner(api_venda_id, cliente_nome, data_previsao_entrega, status_atual)')
@@ -119,13 +119,24 @@ export default function RelatoriosProducao() {
         .from('op_etapas')
         .select('id, ordem_id, nome_etapa, status, iniciado_em, concluido_em')
         .gte('iniciado_em', startISO),
+      supabase
+        .from('pedidos')
+        .select('id, atualizado_em, status_atual')
+        .eq('status_atual', 'FINALIZADO_SIMPLIFICA')
+        .gte('atualizado_em', startISO)
+        .lte('atualizado_em', endISO),
     ]);
 
     const ordensData = (ordensRes.data || []) as unknown as OrdemData[];
     const etapasData = (etapasRes.data || []) as unknown as EtapaData[];
+    const simplificaData = (simplificaRes.data || []) as PedidoSimplifica[];
+
+    // Filter out simplifica pedidos that already have production orders
+    const pedidoIdsComOP = new Set(ordensData.map(o => o.pedido_id));
+    const simplificaSemOP = simplificaData.filter(p => !pedidoIdsComOP.has(p.id));
 
     // Fetch item counts for the pedido_ids
-    const pedidoIds = [...new Set(ordensData.map(o => o.pedido_id))];
+    const pedidoIds = [...new Set([...ordensData.map(o => o.pedido_id), ...simplificaSemOP.map(p => p.id)])];
     let itemsData: ItemCount[] = [];
     if (pedidoIds.length > 0) {
       const { data: items } = await supabase
@@ -144,6 +155,7 @@ export default function RelatoriosProducao() {
     setOrdens(ordensData);
     setEtapas(etapasData);
     setItemCounts(itemsData);
+    setPedidosSimplifica(simplificaSemOP);
     setLoading(false);
   };
 
