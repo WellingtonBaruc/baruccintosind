@@ -1030,9 +1030,9 @@ export default function KanbanProducao() {
               className="gap-1.5"
             >
               {fb.label}
-              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${filterTipo === fb.key ? 'border-primary-foreground/30 text-primary-foreground' : ''}`}>{count}</Badge>
+              <Badge variant="outline" className={`text-[11px] font-bold px-1.5 py-0 ${filterTipo === fb.key ? 'border-primary-foreground/30 text-primary-foreground' : ''}`}>{count}</Badge>
               {isSintetico && (
-                <span className={`text-[9px] ml-0.5 ${filterTipo === fb.key ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                <span className={`text-[11px] font-bold ml-0.5 ${filterTipo === fb.key ? 'text-primary-foreground' : 'text-foreground'}`}>
                   ({producaoCount} prod · {opLojaCount} OP loja)
                 </span>
               )}
