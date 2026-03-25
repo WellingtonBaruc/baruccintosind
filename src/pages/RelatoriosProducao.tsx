@@ -53,6 +53,12 @@ interface ItemCount {
   total_qty: number;
 }
 
+interface PedidoSimplifica {
+  id: string;
+  atualizado_em: string;
+  status_atual: string;
+}
+
 const PIE_COLORS = ['hsl(217, 91%, 60%)', 'hsl(142, 71%, 45%)', 'hsl(38, 92%, 50%)', 'hsl(280, 67%, 55%)'];
 
 function formatDuration(minutes: number): string {
