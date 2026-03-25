@@ -78,6 +78,7 @@ export default function RelatoriosProducao() {
   const [ordens, setOrdens] = useState<OrdemData[]>([]);
   const [etapas, setEtapas] = useState<EtapaData[]>([]);
   const [itemCounts, setItemCounts] = useState<ItemCount[]>([]);
+  const [pedidosSimplifica, setPedidosSimplifica] = useState<PedidoSimplifica[]>([]);
   const [periodo, setPeriodo] = useState<PeriodoFilter>('30d');
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('all');
   const [customStart, setCustomStart] = useState('');
