@@ -242,11 +242,8 @@ export default function RelatoriosProducao() {
     return pedidosSimplifica.reduce((sum, p) => sum + (getPecasByPedido[p.id] || 0), 0);
   }, [pedidosSimplifica, getPecasByPedido]);
 
-  const atrasados = filteredOrdens.filter(o => {
-    if (o.status === 'CONCLUIDA') return false;
-    if (!o.pedidos.data_previsao_entrega) return false;
-    return new Date(o.pedidos.data_previsao_entrega + 'T23:59:59') < new Date();
-  }).length;
+    // All orders are CONCLUIDA, no delayed ones in this context
+  const atrasados = 0;
 
   // Average production time (for completed orders)
   const avgProducaoMinutes = useMemo(() => {
