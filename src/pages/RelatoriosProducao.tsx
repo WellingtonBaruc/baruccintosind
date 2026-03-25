@@ -10,10 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, ArrowLeft, Package, Clock, AlertTriangle, CheckCircle2, TrendingUp, BarChart3, Factory } from 'lucide-react';
-import { format, subDays, subWeeks, subMonths, startOfDay, differenceInHours, differenceInMinutes } from 'date-fns';
+import { Loader2, ArrowLeft, Package, Clock, AlertTriangle, CheckCircle2, TrendingUp, BarChart3, Factory, FileX } from 'lucide-react';
+import { format, subDays, subMonths, startOfDay, differenceInMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 
 const PERFIS_PRODUCAO = ['admin', 'gestor', 'supervisor_producao'];
 
@@ -48,9 +48,9 @@ interface EtapaData {
   concluido_em: string | null;
 }
 
-interface ItemCount {
+interface ItemData {
   pedido_id: string;
-  total_qty: number;
+  quantidade: number;
 }
 
 interface PedidoSimplifica {
@@ -77,7 +77,7 @@ export default function RelatoriosProducao() {
   const [loading, setLoading] = useState(true);
   const [ordens, setOrdens] = useState<OrdemData[]>([]);
   const [etapas, setEtapas] = useState<EtapaData[]>([]);
-  const [itemCounts, setItemCounts] = useState<ItemCount[]>([]);
+  const [allItems, setAllItems] = useState<ItemData[]>([]);
   const [pedidosSimplifica, setPedidosSimplifica] = useState<PedidoSimplifica[]>([]);
   const [periodo, setPeriodo] = useState<PeriodoFilter>('30d');
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('all');
@@ -131,33 +131,39 @@ export default function RelatoriosProducao() {
     const etapasData = (etapasRes.data || []) as unknown as EtapaData[];
     const simplificaData = (simplificaRes.data || []) as PedidoSimplifica[];
 
-    // Filter out simplifica pedidos that already have production orders
     const pedidoIdsComOP = new Set(ordensData.map(o => o.pedido_id));
     const simplificaSemOP = simplificaData.filter(p => !pedidoIdsComOP.has(p.id));
 
-    // Fetch item counts for the pedido_ids
+    // Fetch ALL items for relevant pedidos (needed for peças count)
     const pedidoIds = [...new Set([...ordensData.map(o => o.pedido_id), ...simplificaSemOP.map(p => p.id)])];
-    let itemsData: ItemCount[] = [];
+    let itemsData: ItemData[] = [];
     if (pedidoIds.length > 0) {
-      const { data: items } = await supabase
-        .from('pedido_itens')
-        .select('pedido_id, quantidade')
-        .in('pedido_id', pedidoIds);
-      if (items) {
-        const grouped: Record<string, number> = {};
-        items.forEach((i: any) => {
-          grouped[i.pedido_id] = (grouped[i.pedido_id] || 0) + (i.quantidade || 0);
-        });
-        itemsData = Object.entries(grouped).map(([pedido_id, total_qty]) => ({ pedido_id, total_qty }));
-      }
+      // Batch in chunks of 200 to avoid URI too long
+      const chunks: string[][] = [];
+      for (let i = 0; i < pedidoIds.length; i += 200) chunks.push(pedidoIds.slice(i, i + 200));
+      const allItemResults = await Promise.all(
+        chunks.map(chunk => supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', chunk))
+      );
+      allItemResults.forEach(r => {
+        if (r.data) itemsData.push(...(r.data as ItemData[]));
+      });
     }
 
     setOrdens(ordensData);
     setEtapas(etapasData);
-    setItemCounts(itemsData);
+    setAllItems(itemsData);
     setPedidosSimplifica(simplificaSemOP);
     setLoading(false);
   };
+
+  // Helper: get total peças for a pedido_id
+  const getPecasByPedido = useMemo(() => {
+    const map: Record<string, number> = {};
+    allItems.forEach(i => {
+      map[i.pedido_id] = (map[i.pedido_id] || 0) + (i.quantidade || 0);
+    });
+    return map;
+  }, [allItems]);
 
   const filteredOrdens = tipoFilter === 'all' ? ordens : ordens.filter(o => o.tipo_produto === tipoFilter);
 
@@ -165,14 +171,50 @@ export default function RelatoriosProducao() {
   const totalOPs = filteredOrdens.length;
   const opsFinalizadas = filteredOrdens.filter(o => o.status === 'CONCLUIDA').length;
   const opsEmAndamento = filteredOrdens.filter(o => o.status === 'EM_ANDAMENTO').length;
-  const opsAguardando = filteredOrdens.filter(o => o.status === 'AGUARDANDO').length;
 
+  // Total PEÇAS (sum of item quantities across filtered orders)
   const totalPecas = useMemo(() => {
-    const pedidoIdsInFilter = new Set(filteredOrdens.map(o => o.pedido_id));
-    return itemCounts
-      .filter(ic => pedidoIdsInFilter.has(ic.pedido_id))
-      .reduce((sum, ic) => sum + ic.total_qty, 0);
-  }, [filteredOrdens, itemCounts]);
+    const seen = new Set<string>();
+    let total = 0;
+    filteredOrdens.forEach(o => {
+      if (!seen.has(o.pedido_id)) {
+        seen.add(o.pedido_id);
+        total += getPecasByPedido[o.pedido_id] || 0;
+      }
+    });
+    return total;
+  }, [filteredOrdens, getPecasByPedido]);
+
+  // Peças Sintético / Tecido
+  const pecasSintetico = useMemo(() => {
+    const seen = new Set<string>();
+    let total = 0;
+    filteredOrdens.filter(o => o.tipo_produto === 'SINTETICO').forEach(o => {
+      if (!seen.has(o.pedido_id)) {
+        seen.add(o.pedido_id);
+        total += getPecasByPedido[o.pedido_id] || 0;
+      }
+    });
+    return total;
+  }, [filteredOrdens, getPecasByPedido]);
+
+  const pecasTecido = useMemo(() => {
+    const seen = new Set<string>();
+    let total = 0;
+    filteredOrdens.filter(o => o.tipo_produto === 'TECIDO').forEach(o => {
+      if (!seen.has(o.pedido_id)) {
+        seen.add(o.pedido_id);
+        total += getPecasByPedido[o.pedido_id] || 0;
+      }
+    });
+    return total;
+  }, [filteredOrdens, getPecasByPedido]);
+
+  // Simplifica sem OP
+  const totalSimplificaSemOP = pedidosSimplifica.length;
+  const pecasSimplificaSemOP = useMemo(() => {
+    return pedidosSimplifica.reduce((sum, p) => sum + (getPecasByPedido[p.id] || 0), 0);
+  }, [pedidosSimplifica, getPecasByPedido]);
 
   const atrasados = filteredOrdens.filter(o => {
     if (o.status === 'CONCLUIDA') return false;
@@ -191,40 +233,31 @@ export default function RelatoriosProducao() {
   }, [filteredOrdens]);
 
   // ========== CHART DATA ==========
-  // Production by type (pie)
-  const prodByType = useMemo(() => {
-    const counts: Record<string, number> = {};
-    filteredOrdens.forEach(o => {
-      const tipo = o.tipo_produto || 'OUTROS';
-      counts[tipo] = (counts[tipo] || 0) + 1;
-    });
-    return Object.entries(counts).map(([name, value]) => ({ name: name === 'SINTETICO' ? 'Sintético' : name === 'TECIDO' ? 'Tecido' : name === 'FIVELA_COBERTA' ? 'Fivela Coberta' : name, value }));
-  }, [filteredOrdens]);
-
-  // Daily production stacked chart (OPs concluídas + Simplifica sem OP, por tipo)
+  // Daily production stacked: PEÇAS per day (not OP count)
   const dailyProductionStacked = useMemo(() => {
-    const days: Record<string, { sintetico: number; tecido: number; simplifica_sintetico: number; simplifica_tecido: number; sortKey: string }> = {};
+    const days: Record<string, { sintetico: number; tecido: number; simplifica: number; sortKey: string }> = {};
 
     const ensureDay = (dateStr: string) => {
       const d = new Date(dateStr);
       const key = format(d, 'dd/MM');
       const sortKey = format(d, 'yyyy-MM-dd');
-      if (!days[key]) days[key] = { sintetico: 0, tecido: 0, simplifica_sintetico: 0, simplifica_tecido: 0, sortKey };
+      if (!days[key]) days[key] = { sintetico: 0, tecido: 0, simplifica: 0, sortKey };
       return key;
     };
 
-    // 1) OPs finalizadas internamente
+    // 1) OPs finalizadas — count PEÇAS
     filteredOrdens.filter(o => o.status === 'CONCLUIDA' && o.data_fim_pcp).forEach(o => {
       const key = ensureDay(o.data_fim_pcp!);
-      if (o.tipo_produto === 'SINTETICO') days[key].sintetico++;
-      else if (o.tipo_produto === 'TECIDO') days[key].tecido++;
+      const pecas = getPecasByPedido[o.pedido_id] || 1;
+      if (o.tipo_produto === 'SINTETICO') days[key].sintetico += pecas;
+      else if (o.tipo_produto === 'TECIDO') days[key].tecido += pecas;
+      else days[key].sintetico += pecas; // fallback
     });
 
-    // 2) Pedidos finalizados no Simplifica sem OP
+    // 2) Simplifica sem OP — count PEÇAS
     pedidosSimplifica.forEach(p => {
       const key = ensureDay(p.atualizado_em);
-      // Without OP we can't determine type precisely, count as simplifica
-      days[key].simplifica_sintetico++;
+      days[key].simplifica += getPecasByPedido[p.id] || 1;
     });
 
     return Object.entries(days)
@@ -233,12 +266,21 @@ export default function RelatoriosProducao() {
         sortKey: d.sortKey,
         sintetico: d.sintetico,
         tecido: d.tecido,
-        simplifica: d.simplifica_sintetico + d.simplifica_tecido,
-        total: d.sintetico + d.tecido + d.simplifica_sintetico + d.simplifica_tecido,
+        simplifica: d.simplifica,
+        total: d.sintetico + d.tecido + d.simplifica,
       }))
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
       .slice(-14);
-  }, [filteredOrdens, pedidosSimplifica]);
+  }, [filteredOrdens, pedidosSimplifica, getPecasByPedido]);
+
+  // Production by type (pie) — PEÇAS
+  const prodByType = useMemo(() => {
+    const result: { name: string; value: number }[] = [];
+    if (pecasSintetico > 0) result.push({ name: 'Sintético', value: pecasSintetico });
+    if (pecasTecido > 0) result.push({ name: 'Tecido', value: pecasTecido });
+    if (pecasSimplificaSemOP > 0) result.push({ name: 'Simplifica (sem OP)', value: pecasSimplificaSemOP });
+    return result;
+  }, [pecasSintetico, pecasTecido, pecasSimplificaSemOP]);
 
   // Time per stage (bar chart)
   const timePerStage = useMemo(() => {
@@ -258,7 +300,7 @@ export default function RelatoriosProducao() {
     }));
   }, [etapas, filteredOrdens]);
 
-  // Bottleneck - stage with most items stuck
+  // Bottleneck
   const bottleneck = useMemo(() => {
     const stageCount: Record<string, number> = {};
     const relevantOrdemIds = new Set(filteredOrdens.filter(o => o.status !== 'CONCLUIDA').map(o => o.id));
@@ -270,20 +312,28 @@ export default function RelatoriosProducao() {
   }, [etapas, filteredOrdens]);
 
   // ========== DETAILED TABLE ==========
+  // Filter out AGUARDANDO for orders without any PCP dates (pre-system)
   const tableData = useMemo(() => {
-    return filteredOrdens.map(o => {
-      const itemCount = itemCounts.find(ic => ic.pedido_id === o.pedido_id);
-      const durationMins = o.data_inicio_pcp && o.data_fim_pcp
-        ? differenceInMinutes(new Date(o.data_fim_pcp), new Date(o.data_inicio_pcp))
-        : null;
-      return {
-        ...o,
-        quantidade: itemCount?.total_qty || 0,
-        duracao: durationMins,
-        isOPLoja: o.sequencia > 1,
-      };
-    });
-  }, [filteredOrdens, itemCounts]);
+    return filteredOrdens
+      .filter(o => {
+        // Remove AGUARDANDO orders that have no PCP dates (pre-system period)
+        if (o.status === 'AGUARDANDO' && !o.data_inicio_pcp && !o.data_fim_pcp && !o.programado_inicio_data) {
+          return false;
+        }
+        return true;
+      })
+      .map(o => {
+        const durationMins = o.data_inicio_pcp && o.data_fim_pcp
+          ? differenceInMinutes(new Date(o.data_fim_pcp), new Date(o.data_inicio_pcp))
+          : null;
+        return {
+          ...o,
+          quantidade: getPecasByPedido[o.pedido_id] || 0,
+          duracao: durationMins,
+          isOPLoja: o.sequencia > 1,
+        };
+      });
+  }, [filteredOrdens, getPecasByPedido]);
 
   if (!profile || !PERFIS_PRODUCAO.includes(profile.perfil)) {
     return <Navigate to="/dashboard" replace />;
@@ -291,11 +341,17 @@ export default function RelatoriosProducao() {
 
   const kpiCards = [
     { label: 'Total Peças', value: totalPecas.toLocaleString('pt-BR'), icon: Package, colorClass: 'text-foreground', bgClass: 'bg-muted' },
-    { label: 'OPs Finalizadas', value: opsFinalizadas, icon: CheckCircle2, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-500/10' },
-    { label: 'OPs em Andamento', value: opsEmAndamento, icon: Factory, colorClass: 'text-blue-600', bgClass: 'bg-blue-500/10' },
-    { label: 'OPs Aguardando', value: opsAguardando, icon: Clock, colorClass: 'text-amber-600', bgClass: 'bg-amber-500/10' },
+    { label: 'Peças Sintético', value: pecasSintetico.toLocaleString('pt-BR'), icon: Package, colorClass: 'text-blue-600', bgClass: 'bg-blue-500/10' },
+    { label: 'Peças Tecido', value: pecasTecido.toLocaleString('pt-BR'), icon: Package, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-500/10' },
+    { label: 'Simplifica sem OP', value: `${totalSimplificaSemOP} (${pecasSimplificaSemOP} pçs)`, icon: FileX, colorClass: 'text-amber-600', bgClass: 'bg-amber-500/10' },
     { label: 'Tempo Médio', value: formatDuration(avgProducaoMinutes), icon: TrendingUp, colorClass: 'text-purple-600', bgClass: 'bg-purple-500/10' },
     { label: 'Atrasados', value: atrasados, icon: AlertTriangle, colorClass: 'text-destructive', bgClass: 'bg-destructive/10' },
+  ];
+
+  const kpiCardsSecondary = [
+    { label: 'OPs Finalizadas', value: opsFinalizadas, icon: CheckCircle2, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-500/10' },
+    { label: 'OPs em Andamento', value: opsEmAndamento, icon: Factory, colorClass: 'text-blue-600', bgClass: 'bg-blue-500/10' },
+    { label: 'Total OPs', value: totalOPs, icon: BarChart3, colorClass: 'text-foreground', bgClass: 'bg-muted' },
   ];
 
   return (
@@ -358,7 +414,7 @@ export default function RelatoriosProducao() {
         <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : (
         <>
-          {/* KPI Cards */}
+          {/* KPI Cards — Peças */}
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
             {kpiCards.map(kpi => {
               const Icon = kpi.icon;
@@ -372,6 +428,24 @@ export default function RelatoriosProducao() {
                       <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{kpi.label}</span>
                     </div>
                     <p className={`text-2xl font-bold tabular-nums ${kpi.colorClass}`}>{kpi.value}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* KPI Cards — OPs (secondary) */}
+          <div className="grid gap-3 grid-cols-3 max-w-lg">
+            {kpiCardsSecondary.map(kpi => {
+              const Icon = kpi.icon;
+              return (
+                <Card key={kpi.label} className="border-border/60">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Icon className={`h-3.5 w-3.5 ${kpi.colorClass}`} />
+                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{kpi.label}</span>
+                    </div>
+                    <p className={`text-xl font-bold tabular-nums ${kpi.colorClass}`}>{kpi.value}</p>
                   </CardContent>
                 </Card>
               );
@@ -396,7 +470,7 @@ export default function RelatoriosProducao() {
           {/* Charts */}
           <Tabs defaultValue="diario" className="space-y-4">
             <TabsList>
-              <TabsTrigger value="diario">Produção Diária</TabsTrigger>
+              <TabsTrigger value="diario">Produção Diária (Peças)</TabsTrigger>
               <TabsTrigger value="tipo">Por Tipo</TabsTrigger>
               <TabsTrigger value="etapas">Tempo por Etapa</TabsTrigger>
             </TabsList>
@@ -404,7 +478,7 @@ export default function RelatoriosProducao() {
             <TabsContent value="diario">
               <Card className="border-border/60">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-semibold">Produção Diária — Sintético / Tecido / Simplifica</CardTitle>
+                  <CardTitle className="text-base font-semibold">Peças Produzidas por Dia — Sintético / Tecido / Simplifica</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {dailyProductionStacked.length === 0 ? (
@@ -418,7 +492,7 @@ export default function RelatoriosProducao() {
                           <YAxis allowDecimals={false} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
                           <Tooltip
                             contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                            formatter={(value: number, name: string) => [value, name]}
+                            formatter={(value: number, name: string) => [`${value} pçs`, name]}
                           />
                           <Legend />
                           <Bar dataKey="sintetico" name="Sintético (OP)" stackId="a" fill="hsl(217, 91%, 60%)" radius={[0, 0, 0, 0]} />
@@ -469,7 +543,7 @@ export default function RelatoriosProducao() {
             <TabsContent value="tipo">
               <Card className="border-border/60">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-semibold">Distribuição por Tipo de Produto</CardTitle>
+                  <CardTitle className="text-base font-semibold">Distribuição por Tipo (Peças)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {prodByType.length === 0 ? (
@@ -481,14 +555,14 @@ export default function RelatoriosProducao() {
                           <Pie data={prodByType} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
                             {prodByType.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                           </Pie>
-                          <Tooltip />
+                          <Tooltip formatter={(value: number) => [`${value} pçs`]} />
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="space-y-2">
                         {prodByType.map((d, i) => (
                           <div key={d.name} className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                            <span className="text-sm">{d.name}: <span className="font-bold">{d.value}</span></span>
+                            <span className="text-sm">{d.name}: <span className="font-bold">{d.value} pçs</span></span>
                           </div>
                         ))}
                       </div>
