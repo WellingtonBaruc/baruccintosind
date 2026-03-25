@@ -121,14 +121,9 @@ export default function RelatoriosProducao() {
     const startISO = dateRange.start.toISOString();
     const endISO = dateRange.end.toISOString();
 
-    // Fetch orders created OR completed within the date range
-    const [ordensCriadasRes, ordensConcluidasRes, etapasRes, simplificaRes] = await Promise.all([
-      supabase
-        .from('ordens_producao')
-        .select('id, pedido_id, tipo_produto, status, sequencia, criado_em, data_inicio_pcp, data_fim_pcp, programado_inicio_data, programado_conclusao_data, pedidos!inner(api_venda_id, cliente_nome, data_previsao_entrega, status_atual)')
-        .gte('criado_em', startISO)
-        .lte('criado_em', endISO)
-        .order('criado_em', { ascending: false }),
+    // Fetch only completed orders: OPs CONCLUIDA by data_fim_pcp OR by criado_em within range
+    // Also fetch pedidos with production concluded status
+    const [ordensConcluidasFimRes, ordensConcluidasCriadoRes, etapasRes, pedidosConcluidosRes] = await Promise.all([
       supabase
         .from('ordens_producao')
         .select('id, pedido_id, tipo_produto, status, sequencia, criado_em, data_inicio_pcp, data_fim_pcp, programado_inicio_data, programado_conclusao_data, pedidos!inner(api_venda_id, cliente_nome, data_previsao_entrega, status_atual)')
@@ -137,27 +132,34 @@ export default function RelatoriosProducao() {
         .lte('data_fim_pcp', endISO)
         .order('data_fim_pcp', { ascending: false }),
       supabase
+        .from('ordens_producao')
+        .select('id, pedido_id, tipo_produto, status, sequencia, criado_em, data_inicio_pcp, data_fim_pcp, programado_inicio_data, programado_conclusao_data, pedidos!inner(api_venda_id, cliente_nome, data_previsao_entrega, status_atual)')
+        .eq('status', 'CONCLUIDA')
+        .gte('criado_em', startISO)
+        .lte('criado_em', endISO)
+        .order('criado_em', { ascending: false }),
+      supabase
         .from('op_etapas')
         .select('id, ordem_id, nome_etapa, status, iniciado_em, concluido_em')
         .gte('iniciado_em', startISO),
       supabase
         .from('pedidos')
         .select('id, atualizado_em, status_atual')
-        .eq('status_atual', 'FINALIZADO_SIMPLIFICA')
+        .in('status_atual', ['PRODUCAO_CONCLUIDA', 'FINALIZADO_SIMPLIFICA'])
         .gte('atualizado_em', startISO)
         .lte('atualizado_em', endISO),
     ]);
 
-    // Merge both queries, deduplicating by id
+    // Merge both OP queries, deduplicating by id
     const mergedMap = new Map<string, OrdemData>();
-    (ordensCriadasRes.data || []).forEach((o: any) => mergedMap.set(o.id, o));
-    (ordensConcluidasRes.data || []).forEach((o: any) => mergedMap.set(o.id, o));
+    (ordensConcluidasFimRes.data || []).forEach((o: any) => mergedMap.set(o.id, o));
+    (ordensConcluidasCriadoRes.data || []).forEach((o: any) => mergedMap.set(o.id, o));
     const ordensData = Array.from(mergedMap.values()) as OrdemData[];
     const etapasData = (etapasRes.data || []) as unknown as EtapaData[];
-    const simplificaData = (simplificaRes.data || []) as PedidoSimplifica[];
+    const pedidosConcluidosData = (pedidosConcluidosRes.data || []) as PedidoSimplifica[];
 
     const pedidoIdsComOP = new Set(ordensData.map(o => o.pedido_id));
-    const simplificaSemOP = simplificaData.filter(p => !pedidoIdsComOP.has(p.id));
+    const simplificaSemOP = pedidosConcluidosData.filter(p => !pedidoIdsComOP.has(p.id));
 
     // Fetch ALL items for relevant pedidos (needed for peças count)
     const pedidoIds = [...new Set([...ordensData.map(o => o.pedido_id), ...simplificaSemOP.map(p => p.id)])];
@@ -192,10 +194,9 @@ export default function RelatoriosProducao() {
 
   const filteredOrdens = tipoFilter === 'all' ? ordens : ordens.filter(o => o.tipo_produto === tipoFilter);
 
-  // ========== KPI CALCULATIONS ==========
+  // ========== KPI CALCULATIONS (all orders are CONCLUIDA) ==========
   const totalOPs = filteredOrdens.length;
-  const opsFinalizadas = filteredOrdens.filter(o => o.status === 'CONCLUIDA').length;
-  const opsEmAndamento = filteredOrdens.filter(o => o.status === 'EM_ANDAMENTO').length;
+  const opsFinalizadas = totalOPs;
 
   // Total PEÇAS (sum of item quantities across filtered orders)
   const totalPecas = useMemo(() => {
@@ -241,11 +242,8 @@ export default function RelatoriosProducao() {
     return pedidosSimplifica.reduce((sum, p) => sum + (getPecasByPedido[p.id] || 0), 0);
   }, [pedidosSimplifica, getPecasByPedido]);
 
-  const atrasados = filteredOrdens.filter(o => {
-    if (o.status === 'CONCLUIDA') return false;
-    if (!o.pedidos.data_previsao_entrega) return false;
-    return new Date(o.pedidos.data_previsao_entrega + 'T23:59:59') < new Date();
-  }).length;
+    // All orders are CONCLUIDA, no delayed ones in this context
+  const atrasados = 0;
 
   // Average production time (for completed orders)
   const avgProducaoMinutes = useMemo(() => {
@@ -352,15 +350,12 @@ export default function RelatoriosProducao() {
     { label: 'Total Peças', value: totalPecas.toLocaleString('pt-BR'), icon: Package, colorClass: 'text-foreground', bgClass: 'bg-muted' },
     { label: 'Peças Sintético', value: pecasSintetico.toLocaleString('pt-BR'), icon: Package, colorClass: 'text-blue-600', bgClass: 'bg-blue-500/10' },
     { label: 'Peças Tecido', value: pecasTecido.toLocaleString('pt-BR'), icon: Package, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-500/10' },
-    { label: 'Simplifica sem OP', value: `${totalSimplificaSemOP} (${pecasSimplificaSemOP} pçs)`, icon: FileX, colorClass: 'text-amber-600', bgClass: 'bg-amber-500/10' },
     { label: 'Tempo Médio', value: formatDuration(avgProducaoMinutes), icon: TrendingUp, colorClass: 'text-purple-600', bgClass: 'bg-purple-500/10' },
-    { label: 'Atrasados', value: atrasados, icon: AlertTriangle, colorClass: 'text-destructive', bgClass: 'bg-destructive/10' },
   ];
 
   const kpiCardsSecondary = [
-    { label: 'OPs Finalizadas', value: opsFinalizadas, icon: CheckCircle2, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-500/10' },
-    { label: 'OPs em Andamento', value: opsEmAndamento, icon: Factory, colorClass: 'text-blue-600', bgClass: 'bg-blue-500/10' },
-    { label: 'Total OPs', value: totalOPs, icon: BarChart3, colorClass: 'text-foreground', bgClass: 'bg-muted' },
+    { label: 'OPs Concluídas', value: opsFinalizadas, icon: CheckCircle2, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-500/10' },
+    { label: 'Simplifica sem OP', value: totalSimplificaSemOP, icon: FileX, colorClass: 'text-amber-600', bgClass: 'bg-amber-500/10' },
   ];
 
   return (
@@ -444,7 +439,7 @@ export default function RelatoriosProducao() {
       ) : (
         <>
           {/* KPI Cards — Peças */}
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
             {kpiCards.map(kpi => {
               const Icon = kpi.icon;
               return (
@@ -464,7 +459,7 @@ export default function RelatoriosProducao() {
           </div>
 
           {/* KPI Cards — OPs (secondary) */}
-          <div className="grid gap-3 grid-cols-3 max-w-lg">
+          <div className="grid gap-3 grid-cols-2 max-w-sm">
             {kpiCardsSecondary.map(kpi => {
               const Icon = kpi.icon;
               return (
