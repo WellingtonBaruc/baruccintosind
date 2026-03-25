@@ -369,6 +369,11 @@ export default function AlmoxarifadoPage() {
   const kpiAtrasados = aSeparar.filter(v => calcDiasEntrega(v.data_previsao_entrega) < 0).length
     + emSeparacao.filter(v => calcDiasEntrega(v.data_previsao_entrega) < 0).length;
 
+  /* ── Access control ── */
+  if (!profile || !['admin', 'gestor', 'almoxarifado'].includes(profile.perfil)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
   return (
