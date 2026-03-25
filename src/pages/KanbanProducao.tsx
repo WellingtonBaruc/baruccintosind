@@ -757,7 +757,7 @@ export default function KanbanProducao() {
   // Filter logic
   const getFilteredCards = () => {
     let filtered = cards;
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 
     if (filterTipo !== 'all') {
       filtered = filtered.filter(c => c.tipo_produto === filterTipo);
@@ -1115,7 +1115,7 @@ export default function KanbanProducao() {
                                 {...prov.draggableProps}
                                 {...prov.dragHandleProps}
                                 className={`rounded-lg border bg-white shadow-sm overflow-hidden group ${snap.isDragging ? 'shadow-lg ring-2 ring-primary/30' : ''} ${(() => {
-                                  const todayStr = new Date().toISOString().slice(0, 10);
+                                  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
                                   if (card.programado_inicio_data === todayStr || card.programado_conclusao_data === todayStr) return 'ring-2 ring-primary/40 border-primary/30';
                                   return '';
                                 })()}`}
@@ -1153,7 +1153,7 @@ export default function KanbanProducao() {
                                 </div>
 
                                 {(() => {
-                                  const todayStr = new Date().toISOString().slice(0, 10);
+                                  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
                                   const isProgInicio = card.programado_inicio_data === todayStr;
                                   const isProgConclusao = card.programado_conclusao_data === todayStr;
                                   if (isProgInicio) return <Badge className="mt-1.5 text-[10px] bg-primary/15 text-primary border-primary/30">🗓️ Início programado</Badge>;

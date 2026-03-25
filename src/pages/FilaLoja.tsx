@@ -110,7 +110,7 @@ export default function FilaLoja() {
     }
 
     // Fetch finalizadas hoje
-    const todayStart = startOfDay(new Date()).toISOString();
+    const todayStart = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) + 'T00:00:00-03:00';
     const { count: finHoje } = await supabase
       .from('pedido_historico')
       .select('*', { count: 'exact', head: true })

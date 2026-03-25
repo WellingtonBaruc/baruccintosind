@@ -62,9 +62,8 @@ export default function ProgramacaoDialog({ open, onClose, pedido, tipo, cal, ca
     }
   }, [open, pedido, tipo]);
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const hojeStr = hoje.toISOString().slice(0, 10);
+  const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const hoje = new Date(hojeStr + 'T00:00:00');
 
   const isReprogramacao = useMemo(() => {
     if (!pedido) return false;
@@ -155,7 +154,7 @@ export default function ProgramacaoDialog({ open, onClose, pedido, tipo, cal, ca
   // Load capacity when date changes
   useEffect(() => {
     if (!selectedDate || !pedido) return;
-    const ds = selectedDate.toISOString().slice(0, 10);
+    const ds = selectedDate.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
     setLoadingCarga(true);
 
     loadCapacidadeData(ds).then(({ cap, carga }) => {

@@ -113,7 +113,7 @@ export default function RegistroEnvio() {
 
       await supabase.from('pedidos').update({
         status_atual: 'AGUARDANDO_CIENCIA_COMERCIAL',
-        data_entrega: new Date().toISOString().slice(0, 10),
+        data_entrega: new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }),
       }).eq('id', pedido.id);
 
       await supabase.from('pedido_historico').insert({
