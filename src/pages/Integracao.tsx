@@ -458,6 +458,39 @@ export default function Integracao() {
     fetchData();
   };
 
+  const handleSyncExpandido = async (dias: number) => {
+    setSyncExpandido(true);
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/sync-simplifica`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || anonKey}`,
+            'apikey': anonKey,
+          },
+          body: JSON.stringify({ tipo: 'MANUAL_EXPANDIDO', dias_override: dias }),
+        }
+      );
+
+      const result = await res.json();
+      if (result.success) {
+        toast.success(`Sync expandida (${dias} dias): ${result.total_inseridos} novos, ${result.total_atualizados} atualizados.`);
+      } else {
+        toast.error(`Erro: ${result.error || 'Erro desconhecido'}`);
+      }
+    } catch (err: any) {
+      toast.error(`Falha: ${err.message}`);
+    }
+    setSyncExpandido(false);
+    fetchData();
+  };
+
   const handleToggleAuto = async (checked: boolean) => {
     if (!config) return;
     await supabase.from('integracao_configuracao').update({ ativa: checked }).eq('id', config.id);
