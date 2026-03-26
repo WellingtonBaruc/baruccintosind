@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -18,8 +18,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
-import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star, Scissors, BarChart3 } from 'lucide-react';
+import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star, Scissors, BarChart3, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
+import { hojeBrasilia } from '@/lib/dateUtils';
 
 interface KanbanCard {
   id: string;
@@ -144,6 +145,11 @@ export default function KanbanProducao() {
   // Detail sheet
   const [detailSheet, setDetailSheet] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean; pedido: any | null }>({ open: false, card: null, items: [], loading: false, pedido: null });
   const [showFivelaKpiList, setShowFivelaKpiList] = useState(false);
+
+  // KPI: vendas concluídas com filtro de data
+  const [kpiConcluidasDate, setKpiConcluidasDate] = useState(hojeBrasilia());
+  const [kpiConcluidasCount, setKpiConcluidasCount] = useState(0);
+  const [kpiConcluidasLoading, setKpiConcluidasLoading] = useState(false);
 
   // Obs para Corte
   const [obsCorteModal, setObsCorteModal] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean }>({ open: false, card: null, items: [], loading: false });
