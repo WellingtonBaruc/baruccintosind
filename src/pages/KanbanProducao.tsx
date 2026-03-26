@@ -353,18 +353,46 @@ export default function KanbanProducao() {
       };
     });
 
-    // Deduplicate: hide CONCLUÍDA OPs when same pedido has other OPs still active
+    // Deduplicate: 
+    // 1) Hide CONCLUÍDA OPs when same pedido has other OPs still active
+    // 2) For same pedido+tipo_produto, keep only the highest sequencia (complementary OP)
     const pedidoGroups = new Map<string, typeof kanbanCards>();
     for (const c of kanbanCards) {
       const group = pedidoGroups.get(c.pedido_id) || [];
       group.push(c);
       pedidoGroups.set(c.pedido_id, group);
     }
+
+    // For same pedido+tipo, keep only highest sequencia active OP
+    const bestByPedidoTipo = new Map<string, KanbanCard>();
+    for (const c of kanbanCards) {
+      const key = `${c.pedido_id}|${c.tipo_produto}`;
+      const existing = bestByPedidoTipo.get(key);
+      if (!existing) {
+        bestByPedidoTipo.set(key, c);
+      } else {
+        // Prefer active over concluded
+        const cActive = c.ordem_status !== 'CONCLUIDA';
+        const eActive = existing.ordem_status !== 'CONCLUIDA';
+        if (cActive && !eActive) {
+          bestByPedidoTipo.set(key, c);
+        } else if (cActive === eActive) {
+          // Both active or both concluded: prefer higher sequencia
+          if (c.ordem_sequencia_op > existing.ordem_sequencia_op) {
+            bestByPedidoTipo.set(key, c);
+          }
+        }
+      }
+    }
+
     const filteredCards = kanbanCards.filter(c => {
+      const key = `${c.pedido_id}|${c.tipo_produto}`;
+      const best = bestByPedidoTipo.get(key);
+      if (best && best.id !== c.id) return false;
+
+      // Also hide CONCLUIDA when another tipo for same pedido is still active
       const group = pedidoGroups.get(c.pedido_id);
-      if (!group || group.length <= 1) return true;
-      // Hide cards whose ordem is CONCLUIDA when another OP for same pedido is still active
-      if (c.ordem_status === 'CONCLUIDA') {
+      if (group && group.length > 1 && c.ordem_status === 'CONCLUIDA') {
         const hasActiveOp = group.some(g => g.id !== c.id && g.ordem_status !== 'CONCLUIDA');
         if (hasActiveOp) return false;
       }
