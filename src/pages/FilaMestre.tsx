@@ -17,8 +17,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2 } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
@@ -54,7 +55,7 @@ interface VendaRow {
   is_piloto: boolean;
   status_piloto: string | null;
   fivelas_separadas: boolean;
-  // PCP calculated fields
+  quantidade_itens: number;
   dataPcpCalculada: string | null;
   dataInicioIdeal: string | null;
   atrasoDias: number;
@@ -70,6 +71,17 @@ interface PedidoDetail {
   perdas: any[];
 }
 
+type AgrupamentoType = 'data_entrega' | 'tipo' | 'status';
+
+interface GrupoInfo {
+  key: string;
+  label: string;
+  pedidos: VendaRow[];
+  totalPecas: number;
+  totalValor: number;
+  urgentes: number;
+}
+
 export default function FilaMestre() {
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -80,21 +92,19 @@ export default function FilaMestre() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [prazoFilter, setPrazoFilter] = useState('all');
   const [configOpen, setConfigOpen] = useState(false);
+  const [agrupamento, setAgrupamento] = useState<AgrupamentoType>('data_entrega');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
-  // PCP data
   const [calendarData, setCalendarData] = useState<PcpCalendarData>({ sabadoAtivo: false, domingoAtivo: false, feriados: [], pausas: [] });
   const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
 
-  // Side panel
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<PedidoDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Inline editing
   const [editingPcp, setEditingPcp] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
 
-  // Debounced realtime refresh
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedFetchAll = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -103,14 +113,11 @@ export default function FilaMestre() {
 
   useEffect(() => {
     fetchAll();
-
-    // Realtime: refresh when ordens_producao or op_etapas change
     const channel = supabase
       .channel('filamestre-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ordens_producao' }, debouncedFetchAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'op_etapas' }, debouncedFetchAll)
       .subscribe();
-
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
@@ -143,33 +150,24 @@ export default function FilaMestre() {
   };
 
   const fetchRows = async (cal: PcpCalendarData, lts: Record<string, number>) => {
-    // 1) Fetch pedidos with status_api = 'Em Produção'
     const { data: pedidosEmProducao } = await supabase
       .from('pedidos')
       .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
       .eq('status_api', 'Em Produção')
       .order('criado_em', { ascending: false });
 
-    // 2) Fetch active ordens_producao (not completed/cancelled) to find complementary OPs from Loja
     const { data: todasOrdens } = await supabase
       .from('ordens_producao')
       .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp, sequencia')
       .not('status', 'in', '("CONCLUIDA","CANCELADA")');
 
-    // 3) Find pedido_ids that have active OPs but are NOT in the first query (e.g. complementary OPs from Loja)
     const emProducaoIds = new Set((pedidosEmProducao || []).map(p => p.id));
-    const opPedidoIds = [...new Set((todasOrdens || []).map(o => o.pedido_id))].filter(id => !emProducaoIds.has(id));
-
-    // For backfill: only include pedidos with complementary OPs (sequencia > 1)
-    // This prevents "Pedido Enviado" pedidos from leaking into Fila Mestre
     const complementaryOpPedidoIds = new Set<string>();
     for (const o of (todasOrdens || [])) {
       if ((o as any).sequencia > 1 && !emProducaoIds.has(o.pedido_id)) {
         complementaryOpPedidoIds.add(o.pedido_id);
       }
     }
-    // Also include pedidos that have active primary OPs and status_api = 'Em Produção'
-    // (these should already be in emProducaoIds, but just in case)
     const backfillIds = [...complementaryOpPedidoIds];
 
     let pedidosComOp: any[] = [];
@@ -186,13 +184,21 @@ export default function FilaMestre() {
     if (pedidos.length === 0) { setRows([]); setLoading(false); return; }
 
     const pedidoIds = pedidos.map(p => p.id);
-    // Re-fetch all ordens for these pedidos (including completed ones for display)
-    const { data: ordens } = await supabase
-      .from('ordens_producao')
-      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp')
-      .in('pedido_id', pedidoIds.length > 0 ? pedidoIds : ['none']);
 
-    const ordemIds = (ordens || []).map(o => o.id);
+    const [ordensRes, itensRes] = await Promise.all([
+      supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp').in('pedido_id', pedidoIds),
+      supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', pedidoIds),
+    ]);
+    const ordens = ordensRes.data || [];
+    const itensData = itensRes.data || [];
+
+    // Aggregate quantities per pedido
+    const qtdMap = new Map<string, number>();
+    for (const item of itensData) {
+      qtdMap.set(item.pedido_id, (qtdMap.get(item.pedido_id) || 0) + (item.quantidade || 0));
+    }
+
+    const ordemIds = ordens.map(o => o.id);
     const { data: etapas } = await supabase
       .from('op_etapas')
       .select('id, ordem_id, nome_etapa, operador_id, status, ordem_sequencia, usuarios(nome)')
@@ -203,7 +209,7 @@ export default function FilaMestre() {
     today.setHours(0, 0, 0, 0);
 
     const vendas: VendaRow[] = pedidos.map(p => {
-      const ordem = (ordens || []).find(o => o.pedido_id === p.id);
+      const ordem = ordens.find(o => o.pedido_id === p.id);
       const allOrdemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
       const etapaAtiva = allOrdemEtapas.find(e => e.status === 'EM_ANDAMENTO') || allOrdemEtapas.find(e => e.status === 'PENDENTE') || null;
 
@@ -215,12 +221,10 @@ export default function FilaMestre() {
         else etapaDisplay = ordem.status;
       }
 
-      // PCP calculation
       const tipoProduto = ordem?.tipo_produto || null;
       const lt = lts[tipoProduto || ''] ?? 5;
       const pcp = calcularPrazoPcp(p.data_previsao_entrega, lt, cal, new Date(today));
 
-      // Recalculate status_prazo based on delivery date
       const ATENCAO_DIAS = 3;
       let statusPrazo = 'NO_PRAZO';
       if (p.data_previsao_entrega) {
@@ -245,6 +249,7 @@ export default function FilaMestre() {
         fivelas_separadas: (p as any).fivelas_separadas || false,
         observacao_api: (p as any).observacao_api || null,
         status_prazo: statusPrazo,
+        quantidade_itens: qtdMap.get(p.id) || 0,
         dataPcpCalculada: pcp.dataPcpCalculada,
         dataInicioIdeal: pcp.dataInicioIdeal,
         atrasoDias: pcp.atrasoDias,
@@ -256,23 +261,18 @@ export default function FilaMestre() {
     setRows(vendas);
     setLoading(false);
   };
-  // Admin move order to a specific etapa
+
   const handleMoveToEtapa = async (row: VendaRow, targetEtapa: EtapaInfo) => {
     if (!profile || !['admin', 'gestor'].includes(profile.perfil)) return;
     if (!row.ordem_id) return;
-    
     const etapas = row.etapas || [];
     for (const etapa of etapas) {
       let newStatus: string;
-      if (etapa.ordem_sequencia < targetEtapa.ordem_sequencia) {
-        newStatus = 'CONCLUIDA';
-      } else if (etapa.ordem_sequencia === targetEtapa.ordem_sequencia) {
-        newStatus = 'EM_ANDAMENTO';
-      } else {
-        newStatus = 'PENDENTE';
-      }
+      if (etapa.ordem_sequencia < targetEtapa.ordem_sequencia) newStatus = 'CONCLUIDA';
+      else if (etapa.ordem_sequencia === targetEtapa.ordem_sequencia) newStatus = 'EM_ANDAMENTO';
+      else newStatus = 'PENDENTE';
       if (etapa.status !== newStatus) {
-        await supabase.from('op_etapas').update({ 
+        await supabase.from('op_etapas').update({
           status: newStatus,
           ...(newStatus === 'EM_ANDAMENTO' ? { iniciado_em: new Date().toISOString() } : {}),
           ...(newStatus === 'CONCLUIDA' ? { concluido_em: new Date().toISOString() } : {}),
@@ -335,7 +335,6 @@ export default function FilaMestre() {
     return true;
   });
 
-  // Smart sorting: 1. Priority (URGENTE first), 2. Earliest delivery, 3. Highest delay
   const prioOrder: Record<string, number> = { URGENTE: 0, ATENCAO: 1, NORMAL: 2 };
   const sorted = [...filtered].sort((a, b) => {
     const pa = prioOrder[a.prioridade] ?? 3;
@@ -347,24 +346,82 @@ export default function FilaMestre() {
     return a.atrasoDias - b.atrasoDias;
   });
 
+  // Grouping
+  const buildGroups = (items: VendaRow[]): GrupoInfo[] => {
+    const map = new Map<string, VendaRow[]>();
+    for (const r of items) {
+      let key: string;
+      if (agrupamento === 'data_entrega') {
+        key = r.data_previsao_entrega || 'SEM_DATA';
+      } else if (agrupamento === 'tipo') {
+        key = r.tipo_produto || 'SEM_TIPO';
+      } else {
+        key = r.status_atual || 'SEM_STATUS';
+      }
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+
+    const groups: GrupoInfo[] = [];
+    for (const [key, pedidos] of map.entries()) {
+      let label: string;
+      if (agrupamento === 'data_entrega') {
+        if (key === 'SEM_DATA') label = 'Sem data de entrega';
+        else {
+          try {
+            label = format(new Date(key + 'T00:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+          } catch { label = key; }
+        }
+      } else if (agrupamento === 'tipo') {
+        label = TIPO_PRODUTO_LABELS[key] || key;
+      } else {
+        label = (STATUS_PEDIDO_CONFIG[key] || {}).label || key;
+      }
+
+      groups.push({
+        key,
+        label,
+        pedidos,
+        totalPecas: pedidos.reduce((s, p) => s + p.quantidade_itens, 0),
+        totalValor: pedidos.reduce((s, p) => s + p.valor_liquido, 0),
+        urgentes: pedidos.filter(p => p.prioridade === 'URGENTE').length,
+      });
+    }
+
+    // Sort groups
+    if (agrupamento === 'data_entrega') {
+      groups.sort((a, b) => {
+        if (a.key === 'SEM_DATA') return 1;
+        if (b.key === 'SEM_DATA') return -1;
+        return a.key.localeCompare(b.key);
+      });
+    }
+
+    return groups;
+  };
+
+  const groups = buildGroups(sorted);
+
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   // Intelligence bar stats
   const tipoStats = Object.entries(leadTimes)
     .filter(([tipo]) => tipo !== 'FIVELA_COBERTA')
     .map(([tipo, lt]) => {
-    const tipoRows = rows.filter(r => r.tipo_produto === tipo);
-    const emProducao = tipoRows.filter(r => r.status_atual === 'EM_PRODUCAO').length;
-    const emFila = tipoRows.filter(r => r.status_atual === 'AGUARDANDO_PRODUCAO').length;
-    const atrasados = tipoRows.filter(r => r.prioridade === 'URGENTE');
-    const atrasoMedio = atrasados.length > 0 ? atrasados.reduce((s, r) => s + Math.abs(r.atrasoDias), 0) / atrasados.length : 0;
-    return {
-      tipo,
-      tipoLabel: TIPO_PRODUTO_LABELS[tipo] || tipo,
-      leadTime: lt,
-      emProducao,
-      emFila,
-      atrasoMedio,
-    };
-  });
+      const tipoRows = rows.filter(r => r.tipo_produto === tipo);
+      const emProducao = tipoRows.filter(r => r.status_atual === 'EM_PRODUCAO').length;
+      const emFila = tipoRows.filter(r => r.status_atual === 'AGUARDANDO_PRODUCAO').length;
+      const atrasados = tipoRows.filter(r => r.prioridade === 'URGENTE');
+      const atrasoMedio = atrasados.length > 0 ? atrasados.reduce((s, r) => s + Math.abs(r.atrasoDias), 0) / atrasados.length : 0;
+      return { tipo, tipoLabel: TIPO_PRODUTO_LABELS[tipo] || tipo, leadTime: lt, emProducao, emFila, atrasoMedio };
+    });
 
   const fmt = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const fmtDate = (d: string | null) => d ? format(new Date(d + 'T00:00:00'), 'dd/MM/yy') : '—';
@@ -375,6 +432,7 @@ export default function FilaMestre() {
   };
 
   const canEdit = profile && ['admin', 'gestor', 'supervisor_producao'].includes(profile.perfil);
+  const isAdmin = profile && ['admin', 'gestor'].includes(profile.perfil);
 
   const prioConfig: Record<string, { icon: string; color: string; label: string }> = {
     URGENTE: { icon: '🔴', color: 'bg-destructive/15 text-destructive border-destructive/30', label: 'Urgente' },
@@ -382,10 +440,167 @@ export default function FilaMestre() {
     NORMAL: { icon: '🟢', color: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30', label: 'Normal' },
   };
 
+  const renderCard = (r: VendaRow) => {
+    const tipoBadge = TIPO_PRODUTO_BADGE[r.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border';
+    const tipoLabel = TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || 'A classificar';
+    const prioCfg = prioConfig[r.prioridade];
+    const etapas = r.etapas || [];
+
+    return (
+      <Card
+        key={r.id}
+        className={`border-border/60 shadow-sm cursor-pointer hover:shadow-lg transition-all ${
+          r.prioridade === 'URGENTE' ? 'border-l-4 border-l-destructive' :
+          r.prioridade === 'ATENCAO' ? 'border-l-4 border-l-warning' :
+          'border-l-4 border-l-[hsl(var(--success))]'
+        }`}
+        onClick={() => openDetail(r.id)}
+      >
+        <CardContent className="p-0">
+          {/* Row 1: Header */}
+          <div className="px-5 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="font-bold text-base tracking-tight">{r.api_venda_id || r.numero_pedido}</span>
+              <Badge className={`text-[11px] font-semibold ${prioCfg.color}`}>{prioCfg.icon} {prioCfg.label}</Badge>
+              <Badge className={`text-[11px] font-medium ${tipoBadge}`}>{tipoLabel}</Badge>
+            </div>
+            <span className="text-base font-bold tabular-nums whitespace-nowrap text-foreground">{fmt(r.valor_liquido)}</span>
+          </div>
+
+          {/* Row 2: Client name */}
+          <div className="px-5 pb-2">
+            <p className="text-lg font-bold text-foreground truncate leading-tight">{r.cliente_nome}</p>
+          </div>
+
+          {/* Row 3: Status line */}
+          <div className="px-5 pb-3 flex items-center gap-2 flex-wrap">
+            <Badge className={`text-[11px] font-medium ${(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).color || 'bg-muted text-muted-foreground'}`}>
+              {(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual}
+            </Badge>
+            {r.status_api && (
+              <span className="text-[11px] text-muted-foreground border border-border/60 rounded px-2 py-0.5 font-medium">{r.status_api}</span>
+            )}
+            {r.ordem_status && (
+              <Badge variant="outline" className="text-[11px] font-medium">
+                OP: {r.ordem_status === 'AGUARDANDO' ? 'Aguardando' : r.ordem_status === 'EM_ANDAMENTO' ? 'Em Andamento' : r.ordem_status === 'CONCLUIDA' ? 'Concluída' : r.ordem_status}
+              </Badge>
+            )}
+            {r.operador_atual !== '—' && (
+              <span className="text-[11px] text-muted-foreground ml-auto">👤 {r.operador_atual}</span>
+            )}
+          </div>
+
+          {/* Row 4: Dates grid */}
+          <div className="px-5 pb-3">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 p-3 rounded-lg bg-muted/40 border border-border/30">
+              <DateCell label="Venda" value={fmtDate(r.data_venda_api)} />
+              <DateCell label="Entrega" value={fmtDate(r.data_previsao_entrega)} highlight />
+              <DateCell label="Início Ideal" value={fmtDate(r.dataInicioIdeal)} />
+              <DateCell label="Início PCP" value={fmtDateTime(r.data_inicio_pcp)} />
+              <DateCell label="Fim PCP" value={fmtDateTime(r.data_fim_pcp)} />
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Atraso</span>
+                <span className={`text-sm font-bold tabular-nums mt-0.5 ${
+                  r.atrasoDias < 0 ? 'text-destructive' :
+                  r.atrasoDias <= 2 ? 'text-warning' :
+                  'text-foreground'
+                }`}>
+                  {r.atrasoDias}d
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 5: Current stage */}
+          <div className="px-5 pb-2 flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Etapa atual</span>
+            <span className="text-sm font-bold text-primary">{r.etapa_atual}</span>
+            {r.is_piloto && (
+              <Badge className={`text-[10px] ${r.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
+                {r.status_piloto === 'REPROVADO' ? 'PILOTO ✗' : 'PILOTO'}
+              </Badge>
+            )}
+            {r.fivelas_separadas && (
+              <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
+                Fivelas ✓
+              </Badge>
+            )}
+            {r.observacao_api?.includes('[IMPORTADO SEM DATA PREVISTA]') && (
+              <Badge className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">📋 Sem data prevista</Badge>
+            )}
+          </div>
+
+          {/* Row 6: Progress trail */}
+          {etapas.length > 0 && (
+            <div className="px-5 pb-4 pt-1">
+              <TooltipProvider delayDuration={200}>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {etapas.map((etapa) => {
+                    const isConcluida = etapa.status === 'CONCLUIDA';
+                    const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
+                    return (
+                      <Tooltip key={etapa.id}>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all ${
+                              isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+                            } ${
+                              isConcluida ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]' :
+                              isEmAndamento ? 'bg-primary/15 text-primary font-bold ring-1 ring-primary/40' :
+                              'bg-muted/60 text-muted-foreground'
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isAdmin) handleMoveToEtapa(r, etapa);
+                            }}
+                          >
+                            {isConcluida && <CheckCircle2 className="h-3 w-3" />}
+                            <span className="truncate max-w-[80px]">{etapa.nome_etapa}</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          <p className="font-medium">{etapa.nome_etapa}</p>
+                          <p className="text-muted-foreground">{isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}</p>
+                          {isAdmin && <p className="text-primary mt-0.5">Clique para mover</p>}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all ${
+                          isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+                        } ${
+                          r.ordem_status === 'CONCLUIDA' ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] font-bold' : 'bg-muted/60 text-muted-foreground'
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isAdmin) handleMoveToConcluido(r);
+                        }}
+                      >
+                        {r.ordem_status === 'CONCLUIDA' && <CheckCircle2 className="h-3 w-3" />}
+                        <span>Concluído</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <p className="font-medium">Concluído</p>
+                      {isAdmin && <p className="text-primary mt-0.5">Clique para concluir</p>}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Fila Mestre</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Fila Mestre</h1>
         <div className="flex gap-2">
           {canEdit && (
             <Button variant="outline" onClick={() => setConfigOpen(true)}>
@@ -398,14 +613,13 @@ export default function FilaMestre() {
         </div>
       </div>
 
-      {/* Intelligence Bar */}
       <PcpIntelligenceBar stats={tipoStats} />
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         <div className="relative flex-1 min-w-[180px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
+          <Input className="pl-9" placeholder="Buscar pedido, cliente..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={tipoFilter} onValueChange={setTipoFilter}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
@@ -434,176 +648,81 @@ export default function FilaMestre() {
             <SelectItem value="FUTURO">Futuros</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="h-6 w-px bg-border mx-1" />
+
+        <div className="flex items-center gap-1.5">
+          <Layers className="h-4 w-4 text-muted-foreground" />
+          <Select value={agrupamento} onValueChange={(v) => setAgrupamento(v as AgrupamentoType)}>
+            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="data_entrega">Agrupar por Data de Entrega</SelectItem>
+              <SelectItem value="tipo">Agrupar por Tipo</SelectItem>
+              <SelectItem value="status">Agrupar por Status</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Summary */}
       <div className="flex gap-3 flex-wrap text-sm">
-        <Badge variant="outline" className="text-sm py-1 px-3">{sorted.length} pedidos</Badge>
-        <Badge className="bg-destructive/15 text-destructive border-destructive/30 py-1 px-3">
+        <Badge variant="outline" className="text-sm py-1 px-3 font-semibold">{sorted.length} pedidos</Badge>
+        <Badge className="bg-destructive/15 text-destructive border-destructive/30 py-1 px-3 font-semibold">
           {sorted.filter(r => r.prioridade === 'URGENTE').length} urgentes
         </Badge>
-        <Badge className="bg-warning/15 text-warning border-warning/30 py-1 px-3">
+        <Badge className="bg-warning/15 text-warning border-warning/30 py-1 px-3 font-semibold">
           {sorted.filter(r => r.prioridade === 'ATENCAO').length} atenção
         </Badge>
       </div>
 
-      {/* Grid */}
+      {/* Content */}
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       ) : sorted.length === 0 ? (
         <p className="text-center py-12 text-muted-foreground text-sm">Nenhum pedido encontrado.</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {sorted.map(r => {
-            const prazoCfg = STATUS_PRAZO_CONFIG[r.status_prazo || 'NO_PRAZO'];
-            const tipoBadge = TIPO_PRODUTO_BADGE[r.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border';
-            const tipoLabel = TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || 'A classificar';
-            const prioCfg = prioConfig[r.prioridade];
-            const isAdmin = profile && ['admin', 'gestor'].includes(profile.perfil);
-            const etapas = r.etapas || [];
+        <div className="flex flex-col gap-5">
+          {groups.map(group => {
+            const isCollapsed = collapsedGroups.has(group.key);
+            const hasUrgent = group.urgentes > 0;
 
             return (
-              <Card
-                key={r.id}
-                className={`border-border/60 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${r.prioridade === 'URGENTE' ? 'border-destructive/40' : ''}`}
-                onClick={() => openDetail(r.id)}
-              >
-                {/* Header */}
-                <div className={`px-4 py-2.5 border-b flex items-center justify-between ${
-                  r.prioridade === 'URGENTE' ? 'bg-destructive/10' :
-                  r.prioridade === 'ATENCAO' ? 'bg-warning/10' :
-                  'bg-muted/30'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <span>{prazoCfg?.icon}</span>
-                    <span className="font-semibold text-sm">{r.api_venda_id || r.numero_pedido}</span>
-                    <Badge className={`text-[10px] font-normal ${prioCfg.color}`}>{prioCfg.label}</Badge>
+              <div key={group.key} className="space-y-2">
+                {/* Group header */}
+                <button
+                  onClick={() => toggleGroup(group.key)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors text-left ${
+                    hasUrgent
+                      ? 'bg-destructive/5 border-destructive/30 hover:bg-destructive/10'
+                      : 'bg-muted/50 border-border/60 hover:bg-muted/80'
+                  }`}
+                >
+                  {isCollapsed ? <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" /> : <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-base font-bold capitalize">{group.label}</span>
                   </div>
-                  <Badge className={`text-[10px] font-normal ${tipoBadge}`}>{tipoLabel}</Badge>
-                </div>
-
-                <CardContent className="p-4 space-y-3">
-                  {/* Client & Value */}
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium truncate">{r.cliente_nome}</p>
-                    <span className="text-sm font-semibold tabular-nums whitespace-nowrap">{fmt(r.valor_liquido)}</span>
-                  </div>
-
-                  {/* Status & Operador */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge className={`text-[10px] font-normal ${(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).color || 'bg-muted text-muted-foreground'}`}>
-                      {(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual}
-                    </Badge>
-                    {r.operador_atual !== '—' && (
-                      <span className="text-xs text-muted-foreground">👤 {r.operador_atual}</span>
-                    )}
-                    {r.status_api && (
-                      <span className="text-[10px] text-muted-foreground border border-border/60 rounded px-1.5 py-0.5">{r.status_api}</span>
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground shrink-0">
+                    <span className="font-semibold text-foreground">{group.pedidos.length} pedido{group.pedidos.length !== 1 ? 's' : ''}</span>
+                    <span>·</span>
+                    <span>{group.totalPecas} peças</span>
+                    <span>·</span>
+                    <span className="font-semibold text-foreground tabular-nums">{fmt(group.totalValor)}</span>
+                    {group.urgentes > 0 && (
+                      <>
+                        <span>·</span>
+                        <span className="text-destructive font-bold">{group.urgentes} urgente{group.urgentes !== 1 ? 's' : ''}</span>
+                      </>
                     )}
                   </div>
+                </button>
 
-                  {/* Dates grid */}
-                  <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-xs">
-                    <div className="text-muted-foreground">Venda: <span className="text-foreground">{fmtDate(r.data_venda_api)}</span></div>
-                    <div className="text-muted-foreground">Entrega: <span className="text-foreground font-medium">{fmtDate(r.data_previsao_entrega)}</span></div>
-                    <div className="text-muted-foreground">Início Ideal: <span className="text-foreground">{fmtDate(r.dataInicioIdeal)}</span></div>
-                    <div className="text-muted-foreground">Início PCP: <span className="text-foreground">{fmtDateTime(r.data_inicio_pcp)}</span></div>
-                    <div className="text-muted-foreground">Fim PCP: <span className="text-foreground">{fmtDateTime(r.data_fim_pcp)}</span></div>
-                    <div className="text-muted-foreground">Atraso: {
-                      r.atrasoDias < 0 ? <span className="text-destructive font-semibold">{r.atrasoDias}d</span> :
-                      r.atrasoDias <= 2 ? <span className="text-warning font-semibold">{r.atrasoDias}d</span> :
-                      <span className="text-foreground">{r.atrasoDias}d</span>
-                    }</div>
+                {/* Group items */}
+                {!isCollapsed && (
+                  <div className="flex flex-col gap-3 pl-2">
+                    {group.pedidos.map(renderCard)}
                   </div>
-
-                  {/* Etapa + badges */}
-                  <div className="flex items-center gap-1.5 flex-wrap border-t border-border/40 pt-2">
-                    <span className="text-xs text-muted-foreground">Etapa:</span>
-                    <span className="text-xs font-semibold">{r.etapa_atual}</span>
-                    {r.is_piloto && (
-                      <Badge className={`text-[10px] ${r.status_piloto === 'REPROVADO' ? 'bg-destructive/15 text-destructive border-destructive/30' : 'bg-purple-500/15 text-purple-600 border-purple-500/30'}`}>
-                        {r.status_piloto === 'REPROVADO' ? 'PILOTO ✗' : 'PILOTO'}
-                      </Badge>
-                    )}
-                    {r.fivelas_separadas && (
-                      <Badge className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">
-                        Fivelas ✓
-                      </Badge>
-                    )}
-                    {r.observacao_api?.includes('[IMPORTADO SEM DATA PREVISTA]') && (
-                      <Badge className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">
-                        📋 Sem data prevista
-                      </Badge>
-                    )}
-                    {r.ordem_status && (
-                      <Badge variant="outline" className="text-[10px] font-normal ml-auto">
-                        OP: {r.ordem_status === 'AGUARDANDO' ? 'Aguardando' : r.ordem_status === 'EM_ANDAMENTO' ? 'Em Andamento' : r.ordem_status === 'CONCLUIDA' ? 'Concluída' : r.ordem_status}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Progress bar */}
-                  {etapas.length > 0 && (
-                    <TooltipProvider delayDuration={200}>
-                      <div className="flex items-center gap-0.5 flex-wrap">
-                        {etapas.map((etapa) => {
-                          const isConcluida = etapa.status === 'CONCLUIDA';
-                          const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
-                          return (
-                            <Tooltip key={etapa.id}>
-                              <TooltipTrigger asChild>
-                                <button
-                                  className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-all ${
-                                    isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
-                                  } ${
-                                    isConcluida ? 'bg-green-100 text-green-700' :
-                                    isEmAndamento ? 'bg-primary/15 text-primary font-semibold ring-1 ring-primary/30' :
-                                    'bg-muted/60 text-muted-foreground'
-                                  }`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (isAdmin) handleMoveToEtapa(r, etapa);
-                                  }}
-                                >
-                                  {isConcluida && <CheckCircle2 className="h-2.5 w-2.5" />}
-                                  <span className="truncate max-w-[60px]">{etapa.nome_etapa}</span>
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="text-xs">
-                                <p className="font-medium">{etapa.nome_etapa}</p>
-                                <p className="text-muted-foreground">{isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}</p>
-                                {isAdmin && <p className="text-primary mt-0.5">Clique para mover</p>}
-                              </TooltipContent>
-                            </Tooltip>
-                          );
-                        })}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-all ${
-                                isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
-                              } ${
-                                r.ordem_status === 'CONCLUIDA' ? 'bg-green-100 text-green-700 font-semibold' : 'bg-muted/60 text-muted-foreground'
-                              }`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (isAdmin) handleMoveToConcluido(r);
-                              }}
-                            >
-                              {r.ordem_status === 'CONCLUIDA' && <CheckCircle2 className="h-2.5 w-2.5" />}
-                              <span>Concluído</span>
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="text-xs">
-                            <p className="font-medium">Concluído</p>
-                            {isAdmin && <p className="text-primary mt-0.5">Clique para concluir</p>}
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </TooltipProvider>
-                  )}
-                </CardContent>
-              </Card>
+                )}
+              </div>
             );
           })}
         </div>
@@ -791,8 +910,17 @@ export default function FilaMestre() {
         </SheetContent>
       </Sheet>
 
-      {/* Config Dialog */}
       <ConfigurarPcpDialog open={configOpen} onOpenChange={setConfigOpen} onSaved={fetchAll} />
+    </div>
+  );
+}
+
+/** Small helper component for the date grid cells */
+function DateCell({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{label}</span>
+      <span className={`text-sm tabular-nums mt-0.5 ${highlight ? 'font-bold text-foreground' : 'text-foreground'}`}>{value}</span>
     </div>
   );
 }
