@@ -459,7 +459,7 @@ export default function KanbanProducao() {
       const { data } = await supabase
         .from('ordens_producao')
         .select('tipo_produto')
-        .eq('status', 'CONCLUIDA')
+        .not('data_fim_pcp', 'is', null)
         .neq('tipo_produto', 'OUTROS')
         .gte('data_fim_pcp', startOfDay)
         .lte('data_fim_pcp', endOfDay);
