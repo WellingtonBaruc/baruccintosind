@@ -148,8 +148,9 @@ export default function KanbanProducao() {
 
   // KPI: vendas concluídas com filtro de data
   const [kpiConcluidasDate, setKpiConcluidasDate] = useState(hojeBrasilia());
-  const [kpiConcluidasCount, setKpiConcluidasCount] = useState(0);
+  const [kpiConcluidasPorTipo, setKpiConcluidasPorTipo] = useState<Record<string, number>>({});
   const [kpiConcluidasLoading, setKpiConcluidasLoading] = useState(false);
+  const kpiConcluidasTotal = Object.values(kpiConcluidasPorTipo).reduce((s, v) => s + v, 0);
 
   // Obs para Corte
   const [obsCorteModal, setObsCorteModal] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean }>({ open: false, card: null, items: [], loading: false });
@@ -448,21 +449,26 @@ export default function KanbanProducao() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch KPI vendas concluídas por data
+  // Fetch KPI vendas concluídas por data (breakdown por tipo)
   useEffect(() => {
     const fetchConcluidas = async () => {
       if (!kpiConcluidasDate) return;
       setKpiConcluidasLoading(true);
       const startOfDay = kpiConcluidasDate + 'T00:00:00-03:00';
       const endOfDay = kpiConcluidasDate + 'T23:59:59-03:00';
-      const { count } = await supabase
+      const { data } = await supabase
         .from('ordens_producao')
-        .select('id', { count: 'exact', head: true })
+        .select('tipo_produto')
         .eq('status', 'CONCLUIDA')
         .neq('tipo_produto', 'OUTROS')
         .gte('data_fim_pcp', startOfDay)
         .lte('data_fim_pcp', endOfDay);
-      setKpiConcluidasCount(count || 0);
+      const byTipo: Record<string, number> = {};
+      (data || []).forEach(r => {
+        const tp = r.tipo_produto || 'OUTROS';
+        byTipo[tp] = (byTipo[tp] || 0) + 1;
+      });
+      setKpiConcluidasPorTipo(byTipo);
       setKpiConcluidasLoading(false);
     };
     fetchConcluidas();
@@ -1126,8 +1132,18 @@ export default function KanbanProducao() {
             <CheckCircle2 className="h-3.5 w-3.5 text-[hsl(var(--success))]" />
             <span className="text-xs font-medium text-muted-foreground">Concluídas</span>
             <span className="text-lg font-bold tabular-nums text-[hsl(var(--success))]">
-              {kpiConcluidasLoading ? '…' : kpiConcluidasCount}
+              {kpiConcluidasLoading ? '…' : kpiConcluidasTotal}
             </span>
+            {!kpiConcluidasLoading && kpiConcluidasTotal > 0 && (
+              <span className="text-[10px] text-muted-foreground ml-1 flex items-center gap-1.5">
+                {Object.entries(kpiConcluidasPorTipo).map(([tipo, count]) => (
+                  <span key={tipo} className="inline-flex items-center gap-0.5">
+                    <span className="font-semibold text-foreground">{count}</span>
+                    <span>{TIPO_PRODUTO_LABELS[tipo] || tipo}</span>
+                  </span>
+                ))}
+              </span>
+            )}
           </div>
           <Input
             type="date"
