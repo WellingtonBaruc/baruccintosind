@@ -1,37 +1,22 @@
 
 
-# Correção: Comercial não consegue finalizar venda (página em branco)
+## Fix: Hide duplicate "OUTROS" OPs when main OP exists
 
-## Causa raiz identificada
+### Problem
+Sales 3103921 and 3103964 each have two production orders:
+- 3103921: OP seq1 = TECIDO + OP seq2 = OUTROS
+- 3103964: OP seq1 = SINTETICO + OP seq2 = OUTROS
 
-As políticas de segurança (RLS) das tabelas `pedidos`, `pedido_itens`, `ordens_producao` e `op_etapas` só permitem INSERT para `admin` e `gestor`. Quando um usuário com perfil `comercial` tenta criar uma venda na tela "Nova Venda" (`/comercial/nova-venda`), o INSERT falha silenciosamente com violação de RLS, causando erro e potencialmente uma página em branco.
+The current deduplication only merges cards with the **same** `pedido_id + tipo_produto`. Since OUTROS is a different type, both cards appear as separate entries, looking like duplicates.
 
-**Evidência**: A página `NovaVendaComercial.tsx` permite acesso ao perfil `comercial` (linha 109), mas as tabelas não permitem que ele insira dados.
+### Solution
+In `src/pages/KanbanProducao.tsx`, after the existing deduplication logic, add a rule: if a pedido has an "OUTROS" OP **and** also has a main OP (SINTETICO, TECIDO, or FIVELA_COBERTA), hide the "OUTROS" card. The "OUTROS" OP is typically a secondary/accessory item that should not appear as a separate card.
 
-## Plano de correção
+### Technical Change
+**File: `src/pages/KanbanProducao.tsx`** (~lines 388-400)
 
-### 1. Atualizar RLS — permitir INSERT do perfil comercial (migração SQL)
+In the `filteredCards` filter function, add a condition:
+- For cards with `tipo_produto === 'OUTROS'`, check if the same `pedido_id` has another OP with a non-OUTROS type. If so, exclude the OUTROS card.
 
-Adicionar `comercial` às políticas de INSERT das 4 tabelas envolvidas na criação de venda:
-
-- **pedidos**: `Admin/gestor can insert pedidos` → adicionar `'comercial'`
-- **pedido_itens**: `Admin/gestor can insert pedido_itens` → adicionar `'comercial'`
-- **ordens_producao**: `Admin/gestor can insert ordens` → adicionar `'comercial'`
-- **op_etapas**: `Admin/gestor can insert op_etapas` → adicionar `'comercial'`
-
-### 2. Adicionar tratamento de erro no `handleCiente` (KanbanVenda.tsx)
-
-A função `handleCiente` (linha 268) não tem try/catch nem verificação de erro. Adicionar tratamento para evitar falhas silenciosas.
-
-### 3. Adicionar tratamento de erro robusto no `NovaVendaComercial.tsx`
-
-Melhorar o catch block para mostrar mensagens mais claras quando ocorre erro de permissão, evitando que o usuário fique perdido.
-
-## Detalhes técnicos
-
-**Migração SQL** — 4 políticas atualizadas com `DROP POLICY` + `CREATE POLICY` incluindo `'comercial'` no array de perfis permitidos.
-
-**Arquivos editados**:
-- `src/pages/KanbanVenda.tsx` — error handling no `handleCiente`
-- `src/pages/NovaVendaComercial.tsx` — melhorar mensagens de erro
+This is a ~5-line addition inside the existing filter block.
 
