@@ -504,10 +504,11 @@ async function inserirNovoPedido(
     tiposProduto.add(classificarProduto(item.nm_produto || '', item.nm_categoria || '', item.nm_referencia || ''));
   }
 
-  // Calculate max lead time across all types
+  // Calculate max lead time across production types only (exclude OUTROS)
   if (dataPrevisao && tipoFluxo === 'PRODUCAO') {
     let maxLeadTime = 0;
     for (const tp of tiposProduto) {
+      if (tp === 'OUTROS') continue; // Adicionais não entram no cálculo de lead time
       const lt = leadTimeMap[tp] || 2;
       if (lt > maxLeadTime) maxLeadTime = lt;
     }
@@ -591,6 +592,9 @@ async function inserirNovoPedido(
 
     let sequencia = 1;
     for (const [tipoProduto, _tipoItens] of Object.entries(itensByTipo)) {
+      // Adicionais (OUTROS) não geram OP
+      if (tipoProduto === 'OUTROS') continue;
+
       const pipelineId = PIPELINE_IDS[tipoProduto] || PIPELINE_IDS['SINTETICO'];
       const etapas = pipelineEtapasMap[tipoProduto] || pipelineEtapasMap['SINTETICO'] || [];
 
