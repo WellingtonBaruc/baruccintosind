@@ -337,6 +337,13 @@ export default function FilaMestre() {
     fetchAll();
   };
 
+  const saveEntregaAjustada = async (pedidoId: string, date: Date | undefined) => {
+    const value = date ? format(date, 'yyyy-MM-dd') : null;
+    await supabase.from('pedidos').update({ data_entrega_ajustada_pcp: value } as any).eq('id', pedidoId);
+    toast.success(value ? `Entrega ajustada para ${format(date!, 'dd/MM/yy')}` : 'Entrega ajustada removida');
+    fetchAll();
+  };
+
   // Filters
   const filtered = rows.filter(r => {
     if (search && !r.cliente_nome.toLowerCase().includes(search.toLowerCase()) && !r.numero_pedido.toLowerCase().includes(search.toLowerCase()) && !(r.api_venda_id || '').toLowerCase().includes(search.toLowerCase())) return false;
@@ -365,7 +372,7 @@ export default function FilaMestre() {
     for (const r of items) {
       let key: string;
       if (agrupamento === 'data_entrega') {
-        key = r.data_previsao_entrega || 'SEM_DATA';
+        key = r.dataEntregaEfetiva || 'SEM_DATA';
       } else if (agrupamento === 'tipo') {
         key = r.tipo_produto || 'SEM_TIPO';
       } else {
