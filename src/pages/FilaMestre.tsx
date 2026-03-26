@@ -88,6 +88,12 @@ interface GrupoInfo {
   totalPecas: number;
   totalValor: number;
   urgentes: number;
+  sinteticoCount: number;
+  sinteticoPecas: number;
+  tecidoCount: number;
+  tecidoPecas: number;
+  outrosCount: number;
+  outrosPecas: number;
 }
 
 export default function FilaMestre() {
