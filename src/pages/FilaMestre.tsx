@@ -17,10 +17,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -97,6 +100,8 @@ export default function FilaMestre() {
   const [configOpen, setConfigOpen] = useState(false);
   const [agrupamento, setAgrupamento] = useState<AgrupamentoType>('data_entrega');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [exportDateFrom, setExportDateFrom] = useState<Date | undefined>();
+  const [exportDateTo, setExportDateTo] = useState<Date | undefined>();
 
   const [calendarData, setCalendarData] = useState<PcpCalendarData>({ sabadoAtivo: false, domingoAtivo: false, feriados: [], pausas: [] });
   const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
@@ -484,6 +489,91 @@ export default function FilaMestre() {
     doc.save(`fila_mestre_${group.key.replace(/\s/g, '_')}.pdf`);
     toast.success('PDF exportado com sucesso');
   };
+
+  const getFilteredByDate = () => {
+    let items = sorted;
+    if (exportDateFrom) {
+      const from = format(exportDateFrom, 'yyyy-MM-dd');
+      items = items.filter(r => (r.data_previsao_entrega || '') >= from);
+    }
+    if (exportDateTo) {
+      const to = format(exportDateTo, 'yyyy-MM-dd');
+      items = items.filter(r => (r.data_previsao_entrega || '') <= to);
+    }
+    return items;
+  };
+
+  const exportAllToExcel = () => {
+    const items = getFilteredByDate();
+    if (!items.length) { toast.error('Nenhum pedido para exportar'); return; }
+    const data = items.map(r => ({
+      'Venda': r.api_venda_id || r.numero_pedido,
+      'Cliente': r.cliente_nome,
+      'Tipo': TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || 'A classificar',
+      'Status': (STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual,
+      'Valor': r.valor_liquido,
+      'Qtd Itens': r.quantidade_itens,
+      'Data Venda': r.data_venda_api || '',
+      'Entrega': r.data_previsao_entrega || '',
+      'Início Ideal': r.dataInicioIdeal || '',
+      'Início PCP': r.data_inicio_pcp || '',
+      'Fim PCP': r.data_fim_pcp || '',
+      'Atraso (dias)': r.atrasoDias,
+      'Prioridade': r.prioridade,
+      'Etapa Atual': r.etapa_atual,
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Fila Mestre');
+    const suffix = exportDateFrom || exportDateTo
+      ? `_${exportDateFrom ? format(exportDateFrom, 'ddMMyy') : ''}${exportDateTo ? '_a_' + format(exportDateTo, 'ddMMyy') : ''}`
+      : '_geral';
+    XLSX.writeFile(wb, `fila_mestre${suffix}.xlsx`);
+    toast.success(`Excel exportado — ${items.length} pedidos`);
+  };
+
+  const exportAllToPdf = () => {
+    const items = getFilteredByDate();
+    if (!items.length) { toast.error('Nenhum pedido para exportar'); return; }
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const totalVal = items.reduce((s, r) => s + r.valor_liquido, 0);
+    const totalPecas = items.reduce((s, r) => s + r.quantidade_itens, 0);
+    const urgentes = items.filter(r => r.prioridade === 'URGENTE').length;
+    const rangeLabel = exportDateFrom || exportDateTo
+      ? `${exportDateFrom ? format(exportDateFrom, 'dd/MM/yy') : '...'} até ${exportDateTo ? format(exportDateTo, 'dd/MM/yy') : '...'}`
+      : 'Geral';
+    doc.setFontSize(14);
+    doc.text(`Fila Mestre — ${rangeLabel}`, 14, 15);
+    doc.setFontSize(9);
+    doc.text(`${items.length} pedidos · ${totalPecas} peças · ${fmt(totalVal)} · ${urgentes} urgente(s)`, 14, 22);
+
+    const head = [['Venda', 'Cliente', 'Tipo', 'Status', 'Valor', 'Entrega', 'Atraso', 'Etapa Atual']];
+    const body = items.map(r => [
+      r.api_venda_id || r.numero_pedido,
+      r.cliente_nome,
+      TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || '—',
+      (STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual,
+      fmt(r.valor_liquido),
+      fmtDate(r.data_previsao_entrega),
+      `${r.atrasoDias}d`,
+      r.etapa_atual,
+    ]);
+
+    autoTable(doc, {
+      startY: 26,
+      head,
+      body,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [51, 51, 51], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    const suffix = exportDateFrom || exportDateTo
+      ? `_${exportDateFrom ? format(exportDateFrom, 'ddMMyy') : ''}${exportDateTo ? '_a_' + format(exportDateTo, 'ddMMyy') : ''}`
+      : '_geral';
+    doc.save(`fila_mestre${suffix}.pdf`);
+    toast.success(`PDF exportado — ${items.length} pedidos`);
+  };
   const fmtDateTime = (d: string | null) => {
     if (!d) return '—';
     const date = new Date(d);
@@ -723,8 +813,8 @@ export default function FilaMestre() {
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="flex gap-3 flex-wrap text-sm">
+      {/* Summary + Global Export */}
+      <div className="flex items-center gap-3 flex-wrap text-sm">
         <Badge variant="outline" className="text-sm py-1 px-3 font-semibold">{sorted.length} pedidos</Badge>
         <Badge className="bg-destructive/15 text-destructive border-destructive/30 py-1 px-3 font-semibold">
           {sorted.filter(r => r.prioridade === 'URGENTE').length} urgentes
@@ -732,6 +822,50 @@ export default function FilaMestre() {
         <Badge className="bg-warning/15 text-warning border-warning/30 py-1 px-3 font-semibold">
           {sorted.filter(r => r.prioridade === 'ATENCAO').length} atenção
         </Badge>
+
+        <div className="h-6 w-px bg-border mx-1" />
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Download className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-semibold text-muted-foreground">Exportar:</span>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {exportDateFrom ? format(exportDateFrom, 'dd/MM/yy') : 'De'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarPicker mode="single" selected={exportDateFrom} onSelect={setExportDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {exportDateTo ? format(exportDateTo, 'dd/MM/yy') : 'Até'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarPicker mode="single" selected={exportDateTo} onSelect={setExportDateTo} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+
+          {(exportDateFrom || exportDateTo) && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setExportDateFrom(undefined); setExportDateTo(undefined); }}>
+              Limpar
+            </Button>
+          )}
+
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportAllToExcel}>
+            <FileSpreadsheet className="h-3.5 w-3.5 text-[hsl(var(--success))]" /> Excel
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportAllToPdf}>
+            <FileText className="h-3.5 w-3.5 text-destructive" /> PDF
+          </Button>
+        </div>
       </div>
 
       {/* Content */}
