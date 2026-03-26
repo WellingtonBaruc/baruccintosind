@@ -949,10 +949,25 @@ export default function FilaMestre() {
                   <div className="flex-1 min-w-0">
                     <span className="text-base font-bold capitalize">{group.label}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground shrink-0">
+                   <div className="flex items-center gap-3 text-sm text-muted-foreground shrink-0 flex-wrap">
                     <span className="font-semibold text-foreground">{group.pedidos.length} pedido{group.pedidos.length !== 1 ? 's' : ''}</span>
                     <span>·</span>
-                    <span>{group.totalPecas} peças</span>
+                    <span>{group.totalPecas} pç</span>
+                    {group.sinteticoCount > 0 && (
+                      <span className="text-[11px] bg-blue-500/15 text-blue-600 border border-blue-500/30 rounded px-1.5 py-0.5 font-semibold">
+                        Sint: {group.sinteticoCount}v · {group.sinteticoPecas}pç
+                      </span>
+                    )}
+                    {group.tecidoCount > 0 && (
+                      <span className="text-[11px] bg-amber-500/15 text-amber-600 border border-amber-500/30 rounded px-1.5 py-0.5 font-semibold">
+                        Tec: {group.tecidoCount}v · {group.tecidoPecas}pç
+                      </span>
+                    )}
+                    {group.outrosCount > 0 && (
+                      <span className="text-[11px] bg-muted text-muted-foreground border border-border rounded px-1.5 py-0.5 font-semibold">
+                        Outros: {group.outrosCount}v · {group.outrosPecas}pç
+                      </span>
+                    )}
                     <span>·</span>
                     <span className="font-semibold text-foreground tabular-nums">{fmt(group.totalValor)}</span>
                     {group.urgentes > 0 && (
