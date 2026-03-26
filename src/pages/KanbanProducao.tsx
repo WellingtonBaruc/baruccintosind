@@ -390,8 +390,14 @@ export default function KanbanProducao() {
       const best = bestByPedidoTipo.get(key);
       if (best && best.id !== c.id) return false;
 
-      // Also hide CONCLUIDA when another tipo for same pedido is still active
+      // Hide "OUTROS" card when same pedido has a main OP (SINTETICO/TECIDO/FIVELA_COBERTA)
       const group = pedidoGroups.get(c.pedido_id);
+      if (c.tipo_produto === 'OUTROS' && group && group.length > 1) {
+        const hasMainOp = group.some(g => g.id !== c.id && g.tipo_produto !== 'OUTROS');
+        if (hasMainOp) return false;
+      }
+
+      // Also hide CONCLUIDA when another tipo for same pedido is still active
       if (group && group.length > 1 && c.ordem_status === 'CONCLUIDA') {
         const hasActiveOp = group.some(g => g.id !== c.id && g.ordem_status !== 'CONCLUIDA');
         if (hasActiveOp) return false;
