@@ -1,51 +1,37 @@
 
 
-# Investigacao: Vendas "Em Producao" faltando no sistema
+# Correção: Comercial não consegue finalizar venda (página em branco)
 
-## Diagnostico
+## Causa raiz identificada
 
-### O que o banco de dados tem
+As políticas de segurança (RLS) das tabelas `pedidos`, `pedido_itens`, `ordens_producao` e `op_etapas` só permitem INSERT para `admin` e `gestor`. Quando um usuário com perfil `comercial` tenta criar uma venda na tela "Nova Venda" (`/comercial/nova-venda`), o INSERT falha silenciosamente com violação de RLS, causando erro e potencialmente uma página em branco.
 
-O banco tem **20 pedidos** com `status_atual = EM_PRODUCAO` e `status_api = 'Em Produção'`, mais 1 pedido (3085410/PED-00143) que ja avancou para `AGUARDANDO_FINANCEIRO`.
+**Evidência**: A página `NovaVendaComercial.tsx` permite acesso ao perfil `comercial` (linha 109), mas as tabelas não permitem que ele insira dados.
 
-**Todos os 20 pedidos EM_PRODUCAO tem OPs e etapas criadas corretamente.**
+## Plano de correção
 
-### Venda faltando: 3080376
+### 1. Atualizar RLS — permitir INSERT do perfil comercial (migração SQL)
 
-A venda **3080376** (data 09/03/2026) **nao existe no banco de dados**. Ela nunca foi importada porque:
+Adicionar `comercial` às políticas de INSERT das 4 tabelas envolvidas na criação de venda:
 
-- A sincronizacao automatica (`sync-simplifica`) usa janela de **2 dias** para sincronizacoes subsequentes
-- Na primeira sincronizacao, usa **15 dias**
-- A venda 3080376 e de 09/03, que ja estava fora da janela quando o sistema comecou a sincronizar
+- **pedidos**: `Admin/gestor can insert pedidos` → adicionar `'comercial'`
+- **pedido_itens**: `Admin/gestor can insert pedido_itens` → adicionar `'comercial'`
+- **ordens_producao**: `Admin/gestor can insert ordens` → adicionar `'comercial'`
+- **op_etapas**: `Admin/gestor can insert op_etapas` → adicionar `'comercial'`
 
-### Por que o Kanban mostra menos que 20
+### 2. Adicionar tratamento de erro no `handleCiente` (KanbanVenda.tsx)
 
-O Kanban tem um **filtro por tipo de produto** (`filterTipo`). Se voce selecionou "Sintetico" ou "Tecido", ele esconde os outros tipos. Alem disso, a logica de deduplicacao esconde OPs concluidas quando o mesmo pedido tem outra OP ativa.
+A função `handleCiente` (linha 268) não tem try/catch nem verificação de erro. Adicionar tratamento para evitar falhas silenciosas.
 
-## Plano de Correcao
+### 3. Adicionar tratamento de erro robusto no `NovaVendaComercial.tsx`
 
-### 1. Importar a venda 3080376 (e outras antigas)
+Melhorar o catch block para mostrar mensagens mais claras quando ocorre erro de permissão, evitando que o usuário fique perdido.
 
-Adicionar um parametro opcional `dias_override` na funcao `sync-simplifica` para permitir uma sincronizacao com janela maior (ex: 30 dias). Isso permite importar vendas antigas sem alterar o comportamento normal.
+## Detalhes técnicos
 
-**Arquivo:** `supabase/functions/sync-simplifica/index.ts`
-- Aceitar `{ dias_override: 30 }` no body da requisicao
-- Usar esse valor no lugar do `diasImportacao` padrao de 2 dias
+**Migração SQL** — 4 políticas atualizadas com `DROP POLICY` + `CREATE POLICY` incluindo `'comercial'` no array de perfis permitidos.
 
-### 2. Adicionar botao "Sincronizar Historico" na tela de Integracao
-
-**Arquivo:** `src/pages/Integracao.tsx`
-- Adicionar botao que chama `sync-simplifica` com `dias_override: 30`
-- Permite ao usuario importar vendas antigas manualmente
-
-### 3. Verificar filtro do Kanban
-
-Nenhuma mudanca de codigo necessaria. Verifique se o filtro de tipo no topo do Kanban esta em "Todos" e nao em um tipo especifico.
-
-## Resumo
-
-| Problema | Causa | Solucao |
-|----------|-------|---------|
-| Venda 3080376 nao aparece | Fora da janela de sync (2 dias) | Sync com janela expandida |
-| Kanban mostra 15 e nao 20 | Filtro de tipo ativo ou dedup de OPs | Verificar filtro "Todos" |
+**Arquivos editados**:
+- `src/pages/KanbanVenda.tsx` — error handling no `handleCiente`
+- `src/pages/NovaVendaComercial.tsx` — melhorar mensagens de erro
 
