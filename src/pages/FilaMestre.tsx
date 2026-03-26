@@ -669,9 +669,36 @@ export default function FilaMestre() {
 
           {/* Row 4: Dates grid */}
           <div className="px-5 pb-3">
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 p-3 rounded-lg bg-muted/40 border border-border/30">
+            <div className="grid grid-cols-3 sm:grid-cols-7 gap-3 p-3 rounded-lg bg-muted/40 border border-border/30">
               <DateCell label="Venda" value={fmtDate(r.data_venda_api)} />
-              <DateCell label="Entrega" value={fmtDate(r.data_previsao_entrega)} highlight />
+              <DateCell label="Entrega Orig." value={fmtDate(r.data_previsao_entrega)} />
+              <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Entrega PCP</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className={`text-sm font-bold tabular-nums mt-0.5 text-left hover:underline ${r.data_entrega_ajustada_pcp ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {r.data_entrega_ajustada_pcp ? fmtDate(r.data_entrega_ajustada_pcp) : '✏️ Ajustar'}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <div className="p-2 border-b border-border flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">Ajustar data de entrega</span>
+                      {r.data_entrega_ajustada_pcp && (
+                        <Button variant="ghost" size="sm" className="h-6 text-xs text-destructive" onClick={() => saveEntregaAjustada(r.id, undefined)}>
+                          Remover
+                        </Button>
+                      )}
+                    </div>
+                    <CalendarPicker
+                      mode="single"
+                      selected={r.data_entrega_ajustada_pcp ? new Date(r.data_entrega_ajustada_pcp + 'T00:00:00') : undefined}
+                      onSelect={(date) => saveEntregaAjustada(r.id, date)}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
               <DateCell label="Início Ideal" value={fmtDate(r.dataInicioIdeal)} />
               <DateCell label="Início PCP" value={fmtDateTime(r.data_inicio_pcp)} />
               <DateCell label="Fim PCP" value={fmtDateTime(r.data_fim_pcp)} />
