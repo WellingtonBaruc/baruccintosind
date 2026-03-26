@@ -46,6 +46,7 @@ interface VendaRow {
   valor_liquido: number;
   data_venda_api: string | null;
   data_previsao_entrega: string | null;
+  data_entrega_ajustada_pcp: string | null;
   status_atual: string;
   status_prazo: string | null;
   status_api: string | null;
@@ -67,6 +68,7 @@ interface VendaRow {
   atrasoDias: number;
   prioridade: 'URGENTE' | 'ATENCAO' | 'NORMAL';
   etapas: EtapaInfo[];
+  dataEntregaEfetiva: string | null;
 }
 
 interface PedidoDetail {
@@ -160,7 +162,7 @@ export default function FilaMestre() {
   const fetchRows = async (cal: PcpCalendarData, lts: Record<string, number>) => {
     const { data: pedidosEmProducao } = await supabase
       .from('pedidos')
-      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
+      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
       .eq('status_api', 'Em Produção')
       .order('criado_em', { ascending: false });
 
@@ -182,7 +184,7 @@ export default function FilaMestre() {
     if (backfillIds.length > 0) {
       const { data } = await supabase
         .from('pedidos')
-        .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
+        .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
         .in('id', backfillIds)
         .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")');
       pedidosComOp = data || [];
