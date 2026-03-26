@@ -522,11 +522,11 @@ export default function FilaMestre() {
     let items = sorted;
     if (exportDateFrom) {
       const from = format(exportDateFrom, 'yyyy-MM-dd');
-      items = items.filter(r => (r.data_previsao_entrega || '') >= from);
+      items = items.filter(r => (r.dataEntregaEfetiva || '') >= from);
     }
     if (exportDateTo) {
       const to = format(exportDateTo, 'yyyy-MM-dd');
-      items = items.filter(r => (r.data_previsao_entrega || '') <= to);
+      items = items.filter(r => (r.dataEntregaEfetiva || '') <= to);
     }
     return items;
   };
