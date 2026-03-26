@@ -813,8 +813,8 @@ export default function FilaMestre() {
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="flex gap-3 flex-wrap text-sm">
+      {/* Summary + Global Export */}
+      <div className="flex items-center gap-3 flex-wrap text-sm">
         <Badge variant="outline" className="text-sm py-1 px-3 font-semibold">{sorted.length} pedidos</Badge>
         <Badge className="bg-destructive/15 text-destructive border-destructive/30 py-1 px-3 font-semibold">
           {sorted.filter(r => r.prioridade === 'URGENTE').length} urgentes
@@ -822,6 +822,50 @@ export default function FilaMestre() {
         <Badge className="bg-warning/15 text-warning border-warning/30 py-1 px-3 font-semibold">
           {sorted.filter(r => r.prioridade === 'ATENCAO').length} atenção
         </Badge>
+
+        <div className="h-6 w-px bg-border mx-1" />
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Download className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-semibold text-muted-foreground">Exportar:</span>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {exportDateFrom ? format(exportDateFrom, 'dd/MM/yy') : 'De'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarPicker mode="single" selected={exportDateFrom} onSelect={setExportDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {exportDateTo ? format(exportDateTo, 'dd/MM/yy') : 'Até'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarPicker mode="single" selected={exportDateTo} onSelect={setExportDateTo} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+
+          {(exportDateFrom || exportDateTo) && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setExportDateFrom(undefined); setExportDateTo(undefined); }}>
+              Limpar
+            </Button>
+          )}
+
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportAllToExcel}>
+            <FileSpreadsheet className="h-3.5 w-3.5 text-[hsl(var(--success))]" /> Excel
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportAllToPdf}>
+            <FileText className="h-3.5 w-3.5 text-destructive" /> PDF
+          </Button>
+        </div>
       </div>
 
       {/* Content */}
