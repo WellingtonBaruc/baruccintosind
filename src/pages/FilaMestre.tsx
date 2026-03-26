@@ -404,6 +404,10 @@ export default function FilaMestre() {
         label = (STATUS_PEDIDO_CONFIG[key] || {}).label || key;
       }
 
+      const sinteticos = pedidos.filter(p => p.tipo_produto === 'SINTETICO');
+      const tecidos = pedidos.filter(p => p.tipo_produto === 'TECIDO');
+      const outros = pedidos.filter(p => p.tipo_produto !== 'SINTETICO' && p.tipo_produto !== 'TECIDO');
+
       groups.push({
         key,
         label,
@@ -411,6 +415,12 @@ export default function FilaMestre() {
         totalPecas: pedidos.reduce((s, p) => s + p.quantidade_itens, 0),
         totalValor: pedidos.reduce((s, p) => s + p.valor_liquido, 0),
         urgentes: pedidos.filter(p => p.prioridade === 'URGENTE').length,
+        sinteticoCount: sinteticos.length,
+        sinteticoPecas: sinteticos.reduce((s, p) => s + p.quantidade_itens, 0),
+        tecidoCount: tecidos.length,
+        tecidoPecas: tecidos.reduce((s, p) => s + p.quantidade_itens, 0),
+        outrosCount: outros.length,
+        outrosPecas: outros.reduce((s, p) => s + p.quantidade_itens, 0),
       });
     }
 
