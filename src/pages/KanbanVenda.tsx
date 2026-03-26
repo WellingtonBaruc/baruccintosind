@@ -266,17 +266,24 @@ export default function KanbanVenda() {
   };
 
   const handleCiente = async (card: VendaCard) => {
-    await supabase.from('pedidos').update({ status_atual: 'HISTORICO' } as any).eq('id', card.id);
-    await supabase.from('pedido_historico').insert({
-      pedido_id: card.id,
-      usuario_id: profile!.id,
-      tipo_acao: 'TRANSICAO',
-      status_anterior: card.status_atual,
-      status_novo: 'HISTORICO',
-      observacao: `Comercial confirmou ciência da entrega. Pedido arquivado por ${profile!.nome}.`,
-    });
-    toast.success(`Pedido ${card.api_venda_id || card.numero_pedido} arquivado!`);
-    fetchCards();
+    try {
+      const { error: updateErr } = await supabase.from('pedidos').update({ status_atual: 'HISTORICO' } as any).eq('id', card.id);
+      if (updateErr) throw updateErr;
+      const { error: histErr } = await supabase.from('pedido_historico').insert({
+        pedido_id: card.id,
+        usuario_id: profile!.id,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: card.status_atual,
+        status_novo: 'HISTORICO',
+        observacao: `Comercial confirmou ciência da entrega. Pedido arquivado por ${profile!.nome}.`,
+      });
+      if (histErr) throw histErr;
+      toast.success(`Pedido ${card.api_venda_id || card.numero_pedido} arquivado!`);
+      fetchCards();
+    } catch (err: any) {
+      console.error('Erro ao arquivar pedido:', err);
+      toast.error(err.message || 'Erro ao arquivar pedido. Verifique suas permissões.');
+    }
   };
 
   const openDetail = async (pedidoId: string) => {

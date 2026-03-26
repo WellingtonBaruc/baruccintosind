@@ -282,8 +282,13 @@ export default function NovaVendaComercial() {
       toast.success('Venda criada com sucesso! Pedido inserido no sistema.');
       setVendaCriada({ numeroPedido });
     } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || 'Erro ao criar venda.');
+      console.error('Erro ao criar venda:', err);
+      const msg = err?.message || '';
+      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('policy')) {
+        toast.error('Sem permissão para criar vendas. Contate o administrador.');
+      } else {
+        toast.error(msg || 'Erro ao criar venda. Tente novamente.');
+      }
     }
     setSaving(false);
   };
