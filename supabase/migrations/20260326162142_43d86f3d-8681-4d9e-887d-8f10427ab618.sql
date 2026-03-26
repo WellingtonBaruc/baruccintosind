@@ -1,0 +1,1 @@
+ALTER TABLE public.pedidos ADD COLUMN data_entrega_ajustada_pcp date DEFAULT NULL;

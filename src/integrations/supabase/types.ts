@@ -1042,6 +1042,7 @@ export type Database = {
           codigo_rastreio: string | null
           criado_em: string
           data_entrega: string | null
+          data_entrega_ajustada_pcp: string | null
           data_entrega_api: string | null
           data_envio: string | null
           data_inicio_producao_necessaria: string | null
@@ -1093,6 +1094,7 @@ export type Database = {
           codigo_rastreio?: string | null
           criado_em?: string
           data_entrega?: string | null
+          data_entrega_ajustada_pcp?: string | null
           data_entrega_api?: string | null
           data_envio?: string | null
           data_inicio_producao_necessaria?: string | null
@@ -1144,6 +1146,7 @@ export type Database = {
           codigo_rastreio?: string | null
           criado_em?: string
           data_entrega?: string | null
+          data_entrega_ajustada_pcp?: string | null
           data_entrega_api?: string | null
           data_envio?: string | null
           data_inicio_producao_necessaria?: string | null

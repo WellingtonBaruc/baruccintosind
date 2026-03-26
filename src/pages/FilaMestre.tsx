@@ -46,6 +46,7 @@ interface VendaRow {
   valor_liquido: number;
   data_venda_api: string | null;
   data_previsao_entrega: string | null;
+  data_entrega_ajustada_pcp: string | null;
   status_atual: string;
   status_prazo: string | null;
   status_api: string | null;
@@ -67,6 +68,7 @@ interface VendaRow {
   atrasoDias: number;
   prioridade: 'URGENTE' | 'ATENCAO' | 'NORMAL';
   etapas: EtapaInfo[];
+  dataEntregaEfetiva: string | null;
 }
 
 interface PedidoDetail {
@@ -86,6 +88,12 @@ interface GrupoInfo {
   totalPecas: number;
   totalValor: number;
   urgentes: number;
+  sinteticoCount: number;
+  sinteticoPecas: number;
+  tecidoCount: number;
+  tecidoPecas: number;
+  outrosCount: number;
+  outrosPecas: number;
 }
 
 export default function FilaMestre() {
@@ -160,7 +168,7 @@ export default function FilaMestre() {
   const fetchRows = async (cal: PcpCalendarData, lts: Record<string, number>) => {
     const { data: pedidosEmProducao } = await supabase
       .from('pedidos')
-      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
+      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
       .eq('status_api', 'Em Produção')
       .order('criado_em', { ascending: false });
 
@@ -182,7 +190,7 @@ export default function FilaMestre() {
     if (backfillIds.length > 0) {
       const { data } = await supabase
         .from('pedidos')
-        .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
+        .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
         .in('id', backfillIds)
         .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")');
       pedidosComOp = data || [];
@@ -231,12 +239,13 @@ export default function FilaMestre() {
 
       const tipoProduto = ordem?.tipo_produto || null;
       const lt = lts[tipoProduto || ''] ?? 5;
-      const pcp = calcularPrazoPcp(p.data_previsao_entrega, lt, cal, new Date(today));
+      const dataEntregaEfetiva = (p as any).data_entrega_ajustada_pcp || p.data_previsao_entrega;
+      const pcp = calcularPrazoPcp(dataEntregaEfetiva, lt, cal, new Date(today));
 
       const ATENCAO_DIAS = 3;
       let statusPrazo = 'NO_PRAZO';
-      if (p.data_previsao_entrega) {
-        const previsao = new Date(p.data_previsao_entrega + 'T00:00:00');
+      if (dataEntregaEfetiva) {
+        const previsao = new Date(dataEntregaEfetiva + 'T00:00:00');
         const diffMs = previsao.getTime() - today.getTime();
         const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
         if (diffDias < 0) statusPrazo = 'ATRASADO';
@@ -256,6 +265,7 @@ export default function FilaMestre() {
         status_piloto: (p as any).status_piloto || null,
         fivelas_separadas: (p as any).fivelas_separadas || false,
         observacao_api: (p as any).observacao_api || null,
+        data_entrega_ajustada_pcp: (p as any).data_entrega_ajustada_pcp || null,
         status_prazo: statusPrazo,
         quantidade_itens: qtdMap.get(p.id) || 0,
         dataPcpCalculada: pcp.dataPcpCalculada,
@@ -263,6 +273,7 @@ export default function FilaMestre() {
         atrasoDias: pcp.atrasoDias,
         prioridade: pcp.prioridade,
         etapas: allOrdemEtapas.map((e: any) => ({ id: e.id, nome_etapa: e.nome_etapa, ordem_sequencia: e.ordem_sequencia, status: e.status })),
+        dataEntregaEfetiva,
       };
     });
 
@@ -332,14 +343,21 @@ export default function FilaMestre() {
     fetchAll();
   };
 
+  const saveEntregaAjustada = async (pedidoId: string, date: Date | undefined) => {
+    const value = date ? format(date, 'yyyy-MM-dd') : null;
+    await supabase.from('pedidos').update({ data_entrega_ajustada_pcp: value } as any).eq('id', pedidoId);
+    toast.success(value ? `Entrega ajustada para ${format(date!, 'dd/MM/yy')}` : 'Entrega ajustada removida');
+    fetchAll();
+  };
+
   // Filters
   const filtered = rows.filter(r => {
     if (search && !r.cliente_nome.toLowerCase().includes(search.toLowerCase()) && !r.numero_pedido.toLowerCase().includes(search.toLowerCase()) && !(r.api_venda_id || '').toLowerCase().includes(search.toLowerCase())) return false;
     if (tipoFilter !== 'all' && r.tipo_produto !== tipoFilter) return false;
     if (statusFilter !== 'all' && r.status_atual !== statusFilter) return false;
     if (prazoFilter === 'ATRASADO' && r.status_prazo !== 'ATRASADO') return false;
-    if (prazoFilter === 'HOJE' && r.data_previsao_entrega !== new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })) return false;
-    if (prazoFilter === 'FUTURO' && (r.status_prazo === 'ATRASADO' || r.data_previsao_entrega === new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }))) return false;
+    if (prazoFilter === 'HOJE' && r.dataEntregaEfetiva !== new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })) return false;
+    if (prazoFilter === 'FUTURO' && (r.status_prazo === 'ATRASADO' || r.dataEntregaEfetiva === new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }))) return false;
     return true;
   });
 
@@ -348,8 +366,8 @@ export default function FilaMestre() {
     const pa = prioOrder[a.prioridade] ?? 3;
     const pb = prioOrder[b.prioridade] ?? 3;
     if (pa !== pb) return pa - pb;
-    const dA = a.data_previsao_entrega || '9999-12-31';
-    const dB = b.data_previsao_entrega || '9999-12-31';
+    const dA = a.dataEntregaEfetiva || '9999-12-31';
+    const dB = b.dataEntregaEfetiva || '9999-12-31';
     if (dA !== dB) return dA.localeCompare(dB);
     return a.atrasoDias - b.atrasoDias;
   });
@@ -360,7 +378,7 @@ export default function FilaMestre() {
     for (const r of items) {
       let key: string;
       if (agrupamento === 'data_entrega') {
-        key = r.data_previsao_entrega || 'SEM_DATA';
+        key = r.dataEntregaEfetiva || 'SEM_DATA';
       } else if (agrupamento === 'tipo') {
         key = r.tipo_produto || 'SEM_TIPO';
       } else {
@@ -386,6 +404,10 @@ export default function FilaMestre() {
         label = (STATUS_PEDIDO_CONFIG[key] || {}).label || key;
       }
 
+      const sinteticos = pedidos.filter(p => p.tipo_produto === 'SINTETICO');
+      const tecidos = pedidos.filter(p => p.tipo_produto === 'TECIDO');
+      const outros = pedidos.filter(p => p.tipo_produto !== 'SINTETICO' && p.tipo_produto !== 'TECIDO');
+
       groups.push({
         key,
         label,
@@ -393,6 +415,12 @@ export default function FilaMestre() {
         totalPecas: pedidos.reduce((s, p) => s + p.quantidade_itens, 0),
         totalValor: pedidos.reduce((s, p) => s + p.valor_liquido, 0),
         urgentes: pedidos.filter(p => p.prioridade === 'URGENTE').length,
+        sinteticoCount: sinteticos.length,
+        sinteticoPecas: sinteticos.reduce((s, p) => s + p.quantidade_itens, 0),
+        tecidoCount: tecidos.length,
+        tecidoPecas: tecidos.reduce((s, p) => s + p.quantidade_itens, 0),
+        outrosCount: outros.length,
+        outrosPecas: outros.reduce((s, p) => s + p.quantidade_itens, 0),
       });
     }
 
@@ -443,7 +471,8 @@ export default function FilaMestre() {
       'Valor': r.valor_liquido,
       'Qtd Itens': r.quantidade_itens,
       'Data Venda': r.data_venda_api || '',
-      'Entrega': r.data_previsao_entrega || '',
+      'Entrega Original': r.data_previsao_entrega || '',
+      'Entrega Ajustada': r.data_entrega_ajustada_pcp || '',
       'Início Ideal': r.dataInicioIdeal || '',
       'Início PCP': r.data_inicio_pcp || '',
       'Fim PCP': r.data_fim_pcp || '',
@@ -494,11 +523,11 @@ export default function FilaMestre() {
     let items = sorted;
     if (exportDateFrom) {
       const from = format(exportDateFrom, 'yyyy-MM-dd');
-      items = items.filter(r => (r.data_previsao_entrega || '') >= from);
+      items = items.filter(r => (r.dataEntregaEfetiva || '') >= from);
     }
     if (exportDateTo) {
       const to = format(exportDateTo, 'yyyy-MM-dd');
-      items = items.filter(r => (r.data_previsao_entrega || '') <= to);
+      items = items.filter(r => (r.dataEntregaEfetiva || '') <= to);
     }
     return items;
   };
@@ -514,7 +543,8 @@ export default function FilaMestre() {
       'Valor': r.valor_liquido,
       'Qtd Itens': r.quantidade_itens,
       'Data Venda': r.data_venda_api || '',
-      'Entrega': r.data_previsao_entrega || '',
+      'Entrega Original': r.data_previsao_entrega || '',
+      'Entrega Ajustada': r.data_entrega_ajustada_pcp || '',
       'Início Ideal': r.dataInicioIdeal || '',
       'Início PCP': r.data_inicio_pcp || '',
       'Fim PCP': r.data_fim_pcp || '',
@@ -641,9 +671,36 @@ export default function FilaMestre() {
 
           {/* Row 4: Dates grid */}
           <div className="px-5 pb-3">
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 p-3 rounded-lg bg-muted/40 border border-border/30">
+            <div className="grid grid-cols-3 sm:grid-cols-7 gap-3 p-3 rounded-lg bg-muted/40 border border-border/30">
               <DateCell label="Venda" value={fmtDate(r.data_venda_api)} />
-              <DateCell label="Entrega" value={fmtDate(r.data_previsao_entrega)} highlight />
+              <DateCell label="Entrega Orig." value={fmtDate(r.data_previsao_entrega)} />
+              <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Entrega PCP</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className={`text-sm font-bold tabular-nums mt-0.5 text-left hover:underline ${r.data_entrega_ajustada_pcp ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {r.data_entrega_ajustada_pcp ? fmtDate(r.data_entrega_ajustada_pcp) : '✏️ Ajustar'}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <div className="p-2 border-b border-border flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">Ajustar data de entrega</span>
+                      {r.data_entrega_ajustada_pcp && (
+                        <Button variant="ghost" size="sm" className="h-6 text-xs text-destructive" onClick={() => saveEntregaAjustada(r.id, undefined)}>
+                          Remover
+                        </Button>
+                      )}
+                    </div>
+                    <CalendarPicker
+                      mode="single"
+                      selected={r.data_entrega_ajustada_pcp ? new Date(r.data_entrega_ajustada_pcp + 'T00:00:00') : undefined}
+                      onSelect={(date) => saveEntregaAjustada(r.id, date)}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
               <DateCell label="Início Ideal" value={fmtDate(r.dataInicioIdeal)} />
               <DateCell label="Início PCP" value={fmtDateTime(r.data_inicio_pcp)} />
               <DateCell label="Fim PCP" value={fmtDateTime(r.data_fim_pcp)} />
@@ -894,10 +951,25 @@ export default function FilaMestre() {
                   <div className="flex-1 min-w-0">
                     <span className="text-base font-bold capitalize">{group.label}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground shrink-0">
+                   <div className="flex items-center gap-3 text-sm text-muted-foreground shrink-0 flex-wrap">
                     <span className="font-semibold text-foreground">{group.pedidos.length} pedido{group.pedidos.length !== 1 ? 's' : ''}</span>
                     <span>·</span>
-                    <span>{group.totalPecas} peças</span>
+                    <span>{group.totalPecas} pç</span>
+                    {group.sinteticoCount > 0 && (
+                      <span className="text-[11px] bg-blue-500/15 text-blue-600 border border-blue-500/30 rounded px-1.5 py-0.5 font-semibold">
+                        Sint: {group.sinteticoCount}v · {group.sinteticoPecas}pç
+                      </span>
+                    )}
+                    {group.tecidoCount > 0 && (
+                      <span className="text-[11px] bg-amber-500/15 text-amber-600 border border-amber-500/30 rounded px-1.5 py-0.5 font-semibold">
+                        Tec: {group.tecidoCount}v · {group.tecidoPecas}pç
+                      </span>
+                    )}
+                    {group.outrosCount > 0 && (
+                      <span className="text-[11px] bg-muted text-muted-foreground border border-border rounded px-1.5 py-0.5 font-semibold">
+                        Outros: {group.outrosCount}v · {group.outrosPecas}pç
+                      </span>
+                    )}
                     <span>·</span>
                     <span className="font-semibold text-foreground tabular-nums">{fmt(group.totalValor)}</span>
                     {group.urgentes > 0 && (
