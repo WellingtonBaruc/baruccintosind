@@ -17,7 +17,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -425,6 +428,62 @@ export default function FilaMestre() {
 
   const fmt = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const fmtDate = (d: string | null) => d ? format(new Date(d + 'T00:00:00'), 'dd/MM/yy') : '—';
+
+  const exportGroupToExcel = (group: GrupoInfo) => {
+    const data = group.pedidos.map(r => ({
+      'Venda': r.api_venda_id || r.numero_pedido,
+      'Cliente': r.cliente_nome,
+      'Tipo': TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || 'A classificar',
+      'Status': (STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual,
+      'Valor': r.valor_liquido,
+      'Qtd Itens': r.quantidade_itens,
+      'Data Venda': r.data_venda_api || '',
+      'Entrega': r.data_previsao_entrega || '',
+      'Início Ideal': r.dataInicioIdeal || '',
+      'Início PCP': r.data_inicio_pcp || '',
+      'Fim PCP': r.data_fim_pcp || '',
+      'Atraso (dias)': r.atrasoDias,
+      'Prioridade': r.prioridade,
+      'Etapa Atual': r.etapa_atual,
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Fila');
+    XLSX.writeFile(wb, `fila_mestre_${group.key.replace(/\s/g, '_')}.xlsx`);
+    toast.success('Excel exportado com sucesso');
+  };
+
+  const exportGroupToPdf = (group: GrupoInfo) => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    doc.setFontSize(14);
+    doc.text(`Fila Mestre — ${group.label}`, 14, 15);
+    doc.setFontSize(9);
+    doc.text(`${group.pedidos.length} pedidos · ${group.totalPecas} peças · ${fmt(group.totalValor)} · ${group.urgentes} urgente(s)`, 14, 22);
+
+    const head = [['Venda', 'Cliente', 'Tipo', 'Status', 'Valor', 'Entrega', 'Atraso', 'Etapa Atual']];
+    const body = group.pedidos.map(r => [
+      r.api_venda_id || r.numero_pedido,
+      r.cliente_nome,
+      TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || '—',
+      (STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual,
+      fmt(r.valor_liquido),
+      fmtDate(r.data_previsao_entrega),
+      `${r.atrasoDias}d`,
+      r.etapa_atual,
+    ]);
+
+    autoTable(doc, {
+      startY: 26,
+      head,
+      body,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [51, 51, 51], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    doc.save(`fila_mestre_${group.key.replace(/\s/g, '_')}.pdf`);
+    toast.success('PDF exportado com sucesso');
+  };
   const fmtDateTime = (d: string | null) => {
     if (!d) return '—';
     const date = new Date(d);
@@ -713,6 +772,25 @@ export default function FilaMestre() {
                         <span className="text-destructive font-bold">{group.urgentes} urgente{group.urgentes !== 1 ? 's' : ''}</span>
                       </>
                     )}
+                    <span className="ml-1" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      title="Baixar Excel"
+                      onClick={(e) => { e.stopPropagation(); exportGroupToExcel(group); }}
+                    >
+                      <FileSpreadsheet className="h-4 w-4 text-[hsl(var(--success))]" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      title="Baixar PDF"
+                      onClick={(e) => { e.stopPropagation(); exportGroupToPdf(group); }}
+                    >
+                      <FileText className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
                 </button>
 
