@@ -390,12 +390,10 @@ export default function KanbanProducao() {
       const best = bestByPedidoTipo.get(key);
       if (best && best.id !== c.id) return false;
 
-      // Hide "OUTROS" card when same pedido has a main OP (SINTETICO/TECIDO/FIVELA_COBERTA)
+      // OPs tipo OUTROS pertencem ao fluxo da Loja — nunca aparecem no Kanban de Produção
+      if (c.tipo_produto === 'OUTROS') return false;
+
       const group = pedidoGroups.get(c.pedido_id);
-      if (c.tipo_produto === 'OUTROS' && group && group.length > 1) {
-        const hasMainOp = group.some(g => g.id !== c.id && g.tipo_produto !== 'OUTROS');
-        if (hasMainOp) return false;
-      }
 
       // Also hide CONCLUIDA when another tipo for same pedido is still active
       if (group && group.length > 1 && c.ordem_status === 'CONCLUIDA') {
