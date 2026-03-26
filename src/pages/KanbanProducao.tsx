@@ -448,6 +448,26 @@ export default function KanbanProducao() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch KPI vendas concluídas por data
+  useEffect(() => {
+    const fetchConcluidas = async () => {
+      if (!kpiConcluidasDate) return;
+      setKpiConcluidasLoading(true);
+      const startOfDay = kpiConcluidasDate + 'T00:00:00-03:00';
+      const endOfDay = kpiConcluidasDate + 'T23:59:59-03:00';
+      const { count } = await supabase
+        .from('ordens_producao')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'CONCLUIDA')
+        .neq('tipo_produto', 'OUTROS')
+        .gte('data_fim_pcp', startOfDay)
+        .lte('data_fim_pcp', endOfDay);
+      setKpiConcluidasCount(count || 0);
+      setKpiConcluidasLoading(false);
+    };
+    fetchConcluidas();
+  }, [kpiConcluidasDate, cards]);
+
   const isSupervisor = profile && ['admin', 'gestor', 'supervisor_producao'].includes(profile.perfil);
 
   const handleDragEnd = async (result: DropResult) => {
