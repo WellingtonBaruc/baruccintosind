@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -18,8 +18,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
-import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star, Scissors, BarChart3 } from 'lucide-react';
+import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star, Scissors, BarChart3, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
+import { hojeBrasilia } from '@/lib/dateUtils';
 
 interface KanbanCard {
   id: string;
@@ -144,6 +145,11 @@ export default function KanbanProducao() {
   // Detail sheet
   const [detailSheet, setDetailSheet] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean; pedido: any | null }>({ open: false, card: null, items: [], loading: false, pedido: null });
   const [showFivelaKpiList, setShowFivelaKpiList] = useState(false);
+
+  // KPI: vendas concluídas com filtro de data
+  const [kpiConcluidasDate, setKpiConcluidasDate] = useState(hojeBrasilia());
+  const [kpiConcluidasCount, setKpiConcluidasCount] = useState(0);
+  const [kpiConcluidasLoading, setKpiConcluidasLoading] = useState(false);
 
   // Obs para Corte
   const [obsCorteModal, setObsCorteModal] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean }>({ open: false, card: null, items: [], loading: false });
@@ -441,6 +447,26 @@ export default function KanbanProducao() {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch KPI vendas concluídas por data
+  useEffect(() => {
+    const fetchConcluidas = async () => {
+      if (!kpiConcluidasDate) return;
+      setKpiConcluidasLoading(true);
+      const startOfDay = kpiConcluidasDate + 'T00:00:00-03:00';
+      const endOfDay = kpiConcluidasDate + 'T23:59:59-03:00';
+      const { count } = await supabase
+        .from('ordens_producao')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'CONCLUIDA')
+        .neq('tipo_produto', 'OUTROS')
+        .gte('data_fim_pcp', startOfDay)
+        .lte('data_fim_pcp', endOfDay);
+      setKpiConcluidasCount(count || 0);
+      setKpiConcluidasLoading(false);
+    };
+    fetchConcluidas();
+  }, [kpiConcluidasDate, cards]);
 
   const isSupervisor = profile && ['admin', 'gestor', 'supervisor_producao'].includes(profile.perfil);
 
@@ -1091,6 +1117,25 @@ export default function KanbanProducao() {
             {fivelaAguardandoCards.length}
           </Badge>
         </Button>
+
+        <div className="w-px h-6 bg-border mx-1" />
+
+        {/* KPI Vendas Concluídas */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-[hsl(var(--success))]" />
+            <span className="text-xs font-medium text-muted-foreground">Concluídas</span>
+            <span className="text-lg font-bold tabular-nums text-[hsl(var(--success))]">
+              {kpiConcluidasLoading ? '…' : kpiConcluidasCount}
+            </span>
+          </div>
+          <Input
+            type="date"
+            value={kpiConcluidasDate}
+            onChange={e => setKpiConcluidasDate(e.target.value)}
+            className="w-[140px] h-8 text-xs"
+          />
+        </div>
       </div>
 
       {/* Fivela KPI expanded list */}
