@@ -233,12 +233,13 @@ export default function FilaMestre() {
 
       const tipoProduto = ordem?.tipo_produto || null;
       const lt = lts[tipoProduto || ''] ?? 5;
-      const pcp = calcularPrazoPcp(p.data_previsao_entrega, lt, cal, new Date(today));
+      const dataEntregaEfetiva = (p as any).data_entrega_ajustada_pcp || p.data_previsao_entrega;
+      const pcp = calcularPrazoPcp(dataEntregaEfetiva, lt, cal, new Date(today));
 
       const ATENCAO_DIAS = 3;
       let statusPrazo = 'NO_PRAZO';
-      if (p.data_previsao_entrega) {
-        const previsao = new Date(p.data_previsao_entrega + 'T00:00:00');
+      if (dataEntregaEfetiva) {
+        const previsao = new Date(dataEntregaEfetiva + 'T00:00:00');
         const diffMs = previsao.getTime() - today.getTime();
         const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
         if (diffDias < 0) statusPrazo = 'ATRASADO';
@@ -258,6 +259,7 @@ export default function FilaMestre() {
         status_piloto: (p as any).status_piloto || null,
         fivelas_separadas: (p as any).fivelas_separadas || false,
         observacao_api: (p as any).observacao_api || null,
+        data_entrega_ajustada_pcp: (p as any).data_entrega_ajustada_pcp || null,
         status_prazo: statusPrazo,
         quantidade_itens: qtdMap.get(p.id) || 0,
         dataPcpCalculada: pcp.dataPcpCalculada,
@@ -265,6 +267,7 @@ export default function FilaMestre() {
         atrasoDias: pcp.atrasoDias,
         prioridade: pcp.prioridade,
         etapas: allOrdemEtapas.map((e: any) => ({ id: e.id, nome_etapa: e.nome_etapa, ordem_sequencia: e.ordem_sequencia, status: e.status })),
+        dataEntregaEfetiva,
       };
     });
 
