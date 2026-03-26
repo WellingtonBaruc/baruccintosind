@@ -356,8 +356,8 @@ export default function FilaMestre() {
     if (tipoFilter !== 'all' && r.tipo_produto !== tipoFilter) return false;
     if (statusFilter !== 'all' && r.status_atual !== statusFilter) return false;
     if (prazoFilter === 'ATRASADO' && r.status_prazo !== 'ATRASADO') return false;
-    if (prazoFilter === 'HOJE' && r.data_previsao_entrega !== new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })) return false;
-    if (prazoFilter === 'FUTURO' && (r.status_prazo === 'ATRASADO' || r.data_previsao_entrega === new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }))) return false;
+    if (prazoFilter === 'HOJE' && r.dataEntregaEfetiva !== new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })) return false;
+    if (prazoFilter === 'FUTURO' && (r.status_prazo === 'ATRASADO' || r.dataEntregaEfetiva === new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }))) return false;
     return true;
   });
 
@@ -366,8 +366,8 @@ export default function FilaMestre() {
     const pa = prioOrder[a.prioridade] ?? 3;
     const pb = prioOrder[b.prioridade] ?? 3;
     if (pa !== pb) return pa - pb;
-    const dA = a.data_previsao_entrega || '9999-12-31';
-    const dB = b.data_previsao_entrega || '9999-12-31';
+    const dA = a.dataEntregaEfetiva || '9999-12-31';
+    const dB = b.dataEntregaEfetiva || '9999-12-31';
     if (dA !== dB) return dA.localeCompare(dB);
     return a.atrasoDias - b.atrasoDias;
   });
