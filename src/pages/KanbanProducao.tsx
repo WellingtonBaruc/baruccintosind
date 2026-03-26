@@ -1117,6 +1117,25 @@ export default function KanbanProducao() {
             {fivelaAguardandoCards.length}
           </Badge>
         </Button>
+
+        <div className="w-px h-6 bg-border mx-1" />
+
+        {/* KPI Vendas Concluídas */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-[hsl(var(--success))]" />
+            <span className="text-xs font-medium text-muted-foreground">Concluídas</span>
+            <span className="text-lg font-bold tabular-nums text-[hsl(var(--success))]">
+              {kpiConcluidasLoading ? '…' : kpiConcluidasCount}
+            </span>
+          </div>
+          <Input
+            type="date"
+            value={kpiConcluidasDate}
+            onChange={e => setKpiConcluidasDate(e.target.value)}
+            className="w-[140px] h-8 text-xs"
+          />
+        </div>
       </div>
 
       {/* Fivela KPI expanded list */}
