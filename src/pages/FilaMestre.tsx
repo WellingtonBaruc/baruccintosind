@@ -972,7 +972,7 @@ export default function FilaMestre() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                      className={`flex-1 px-2 py-1 rounded-md text-[11px] font-semibold text-center ${
                         isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
                       } ${
                         r.ordem_status === 'CONCLUIDA' ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] font-bold' : 'bg-muted/60 text-muted-foreground'
