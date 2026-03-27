@@ -1846,6 +1846,21 @@ export default function FilaMestre() {
             </div>
           )}
 
+          {/* Cancelar Venda button - for admin/gestor */}
+          {isAdmin && !isPcpOp && r.ordem_status !== 'CONCLUIDA' && (
+            <div className="px-4 pb-2 flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
+                onClick={(e) => { e.stopPropagation(); setCancelVendaTarget(r); setCancelVendaObs(''); setCancelVendaDialogOpen(true); }}
+              >
+                <Ban className="h-3.5 w-3.5 mr-1" />
+                <span className="text-[11px]">Cancelar Venda</span>
+              </Button>
+            </div>
+          )}
+
         </div>
       </div>
     );
@@ -2719,6 +2734,46 @@ export default function FilaMestre() {
             >
               {deleteOpLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
               Excluir OP
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AlertDialog para cancelar Venda */}
+      <AlertDialog open={cancelVendaDialogOpen} onOpenChange={(open) => { setCancelVendaDialogOpen(open); if (!open) setCancelVendaObs(''); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar Venda</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                Tem certeza que deseja cancelar esta venda? A sincronização será bloqueada e todas as OPs serão canceladas.
+                {cancelVendaTarget && (
+                  <span className="block mt-2 font-semibold text-foreground">
+                    {cancelVendaTarget.api_venda_id || cancelVendaTarget.numero_pedido} — {cancelVendaTarget.cliente_nome}
+                  </span>
+                )}
+                <div className="mt-3">
+                  <Label className="text-sm font-medium text-foreground">Observação (opcional)</Label>
+                  <Textarea
+                    className="mt-1"
+                    placeholder="Motivo do cancelamento..."
+                    value={cancelVendaObs}
+                    onChange={(e) => setCancelVendaObs(e.target.value)}
+                  />
+                </div>
+                <span className="block mt-2 text-destructive font-medium">Essa ação não poderá ser desfeita.</span>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelVendaLoading}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelVenda}
+              disabled={cancelVendaLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelVendaLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Ban className="h-4 w-4 mr-1" />}
+              Cancelar Venda
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
