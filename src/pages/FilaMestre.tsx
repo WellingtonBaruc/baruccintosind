@@ -513,7 +513,8 @@ export default function FilaMestre() {
 
     const emProducaoIds = new Set((pedidosEmProducao || []).map(p => p.id));
     const pcpIds = new Set((pedidosPcp || []).map(p => p.id));
-    const allKnownIds = new Set([...emProducaoIds, ...pcpIds]);
+    const novaVendaIds = new Set((pedidosNovaVenda || []).map(p => p.id));
+    const allKnownIds = new Set([...emProducaoIds, ...pcpIds, ...novaVendaIds]);
     const complementaryOpPedidoIds = new Set<string>();
     for (const o of (todasOrdens || [])) {
       if ((o as any).sequencia > 1 && !allKnownIds.has(o.pedido_id)) {
@@ -536,7 +537,7 @@ export default function FilaMestre() {
     // Merge all, deduplicating by id
     const seenIds = new Set<string>();
     const pedidos: any[] = [];
-    for (const p of [...(pedidosEmProducao || []), ...(pedidosPcp || []), ...pedidosComOp]) {
+    for (const p of [...(pedidosEmProducao || []), ...(pedidosPcp || []), ...(pedidosNovaVenda || []), ...pedidosComOp]) {
       if (!seenIds.has(p.id)) {
         seenIds.add(p.id);
         pedidos.push(p);
