@@ -1447,9 +1447,13 @@ export default function FilaMestre() {
               }`}>
                 Simplifica: {r.status_api}
               </Badge>
-            ) : (
+            ) : r.origem_op === 'PCP' ? (
               <Badge className="text-[11px] font-semibold bg-orange-500/15 text-orange-700 border-orange-300">
                 Venda PCP — Em Produção
+              </Badge>
+            ) : (
+              <Badge className="text-[11px] font-semibold bg-purple-500/15 text-purple-700 border-purple-300">
+                Nova Venda — {(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual}
               </Badge>
             )}
             {r.operador_atual !== '—' && (
