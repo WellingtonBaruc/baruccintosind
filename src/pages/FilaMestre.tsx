@@ -1276,23 +1276,11 @@ export default function FilaMestre() {
           if (start <= daysInMonth) weeks.push({ num: w, start, end });
         }
 
-        // Get rows for selected week
         const weekKey = `${currentYear}-${currentMonth}-${selectedWeek}`;
-        const weekRows = rows.filter(r => {
-          if (!r.dataEntregaEfetiva) return false;
-          const d = new Date(r.dataEntregaEfetiva + 'T00:00:00');
-          if (d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) return false;
-          const wn = Math.ceil(d.getDate() / 7);
-          return wn === selectedWeek;
-        });
-        const wSint = weekRows.filter(r => r.tipo_produto === 'SINTETICO').reduce((s, r) => s + r.quantidade_itens, 0);
-        const wTec = weekRows.filter(r => r.tipo_produto === 'TECIDO').reduce((s, r) => s + r.quantidade_itens, 0);
+        const wSint = weekSummary.sintetico;
+        const wTec = weekSummary.tecido;
         const wTotal = wSint + wTec;
-        const wConcl = weekRows.filter(r => {
-          if (!r.data_fim_pcp) return false;
-          const fd = new Date(r.data_fim_pcp);
-          return fd.getMonth() === currentMonth && fd.getFullYear() === currentYear && Math.ceil(fd.getDate() / 7) === selectedWeek;
-        }).reduce((s, r) => s + r.quantidade_itens, 0);
+        const wConcl = weekSummary.concluido;
         const isWeekSelected = selectedWeekFilter === weekKey;
 
         return (
