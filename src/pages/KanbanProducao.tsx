@@ -988,19 +988,26 @@ export default function KanbanProducao() {
     }
   };
 
-  const handleEnviarParaComercial = async (card: KanbanCard) => {
-    if (!profile) return;
+   const handleEnviarParaComercial = async (card: KanbanCard) => {
+    if (!profile) { console.error('handleEnviarParaComercial: no profile'); return; }
     setWhatsappLoading(true);
     try {
       // Fetch full pedido data for the WhatsApp message
-      const { data: pedido } = await supabase
+      const { data: pedido, error: pedidoError } = await supabase
         .from('pedidos')
         .select('numero_pedido, cliente_nome, cliente_telefone, cliente_endereco, canal_venda, data_previsao_entrega, valor_liquido, observacao_api, observacao_comercial')
         .eq('id', card.pedido_id)
         .single();
+      console.log('handleEnviarParaComercial pedido:', pedido, 'error:', pedidoError, 'card.pedido_id:', card.pedido_id);
+      if (pedidoError) {
+        toast.error('Erro ao carregar dados da venda');
+        setWhatsappLoading(false);
+        return;
+      }
       setWhatsappPedidoData(pedido);
       setWhatsappModal({ open: true, card });
-    } catch {
+    } catch (err) {
+      console.error('handleEnviarParaComercial catch:', err);
       toast.error('Erro ao carregar dados da venda');
     }
     setWhatsappLoading(false);
@@ -1008,7 +1015,10 @@ export default function KanbanProducao() {
 
   const handleSelectVendedora = async (vendedora: { nome: string; whatsapp: string }) => {
     const card = whatsappModal.card;
-    if (!card || !profile || !whatsappPedidoData) return;
+    if (!card || !profile || !whatsappPedidoData) { 
+      console.error('handleSelectVendedora: missing data', { card: !!card, profile: !!profile, whatsappPedidoData: !!whatsappPedidoData });
+      return; 
+    }
     const p = whatsappPedidoData;
 
     // Build WhatsApp message
@@ -1024,18 +1034,25 @@ export default function KanbanProducao() {
     ];
     const message = lines.join('\n');
     const url = `https://wa.me/${vendedora.whatsapp}?text=${encodeURIComponent(message)}`;
+    console.log('WhatsApp URL:', url);
     window.open(url, '_blank');
 
     // Log to history
     try {
-      await supabase.from('pedido_historico').insert({
+      const { error: histError } = await supabase.from('pedido_historico').insert({
         pedido_id: card.pedido_id,
         usuario_id: profile.id,
         tipo_acao: 'COMENTARIO',
         observacao: `Encaminhado para ${vendedora.nome} via WhatsApp`,
       });
-      toast.success(`Encaminhado para ${vendedora.nome} via WhatsApp`);
-    } catch {
+      if (histError) {
+        console.error('pedido_historico insert error:', histError);
+        toast.error('Erro ao registrar encaminhamento');
+      } else {
+        toast.success(`Encaminhado para ${vendedora.nome} via WhatsApp`);
+      }
+    } catch (err) {
+      console.error('handleSelectVendedora catch:', err);
       toast.error('Erro ao registrar encaminhamento');
     }
 
