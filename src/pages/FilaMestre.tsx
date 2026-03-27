@@ -823,15 +823,30 @@ export default function FilaMestre() {
       >
         <div className="px-4 py-2.5 space-y-1.5">
           {/* Linha 1 — Identificação */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs tabular-nums text-muted-foreground font-medium shrink-0">#{r.api_venda_id || r.numero_pedido}</span>
-              <span className="text-[15px] font-bold text-foreground truncate leading-tight min-w-0">{r.cliente_nome}</span>
-              <span className="text-sm font-bold tabular-nums text-foreground whitespace-nowrap shrink-0">{fmt(r.valor_liquido)}</span>
-              <Badge className={`text-[11px] font-semibold shrink-0 ${tipoBadge}`}>{tipoLabel}</Badge>
-              {r.is_piloto && <Badge className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30 shrink-0">Piloto</Badge>}
+          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-0 border-b border-border pb-1.5">
+            <div className="px-2 py-0.5 border-r border-border">
+              <span className="text-[11px] text-muted-foreground">Nº Venda</span>
+              <p className="text-xs font-bold tabular-nums text-foreground">#{r.api_venda_id || r.numero_pedido}</p>
             </div>
-            <span className="text-xs tabular-nums text-muted-foreground shrink-0 whitespace-nowrap">Venda: <span className="font-semibold text-foreground">{fmtDate(r.data_venda_api)}</span></span>
+            <div className="px-2 py-0.5 border-r border-border min-w-0">
+              <span className="text-[11px] text-muted-foreground">Cliente</span>
+              <p className="text-[14px] font-bold text-foreground truncate leading-tight">{r.cliente_nome}</p>
+            </div>
+            <div className="px-2 py-0.5 border-r border-border text-right">
+              <span className="text-[11px] text-muted-foreground">Valor</span>
+              <p className="text-xs font-bold tabular-nums text-foreground whitespace-nowrap">{fmt(r.valor_liquido)}</p>
+            </div>
+            <div className="px-2 py-0.5 border-r border-border text-center">
+              <span className="text-[11px] text-muted-foreground">Tipo</span>
+              <div className="mt-0.5">
+                <Badge className={`text-[10px] font-semibold ${tipoBadge}`}>{tipoLabel}</Badge>
+                {r.is_piloto && <Badge className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30 ml-1">Piloto</Badge>}
+              </div>
+            </div>
+            <div className="px-2 py-0.5 text-right">
+              <span className="text-[11px] text-muted-foreground">Data Venda</span>
+              <p className="text-xs font-semibold tabular-nums text-foreground whitespace-nowrap">{fmtDate(r.data_venda_api)}</p>
+            </div>
           </div>
 
           {/* Linha 2 — Datas principais */}
