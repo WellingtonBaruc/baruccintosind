@@ -849,24 +849,62 @@ export default function FilaMestre() {
             </div>
           </div>
 
-          {/* Linha 2 — Datas principais */}
-          <div className="flex items-center gap-5 text-[13px] tabular-nums">
-            <span className="text-muted-foreground">Entrega: <span className="font-semibold text-foreground">{fmtDate(r.dataEntregaEfetiva)}</span></span>
-            <span className="text-muted-foreground">Início ideal: <span className="font-semibold text-foreground">{fmtDate(r.dataInicioIdeal)}</span></span>
-            <span className="text-muted-foreground">Início PCP: <span className="font-semibold text-foreground">{r.data_inicio_pcp ? fmtDateTime(r.data_inicio_pcp).split(' ')[0] : '—'}</span></span>
-            <span className={`font-bold ${r.atrasoDias < 0 ? 'text-destructive' : r.atrasoDias <= 2 ? 'text-warning' : 'text-foreground'}`}>
-              Atraso: {r.atrasoDias}d
-            </span>
-          </div>
+          {/* Corpo — Grid 30/70 */}
+          <div className="grid grid-cols-[30%_70%] gap-0">
+            {/* Lado esquerdo — Datas */}
+            <div className="border-r border-border pr-2 space-y-1 text-[12px] tabular-nums">
+              <div>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Entrega</span>
+                <p className="font-bold text-foreground">{fmtDate(r.dataEntregaEfetiva)}</p>
+              </div>
+              <div>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Início Ideal</span>
+                <p className="font-bold text-foreground">
+                  {(() => {
+                    if (r.data_venda_api && r.dataEntregaEfetiva && r.data_venda_api === r.dataEntregaEfetiva) {
+                      return 'ENT IMEDIATA';
+                    }
+                    if (r.data_venda_api && r.dataEntregaEfetiva && r.dataEntregaEfetiva > r.data_venda_api) {
+                      // Calculate 1 business day after sale date
+                      const vendaDate = new Date(r.data_venda_api + 'T00:00:00');
+                      const nextBizDay = new Date(vendaDate);
+                      let found = false;
+                      while (!found) {
+                        nextBizDay.setDate(nextBizDay.getDate() + 1);
+                        const dow = nextBizDay.getDay();
+                        if (dow !== 0 && dow !== 6) found = true;
+                      }
+                      const diffMs = new Date(r.dataEntregaEfetiva + 'T00:00:00').getTime() - vendaDate.getTime();
+                      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+                      return `${diffDays}D`;
+                    }
+                    return fmtDate(r.dataInicioIdeal);
+                  })()}
+                </p>
+              </div>
+              <div>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Iniciado</span>
+                <div className="flex items-center justify-between gap-1">
+                  <p className="font-bold text-foreground">
+                    {r.data_inicio_pcp ? new Date(r.data_inicio_pcp).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                  </p>
+                  <span className={`text-[11px] font-bold ${r.atrasoDias < 0 ? 'text-destructive' : r.atrasoDias <= 2 ? 'text-warning' : 'text-[hsl(var(--success))]'}`}>
+                    {r.atrasoDias < 0 ? `${Math.abs(r.atrasoDias)}d atraso` : r.atrasoDias === 0 ? 'Hoje' : `${r.atrasoDias}d`}
+                  </span>
+                </div>
+              </div>
+            </div>
 
-          {/* Linha 3 — Status + Etapa */}
-          <div className="flex items-center gap-5 text-[13px]">
-            <span className="text-muted-foreground">Status: <Badge className={`text-[11px] font-medium ml-1 ${(statusCfg as any).color || ''}`}>{(statusCfg as any).label || r.status_atual}</Badge></span>
-            <span className="text-muted-foreground">Etapa Atual: <span className="font-bold text-primary">{r.etapa_atual}</span></span>
-          </div>
+            {/* Lado direito — Status, Etapa e Progresso */}
+            <div className="pl-2 space-y-1.5">
+              {/* Status + Etapa */}
+              <div className="flex items-center gap-5 text-[13px]">
+                <span className="text-muted-foreground">Status: <Badge className={`text-[11px] font-medium ml-1 ${(statusCfg as any).color || ''}`}>{(statusCfg as any).label || r.status_atual}</Badge></span>
+                <span className="text-muted-foreground">Etapa: <span className="font-bold text-primary">{r.etapa_atual}</span></span>
+              </div>
 
-          {/* Linha 4 — Progresso */}
-          {etapas.length > 0 && (
+              {/* Progresso */}
+              {etapas.length > 0 && (
             <TooltipProvider delayDuration={200}>
               <div className="flex items-center gap-1 flex-wrap">
                 {etapas.map((etapa) => {
