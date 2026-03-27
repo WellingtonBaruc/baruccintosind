@@ -227,7 +227,13 @@ export default function FilaMestre() {
     today.setHours(0, 0, 0, 0);
 
     const vendas: VendaRow[] = pedidos.map(p => {
-      const ordem = ordens.find(o => o.pedido_id === p.id);
+      // Priorizar OP principal (não-OUTROS) e ativa (EM_ANDAMENTO > AGUARDANDO)
+      const ordensDoPedido = ordens.filter(o => o.pedido_id === p.id);
+      const ordem = ordensDoPedido.find(o => o.status === 'EM_ANDAMENTO' && o.tipo_produto !== 'OUTROS')
+        || ordensDoPedido.find(o => o.status === 'AGUARDANDO' && o.tipo_produto !== 'OUTROS')
+        || ordensDoPedido.find(o => o.status === 'EM_ANDAMENTO')
+        || ordensDoPedido.find(o => o.status === 'AGUARDANDO')
+        || ordensDoPedido[0] || null;
       const allOrdemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
       const etapaAtiva = allOrdemEtapas.find(e => e.status === 'EM_ANDAMENTO') || allOrdemEtapas.find(e => e.status === 'PENDENTE') || null;
 
