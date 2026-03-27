@@ -1037,11 +1037,14 @@ export default function KanbanProducao() {
     const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     console.log('WhatsApp URL:', url);
 
-    const popup = window.open(url, '_blank', 'noopener,noreferrer');
-
-    if (!popup) {
-      toast.info('Não foi possível abrir o WhatsApp. Verifique se o navegador bloqueou pop-ups.');
-    }
+    // Create a real <a> element and click it to avoid sandbox/iframe blocking
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
     // Log to history
     try {
