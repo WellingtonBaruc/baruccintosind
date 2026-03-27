@@ -18,7 +18,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
-import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star, Scissors, BarChart3, CalendarDays } from 'lucide-react';
+import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star, Scissors, BarChart3, CalendarDays, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { hojeBrasilia } from '@/lib/dateUtils';
 
@@ -156,6 +156,19 @@ export default function KanbanProducao() {
   const [obsCorteModal, setObsCorteModal] = useState<{ open: boolean; card: KanbanCard | null; items: any[]; loading: boolean }>({ open: false, card: null, items: [], loading: false });
   const [obsCorteTexts, setObsCorteTexts] = useState<Map<string, string>>(new Map());
   const [savingObsCorte, setSavingObsCorte] = useState(false);
+
+  // WhatsApp vendedora modal
+  const [whatsappModal, setWhatsappModal] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
+  const [whatsappPedidoData, setWhatsappPedidoData] = useState<any>(null);
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
+
+  const VENDEDORAS = [
+    { nome: 'Vendedora 1', whatsapp: '5500000000001' },
+    { nome: 'Vendedora 2', whatsapp: '5500000000002' },
+    { nome: 'Vendedora 3', whatsapp: '5500000000003' },
+    { nome: 'Vendedora 4', whatsapp: '5500000000004' },
+    { nome: 'Vendedora 5', whatsapp: '5500000000005' },
+  ];
 
   const openDetailSheet = async (card: KanbanCard) => {
     setDetailSheet({ open: true, card, items: [], loading: true, pedido: null });
@@ -977,55 +990,57 @@ export default function KanbanProducao() {
 
   const handleEnviarParaComercial = async (card: KanbanCard) => {
     if (!profile) return;
+    setWhatsappLoading(true);
     try {
-      const { data: allOrdens } = await supabase
-        .from('ordens_producao')
-        .select('id, status, tipo_produto, op_etapas(id, nome_etapa, status, ordem_sequencia)')
-        .eq('pedido_id', card.pedido_id);
+      // Fetch full pedido data for the WhatsApp message
+      const { data: pedido } = await supabase
+        .from('pedidos')
+        .select('numero_pedido, cliente_nome, cliente_telefone, cliente_endereco, canal_venda, data_previsao_entrega, valor_liquido, observacao_api, observacao_comercial')
+        .eq('id', card.pedido_id)
+        .single();
+      setWhatsappPedidoData(pedido);
+      setWhatsappModal({ open: true, card });
+    } catch {
+      toast.error('Erro ao carregar dados da venda');
+    }
+    setWhatsappLoading(false);
+  };
 
-      if (!allOrdens) {
-        toast.error('Erro ao verificar ordens do pedido.');
-        return;
-      }
+  const handleSelectVendedora = async (vendedora: { nome: string; whatsapp: string }) => {
+    const card = whatsappModal.card;
+    if (!card || !profile || !whatsappPedidoData) return;
+    const p = whatsappPedidoData;
 
-      for (const ordem of allOrdens) {
-        if (ordem.status === 'CONCLUIDA') continue;
-        const etapas = (ordem as any).op_etapas as Array<{ id: string; nome_etapa: string; status: string; ordem_sequencia: number }> || [];
-        const sorted = [...etapas].sort((a, b) => a.ordem_sequencia - b.ordem_sequencia);
-        const activeEtapa = sorted.find(e => e.status === 'EM_ANDAMENTO') || sorted[sorted.length - 1];
-        const effectiveColumn = activeEtapa 
-          ? mapEtapaToColumn(activeEtapa.nome_etapa, activeEtapa.status, ordem.status, ordem.tipo_produto || undefined)
-          : null;
+    // Build WhatsApp message
+    const lines = [
+      `📋 *Venda #${p.numero_pedido}*`,
+      `👤 Cliente: ${p.cliente_nome || '—'}`,
+      `📞 Telefone: ${p.cliente_telefone || '—'}`,
+      `📍 Cidade/UF: ${p.cliente_endereco || '—'}`,
+      `🏷️ Segmento: ${p.canal_venda || '—'}`,
+      `📅 Data de Entrega: ${p.data_previsao_entrega ? new Date(p.data_previsao_entrega + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}`,
+      `💰 Valor Total: ${Number(p.valor_liquido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+      `📝 Observação: ${p.observacao_api || p.observacao_comercial || '—'}`,
+    ];
+    const message = lines.join('\n');
+    const url = `https://wa.me/${vendedora.whatsapp}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
 
-        if (effectiveColumn === 'Concluído' || sorted.every(e => e.status === 'CONCLUIDA')) {
-          await supabase.from('ordens_producao').update({ status: 'CONCLUIDA' }).eq('id', ordem.id);
-          const pendingEtapas = etapas.filter(e => e.status !== 'CONCLUIDA');
-          for (const pe of pendingEtapas) {
-            await supabase.from('op_etapas').update({ 
-              status: 'CONCLUIDA', 
-              concluido_em: new Date().toISOString() 
-            }).eq('id', pe.id);
-          }
-        } else {
-          toast.error('Ainda existem ordens em andamento para este pedido.');
-          return;
-        }
-      }
-
-      await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', card.pedido_id);
+    // Log to history
+    try {
       await supabase.from('pedido_historico').insert({
         pedido_id: card.pedido_id,
         usuario_id: profile.id,
-        tipo_acao: 'TRANSICAO',
-        status_anterior: card.pedido_status,
-        status_novo: 'AGUARDANDO_COMERCIAL',
-        observacao: `Produção concluída. Enviado para comercial por ${profile.nome}.`,
+        tipo_acao: 'COMENTARIO',
+        observacao: `Encaminhado para ${vendedora.nome} via WhatsApp`,
       });
-      toast.success(`Pedido #${card.api_venda_id} enviado para o Comercial`);
-      fetchCards();
+      toast.success(`Encaminhado para ${vendedora.nome} via WhatsApp`);
     } catch {
-      toast.error('Erro ao enviar para o comercial');
+      toast.error('Erro ao registrar encaminhamento');
     }
+
+    setWhatsappModal({ open: false, card: null });
+    setWhatsappPedidoData(null);
   };
 
   const filteredCards = getFilteredCards();
@@ -1409,8 +1424,8 @@ export default function KanbanProducao() {
                                   </Button>
                                 )}
                                 {inConcluido && canSendToComercial(card) && (
-                                  <Button size="sm" className="w-full mt-2 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => handleEnviarParaComercial(card)}>
-                                    <ArrowRight className="h-3 w-3 mr-1" /> Enviar para o Comercial
+                                  <Button size="sm" className="w-full mt-2 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleEnviarParaComercial(card)} disabled={whatsappLoading}>
+                                    <MessageCircle className="h-3 w-3 mr-1" /> Enviar para o Comercial
                                   </Button>
                                 )}
 
@@ -1720,6 +1735,49 @@ export default function KanbanProducao() {
           </ScrollArea>
         </SheetContent>
       </Sheet>
+
+      {/* WhatsApp Vendedora Modal */}
+      <Dialog open={whatsappModal.open} onOpenChange={(open) => { if (!open) { setWhatsappModal({ open: false, card: null }); setWhatsappPedidoData(null); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <MessageCircle className="h-5 w-5 text-emerald-600" />
+              Encaminhar para Vendedora
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Selecione a vendedora para enviar os dados da venda via WhatsApp
+            </DialogDescription>
+          </DialogHeader>
+          {whatsappPedidoData && (
+            <div className="rounded-lg border bg-muted/30 p-3 mb-2">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Venda #{whatsappPedidoData.numero_pedido}</p>
+              <p className="text-sm font-semibold">{whatsappPedidoData.cliente_nome}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {Number(whatsappPedidoData.valor_liquido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </p>
+            </div>
+          )}
+          <div className="grid gap-2">
+            {VENDEDORAS.map((v, i) => (
+              <Button
+                key={i}
+                variant="outline"
+                className="h-14 justify-start gap-3 text-left hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all group"
+                onClick={() => handleSelectVendedora(v)}
+              >
+                <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm shrink-0 group-hover:bg-emerald-200 transition-colors">
+                  {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{v.nome}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{v.whatsapp.replace(/(\d{2})(\d{2})(\d{5})(\d{4})/, '+$1 ($2) $3-$4')}</p>
+                </div>
+                <MessageCircle className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
