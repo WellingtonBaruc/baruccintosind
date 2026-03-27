@@ -990,55 +990,57 @@ export default function KanbanProducao() {
 
   const handleEnviarParaComercial = async (card: KanbanCard) => {
     if (!profile) return;
+    setWhatsappLoading(true);
     try {
-      const { data: allOrdens } = await supabase
-        .from('ordens_producao')
-        .select('id, status, tipo_produto, op_etapas(id, nome_etapa, status, ordem_sequencia)')
-        .eq('pedido_id', card.pedido_id);
+      // Fetch full pedido data for the WhatsApp message
+      const { data: pedido } = await supabase
+        .from('pedidos')
+        .select('numero_pedido, cliente_nome, cliente_telefone, cliente_endereco, canal_venda, data_previsao_entrega, valor_liquido, observacao_api, observacao_comercial')
+        .eq('id', card.pedido_id)
+        .single();
+      setWhatsappPedidoData(pedido);
+      setWhatsappModal({ open: true, card });
+    } catch {
+      toast.error('Erro ao carregar dados da venda');
+    }
+    setWhatsappLoading(false);
+  };
 
-      if (!allOrdens) {
-        toast.error('Erro ao verificar ordens do pedido.');
-        return;
-      }
+  const handleSelectVendedora = async (vendedora: { nome: string; whatsapp: string }) => {
+    const card = whatsappModal.card;
+    if (!card || !profile || !whatsappPedidoData) return;
+    const p = whatsappPedidoData;
 
-      for (const ordem of allOrdens) {
-        if (ordem.status === 'CONCLUIDA') continue;
-        const etapas = (ordem as any).op_etapas as Array<{ id: string; nome_etapa: string; status: string; ordem_sequencia: number }> || [];
-        const sorted = [...etapas].sort((a, b) => a.ordem_sequencia - b.ordem_sequencia);
-        const activeEtapa = sorted.find(e => e.status === 'EM_ANDAMENTO') || sorted[sorted.length - 1];
-        const effectiveColumn = activeEtapa 
-          ? mapEtapaToColumn(activeEtapa.nome_etapa, activeEtapa.status, ordem.status, ordem.tipo_produto || undefined)
-          : null;
+    // Build WhatsApp message
+    const lines = [
+      `📋 *Venda #${p.numero_pedido}*`,
+      `👤 Cliente: ${p.cliente_nome || '—'}`,
+      `📞 Telefone: ${p.cliente_telefone || '—'}`,
+      `📍 Cidade/UF: ${p.cliente_endereco || '—'}`,
+      `🏷️ Segmento: ${p.canal_venda || '—'}`,
+      `📅 Data de Entrega: ${p.data_previsao_entrega ? new Date(p.data_previsao_entrega + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}`,
+      `💰 Valor Total: ${Number(p.valor_liquido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+      `📝 Observação: ${p.observacao_api || p.observacao_comercial || '—'}`,
+    ];
+    const message = lines.join('\n');
+    const url = `https://wa.me/${vendedora.whatsapp}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
 
-        if (effectiveColumn === 'Concluído' || sorted.every(e => e.status === 'CONCLUIDA')) {
-          await supabase.from('ordens_producao').update({ status: 'CONCLUIDA' }).eq('id', ordem.id);
-          const pendingEtapas = etapas.filter(e => e.status !== 'CONCLUIDA');
-          for (const pe of pendingEtapas) {
-            await supabase.from('op_etapas').update({ 
-              status: 'CONCLUIDA', 
-              concluido_em: new Date().toISOString() 
-            }).eq('id', pe.id);
-          }
-        } else {
-          toast.error('Ainda existem ordens em andamento para este pedido.');
-          return;
-        }
-      }
-
-      await supabase.from('pedidos').update({ status_atual: 'AGUARDANDO_COMERCIAL' }).eq('id', card.pedido_id);
+    // Log to history
+    try {
       await supabase.from('pedido_historico').insert({
         pedido_id: card.pedido_id,
         usuario_id: profile.id,
-        tipo_acao: 'TRANSICAO',
-        status_anterior: card.pedido_status,
-        status_novo: 'AGUARDANDO_COMERCIAL',
-        observacao: `Produção concluída. Enviado para comercial por ${profile.nome}.`,
+        tipo_acao: 'COMENTARIO',
+        observacao: `Encaminhado para ${vendedora.nome} via WhatsApp`,
       });
-      toast.success(`Pedido #${card.api_venda_id} enviado para o Comercial`);
-      fetchCards();
+      toast.success(`Encaminhado para ${vendedora.nome} via WhatsApp`);
     } catch {
-      toast.error('Erro ao enviar para o comercial');
+      toast.error('Erro ao registrar encaminhamento');
     }
+
+    setWhatsappModal({ open: false, card: null });
+    setWhatsappPedidoData(null);
   };
 
   const filteredCards = getFilteredCards();
