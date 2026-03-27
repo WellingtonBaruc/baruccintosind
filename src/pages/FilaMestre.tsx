@@ -2157,14 +2157,16 @@ export default function FilaMestre() {
 
       {/* Dialog: Gerar OP PCP */}
       <Dialog open={gerarOpDialogOpen} onOpenChange={setGerarOpDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wrench className="h-5 w-5 text-orange-600" />
               Gerar OP de Produção (PCP)
             </DialogTitle>
+            <DialogDescription>Configure os produtos e composição da ordem de produção.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* Tipo */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Tipo de Produto *</Label>
               <Select value={gerarOpTipo} onValueChange={setGerarOpTipo}>
@@ -2176,26 +2178,149 @@ export default function FilaMestre() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Produto a produzir *</Label>
-              <Input
-                placeholder="Ex: Cinto Sintético 2,0 cm Preto"
-                value={gerarOpProduto}
-                onChange={(e) => setGerarOpProduto(e.target.value)}
-              />
+            {/* Produtos da OP */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-bold">Produtos da OP ({opProdutos.length})</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { resetFormProduto(); setEditingProdutoIdx(null); setShowProdutoForm(true); }}
+                  className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Produto
+                </Button>
+              </div>
+
+              {/* Product cards */}
+              {opProdutos.map((p, idx) => (
+                <div key={p.id} className="rounded-lg border border-orange-200 bg-orange-50/50 p-3 space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-bold text-foreground">{buildProdutoDesc(p)}</p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleEditProduto(idx)}>Editar</Button>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive" onClick={() => handleRemoveProduto(idx)}>Remover</Button>
+                    </div>
+                  </div>
+                  <div className="flex gap-4 text-xs text-muted-foreground">
+                    <span>Fivela: {p.fivela}</span>
+                    <span>Banho: {p.banhoFivela}</span>
+                    <span>Abertura: {p.aberturaFivela || '—'}</span>
+                    <span>Material: {p.material}</span>
+                  </div>
+                  <p className="text-sm font-bold text-orange-700">Qtd: {p.quantidade}</p>
+                </div>
+              ))}
+
+              {opProdutos.length === 0 && !showProdutoForm && (
+                <p className="text-sm text-muted-foreground text-center py-4 border border-dashed border-border rounded-lg">
+                  Nenhum produto adicionado. Clique em "+ Adicionar Produto".
+                </p>
+              )}
+
+              {/* Product form */}
+              {showProdutoForm && (
+                <div className="rounded-lg border border-primary/30 bg-muted/30 p-4 space-y-3">
+                  <p className="text-sm font-bold text-foreground">{editingProdutoIdx !== null ? 'Editar Produto' : 'Novo Produto'}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Fivela */}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Fivela *</Label>
+                      <Input placeholder="Ex: Fivela 30mm" value={formProduto.fivela} onChange={(e) => setFormProduto(prev => ({ ...prev, fivela: e.target.value }))} className="h-9 text-sm" />
+                    </div>
+                    {/* Banho */}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Banho da Fivela *</Label>
+                      <div className="flex gap-1">
+                        <Select value={formProduto.banhoFivela} onValueChange={(v) => setFormProduto(prev => ({ ...prev, banhoFivela: v }))}>
+                          <SelectTrigger className="h-9 text-sm flex-1"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                          <SelectContent>
+                            {BANHO_OPTIONS.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        {!addingBanho ? (
+                          <Button type="button" variant="outline" size="sm" className="h-9 px-2" onClick={() => setAddingBanho(true)}><Plus className="h-3 w-3" /></Button>
+                        ) : (
+                          <div className="flex gap-1">
+                            <Input className="h-9 w-20 text-xs" value={newBanho} onChange={(e) => setNewBanho(e.target.value)} placeholder="Novo" />
+                            <Button type="button" size="sm" className="h-9 px-2" onClick={() => { if (newBanho.trim()) { setCustomBanhos(prev => [...prev, newBanho.trim()]); setFormProduto(prev => ({ ...prev, banhoFivela: newBanho.trim() })); } setNewBanho(''); setAddingBanho(false); }}>OK</Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Abertura */}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Abertura da Fivela</Label>
+                      <Input placeholder="Ex: 35mm" value={formProduto.aberturaFivela} onChange={(e) => setFormProduto(prev => ({ ...prev, aberturaFivela: e.target.value }))} className="h-9 text-sm" />
+                    </div>
+                    {/* Tamanho */}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tamanho *</Label>
+                      <Select value={formProduto.tamanho} onValueChange={(v) => setFormProduto(prev => ({ ...prev, tamanho: v }))}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Slim">Slim</SelectItem>
+                          <SelectItem value="Plus">Plus</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Material */}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Material *</Label>
+                      <Select value={formProduto.material} onValueChange={(v) => setFormProduto(prev => ({ ...prev, material: v }))}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Perugia 2,5">Perugia 2,5</SelectItem>
+                          <SelectItem value="Mega 2,5">Mega 2,5</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Cor */}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Cor *</Label>
+                      <div className="flex gap-1">
+                        <Select value={formProduto.cor} onValueChange={(v) => setFormProduto(prev => ({ ...prev, cor: v }))}>
+                          <SelectTrigger className="h-9 text-sm flex-1"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                          <SelectContent>
+                            {COR_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        {!addingCor ? (
+                          <Button type="button" variant="outline" size="sm" className="h-9 px-2" onClick={() => setAddingCor(true)}><Plus className="h-3 w-3" /></Button>
+                        ) : (
+                          <div className="flex gap-1">
+                            <Input className="h-9 w-20 text-xs" value={newCor} onChange={(e) => setNewCor(e.target.value)} placeholder="Nova" />
+                            <Button type="button" size="sm" className="h-9 px-2" onClick={() => { if (newCor.trim()) { setCustomCores(prev => [...prev, newCor.trim()]); setFormProduto(prev => ({ ...prev, cor: newCor.trim() })); } setNewCor(''); setAddingCor(false); }}>OK</Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Quantidade */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Quantidade *</Label>
+                    <Input type="number" min={1} placeholder="Ex: 300" value={formProduto.quantidade} onChange={(e) => setFormProduto(prev => ({ ...prev, quantidade: parseInt(e.target.value) || 0 }))} className="h-9 text-sm w-32" />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <Button type="button" size="sm" onClick={handleAddProduto} className="bg-orange-600 hover:bg-orange-700 text-white">
+                      {editingProdutoIdx !== null ? 'Salvar' : 'Adicionar'}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => { setShowProdutoForm(false); setEditingProdutoIdx(null); }}>Cancelar</Button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Quantidade *</Label>
-              <Input
-                type="number"
-                min={1}
-                placeholder="Ex: 300"
-                value={gerarOpQuantidade}
-                onChange={(e) => setGerarOpQuantidade(parseInt(e.target.value) || 0)}
-              />
-            </div>
+            {/* Total */}
+            {opProdutos.length > 0 && (
+              <div className="rounded-lg border border-orange-300 bg-orange-100/50 p-3 flex items-center justify-between">
+                <span className="text-sm font-bold text-foreground">TOTAL DA OP</span>
+                <span className="text-lg font-bold text-orange-700">{totalOpQuantidade} peças</span>
+              </div>
+            )}
 
+            {/* Data entrega */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Data de Entrega *</Label>
               <Popover>
@@ -2206,36 +2331,26 @@ export default function FilaMestre() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarPicker
-                    mode="single"
-                    selected={gerarOpDataEntrega}
-                    onSelect={setGerarOpDataEntrega}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
+                  <CalendarPicker mode="single" selected={gerarOpDataEntrega} onSelect={setGerarOpDataEntrega} initialFocus className={cn("p-3 pointer-events-auto")} />
                 </PopoverContent>
               </Popover>
             </div>
 
+            {/* Observação */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Observação (opcional)</Label>
-              <Textarea
-                placeholder="Motivo ou detalhes da OP..."
-                value={gerarOpObs}
-                onChange={(e) => setGerarOpObs(e.target.value)}
-                className="text-sm"
-              />
+              <Textarea placeholder="Motivo ou detalhes da OP..." value={gerarOpObs} onChange={(e) => setGerarOpObs(e.target.value)} className="text-sm" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setGerarOpDialogOpen(false)}>Cancelar</Button>
             <Button
               onClick={handleGerarOpPcp}
-              disabled={gerarOpLoading || !gerarOpProduto.trim() || !gerarOpDataEntrega || gerarOpQuantidade < 1}
+              disabled={gerarOpLoading || opProdutos.length === 0 || !gerarOpDataEntrega}
               className="bg-orange-600 hover:bg-orange-700 text-white"
             >
               {gerarOpLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
-              Gerar OP PCP
+              Gerar OP PCP ({totalOpQuantidade} peças)
             </Button>
           </DialogFooter>
         </DialogContent>
