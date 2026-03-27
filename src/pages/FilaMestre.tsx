@@ -134,6 +134,15 @@ export default function FilaMestre() {
   const [editingPcp, setEditingPcp] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
 
+  // Gerar OP PCP dialog state
+  const [gerarOpDialogOpen, setGerarOpDialogOpen] = useState(false);
+  const [gerarOpPedidoId, setGerarOpPedidoId] = useState<string | null>(null);
+  const [gerarOpTipo, setGerarOpTipo] = useState<string>('SINTETICO');
+  const [gerarOpObs, setGerarOpObs] = useState('');
+  const [gerarOpLoading, setGerarOpLoading] = useState(false);
+  const [gerarOpItens, setGerarOpItens] = useState<any[]>([]);
+  const [gerarOpItensSelecionados, setGerarOpItensSelecionados] = useState<Set<string>>(new Set());
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedFetchAll = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
