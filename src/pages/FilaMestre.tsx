@@ -1410,6 +1410,30 @@ export default function FilaMestre() {
           )}
             </div>
           </div>
+
+          {/* PCP OP: Produto a produzir */}
+          {isPcpOp && r.produtos_descricao && (
+            <div className="px-4 pb-2">
+              <div className="rounded-md border border-orange-300/50 bg-orange-100/30 dark:bg-orange-900/10 p-2 text-[11px]">
+                <span className="text-muted-foreground font-medium">Produto a produzir: </span>
+                <span className="font-bold text-foreground">{r.produtos_descricao}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Gerar OP PCP button */}
+          {canEdit && !isPcpOp && (
+            <div className="px-4 pb-2" onClick={(e) => e.stopPropagation()}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[11px] gap-1 border-orange-400/50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:hover:bg-orange-950/20"
+                onClick={() => openGerarOpDialog(r.id)}
+              >
+                <Plus className="h-3 w-3" /> Gerar OP PCP
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );
