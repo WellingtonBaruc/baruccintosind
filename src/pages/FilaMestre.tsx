@@ -1077,19 +1077,19 @@ export default function FilaMestre() {
             {sorted.filter(r => r.tipo_produto !== 'SINTETICO' && r.tipo_produto !== 'TECIDO').length} Outro
           </Badge>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-1 justify-end">
           {canEdit && (
-            <Button variant="outline" onClick={() => setConfigOpen(true)}>
-              <Settings className="h-4 w-4 mr-1.5" /> Configurar PCP
+            <Button variant="outline" size="lg" className="flex-1 text-sm" onClick={() => setConfigOpen(true)}>
+              <Settings className="h-5 w-5 mr-2" /> Configurar PCP
             </Button>
           )}
-          <Button variant="outline" onClick={() => navigate('/painel-dia')}>
-            <Calendar className="h-4 w-4 mr-1.5" /> Painel do Dia
+          <Button variant="outline" size="lg" className="flex-1 text-sm" onClick={() => navigate('/painel-dia')}>
+            <Calendar className="h-5 w-5 mr-2" /> Painel do Dia
           </Button>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="gap-1.5">
-                <Download className="h-4 w-4" /> Exportar <ChevronDown className="h-3 w-3 opacity-50" />
+              <Button variant="outline" size="lg" className="flex-1 text-sm gap-2">
+                <Download className="h-5 w-5" /> Exportar <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-3" align="end">
