@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import * as XLSX from 'xlsx';
