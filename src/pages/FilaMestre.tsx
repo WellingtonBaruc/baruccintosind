@@ -1012,7 +1012,7 @@ export default function FilaMestre() {
                 <div className="flex items-center gap-1 flex-wrap">
                   {(() => {
                     const lastEtapaNorm = etapas.length > 0 ? etapas[etapas.length - 1].nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-                    const lastEtapaIsConcluido = ['concluido', 'producao finalizada'].includes(lastEtapaNorm);
+                    const lastEtapaIsConcluido = ['concluido', 'producao finalizada', 'conclusao', 'concluida'].includes(lastEtapaNorm) || r.tipo_produto === 'TECIDO';
                     return (
                       <>
                         {etapas.map((etapa) => {
