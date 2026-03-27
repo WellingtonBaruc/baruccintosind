@@ -1416,54 +1416,45 @@ export default function KanbanProducao() {
                                   </Button>
                                 )}
                                 {inConcluido && canSendToComercial(card) && (
-                                  <DropdownMenu
-                                    open={whatsappMenuCardId === card.id}
-                                    onOpenChange={(open) => {
-                                      if (open) {
-                                        void prepareWhatsappContext(card);
-                                        return;
-                                      }
-
-                                      if (whatsappMenuCardId === card.id) {
-                                        resetWhatsappState();
-                                      }
-                                    }}
-                                  >
-                                    <DropdownMenuTrigger asChild>
-                                      <Button size="sm" className="w-full mt-2 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" disabled={whatsappLoading && whatsappMenuCardId === card.id}>
-                                        <MessageCircle className="h-3 w-3 mr-1" /> Enviar para o Comercial
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-72">
-                                      {whatsappLoading && whatsappMenuCardId === card.id ? (
-                                        <DropdownMenuItem disabled>
-                                          <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> Carregando dados da venda...
-                                        </DropdownMenuItem>
-                                      ) : vendedorasDb.length === 0 ? (
-                                        <DropdownMenuItem disabled>Nenhuma vendedora cadastrada.</DropdownMenuItem>
-                                      ) : (
-                                        vendedorasDb.map((v) => (
-                                          <DropdownMenuItem
-                                            key={v.id}
-                                            onSelect={(event) => {
-                                              event.preventDefault();
-                                              handleWhatsappSelection(card, v);
-                                            }}
-                                            className="flex items-center gap-3 py-3"
-                                          >
-                                            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 font-bold text-xs shrink-0">
-                                              {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                              <p className="font-medium text-sm leading-none">{v.nome}</p>
-                                              <p className="text-xs text-muted-foreground font-mono mt-1">{formatWhatsappDisplay(v.whatsapp)}</p>
-                                            </div>
-                                            <MessageCircle className="h-4 w-4 text-emerald-500 shrink-0" />
-                                          </DropdownMenuItem>
-                                        ))
-                                      )}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                  <div className="mt-2">
+                                    <Button
+                                      size="sm"
+                                      className="w-full h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                      onClick={() => setWhatsappExpandedCardId(whatsappExpandedCardId === card.id ? null : card.id)}
+                                    >
+                                      <MessageCircle className="h-3 w-3 mr-1" />
+                                      Enviar para o Comercial
+                                    </Button>
+                                    {whatsappExpandedCardId === card.id && (
+                                      <div className="mt-1 rounded-md border bg-popover p-1 space-y-0.5">
+                                        {vendedorasDb.length === 0 ? (
+                                          <p className="text-xs text-muted-foreground p-2">Nenhuma vendedora cadastrada.</p>
+                                        ) : (
+                                          vendedorasDb.map((v) => (
+                                            <a
+                                              key={v.id}
+                                              href={buildWhatsappUrl(v.whatsapp, card)}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="flex items-center gap-3 py-2 px-2 rounded-sm hover:bg-accent transition-colors cursor-pointer no-underline"
+                                              onClick={() => {
+                                                void registerWhatsappReferral(card, v);
+                                              }}
+                                            >
+                                              <div className="flex items-center justify-center h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 font-bold text-xs shrink-0">
+                                                {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <p className="font-medium text-sm leading-none text-foreground">{v.nome}</p>
+                                                <p className="text-xs text-muted-foreground font-mono mt-1">{formatWhatsappDisplay(v.whatsapp)}</p>
+                                              </div>
+                                              <MessageCircle className="h-4 w-4 text-emerald-500 shrink-0" />
+                                            </a>
+                                          ))
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
 
                                 {!inConcluido && col !== 'Aguardando Início' && isSupervisor && (
