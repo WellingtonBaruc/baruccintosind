@@ -1942,7 +1942,15 @@ export default function FilaMestre() {
           <h1 className="text-2xl font-bold tracking-tight">Fila Mestre</h1>
           <Badge variant="outline" className="text-lg py-2 px-4 font-bold">{sorted.length} vendas</Badge>
           <Badge variant="outline" className="text-lg py-2 px-4 font-bold bg-blue-500/10 text-blue-600 border-blue-500/30">
-            {sorted.filter(r => r.tipo_produto === 'SINTETICO').length} Sint
+            <div className="flex flex-col items-center leading-tight">
+              <span>{sorted.filter(r => r.tipo_produto === 'SINTETICO').length} Sint</span>
+              {(() => {
+                const novaVendaSint = sorted.filter(r => r.tipo_produto === 'SINTETICO' && !r.api_venda_id && r.origem_op !== 'PCP' && r.origem_op !== 'LOJA').length;
+                return novaVendaSint > 0 ? (
+                  <span className="text-[10px] font-medium text-purple-600">{novaVendaSint} nova venda</span>
+                ) : null;
+              })()}
+            </div>
           </Badge>
           <Badge variant="outline" className="text-lg py-2 px-4 font-bold bg-amber-500/10 text-amber-600 border-amber-500/30">
             {sorted.filter(r => r.tipo_produto === 'TECIDO').length} Tec
