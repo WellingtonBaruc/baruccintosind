@@ -1065,19 +1065,8 @@ export default function FilaMestre() {
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">Fila Mestre</h1>
-          <Badge variant="outline" className="text-sm py-1 px-3 font-bold">{sorted.length} vendas</Badge>
-          <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 font-medium bg-blue-500/10 text-blue-600 border-blue-500/30">
-            {sorted.filter(r => r.tipo_produto === 'SINTETICO').length} Sint
-          </Badge>
-          <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 font-medium bg-amber-500/10 text-amber-600 border-amber-500/30">
-            {sorted.filter(r => r.tipo_produto === 'TECIDO').length} Tec
-          </Badge>
-          <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 font-medium bg-muted text-muted-foreground border-border">
-            {sorted.filter(r => r.tipo_produto !== 'SINTETICO' && r.tipo_produto !== 'TECIDO').length} Outro
-          </Badge>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Fila Mestre</h1>
+        <div className="flex gap-2 items-center">
         <div className="flex gap-2 items-center flex-1 justify-end">
           {canEdit && (
             <Button variant="outline" size="sm" className="text-xs h-7 px-2" onClick={() => setConfigOpen(true)}>
