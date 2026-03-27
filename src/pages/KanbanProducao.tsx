@@ -1108,6 +1108,23 @@ export default function KanbanProducao() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">Kanban de Produção</h1>
+          <Button variant="outline" size="sm" className="gap-1.5 border-emerald-500 text-emerald-600"
+            onClick={() => {
+              console.log('TESTE WhatsApp - botão isolado');
+              const testUrl = 'https://wa.me/5500000000000?text=Teste%20Lovable';
+              console.log('URL TESTE:', testUrl);
+              const link = document.createElement('a');
+              link.href = testUrl;
+              link.target = '_blank';
+              link.rel = 'noopener noreferrer';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              console.log('TESTE - link clicado');
+            }}
+          >
+            <MessageCircle className="h-3.5 w-3.5" /> Teste WhatsApp
+          </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/relatorios/producao')} className="gap-1.5">
             <BarChart3 className="h-3.5 w-3.5" /> Relatórios
           </Button>
