@@ -584,14 +584,61 @@ export default function Integracao() {
                 </SelectContent>
               </Select>
             </div>
-            {config?.ativa && config?.ultima_sincronizacao && (
-              <p className="text-xs text-muted-foreground">
-                Próxima sync prevista: {format(
-                  new Date(new Date(config.ultima_sincronizacao).getTime() + (config.intervalo_minutos * 60000)),
-                  "dd/MM 'às' HH:mm", { locale: ptBR }
-                )}
-              </p>
-            )}
+            {config?.ativa && config?.ultima_sincronizacao && (() => {
+              const ultima = new Date(config.ultima_sincronizacao);
+              const agora = new Date();
+              // Próximo slot: a cada 15min, seg-sex 07:50-18:30 BRT
+              const getNextSync = (from: Date): Date => {
+                const d = new Date(from);
+                // Avança 15 minutos a partir da última sync
+                d.setMinutes(d.getMinutes() + 15);
+                // Arredonda para próximo slot de 15min (minutos 5,20,35,50)
+                const slots = [5, 20, 35, 50];
+                const m = d.getMinutes();
+                let nextSlot = slots.find(s => s >= m);
+                if (nextSlot === undefined) {
+                  nextSlot = slots[0];
+                  d.setHours(d.getHours() + 1);
+                }
+                d.setMinutes(nextSlot, 0, 0);
+                
+                // Converter para BRT para verificar horário comercial
+                const brt = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+                const brtH = brt.getUTCHours();
+                const brtM = brt.getUTCMinutes();
+                const brtDay = brt.getUTCDay(); // 0=dom, 6=sab
+                
+                // Se fim de semana, avança para segunda 07:50
+                if (brtDay === 0 || brtDay === 6) {
+                  const daysToMon = brtDay === 0 ? 1 : 2;
+                  brt.setUTCDate(brt.getUTCDate() + daysToMon);
+                  brt.setUTCHours(7, 50, 0, 0);
+                  return new Date(brt.getTime() + 3 * 60 * 60 * 1000);
+                }
+                // Se antes das 07:50, ajusta para 07:50
+                if (brtH < 7 || (brtH === 7 && brtM < 50)) {
+                  brt.setUTCHours(7, 50, 0, 0);
+                  return new Date(brt.getTime() + 3 * 60 * 60 * 1000);
+                }
+                // Se depois das 18:30, avança para próximo dia útil 07:50
+                if (brtH > 18 || (brtH === 18 && brtM > 30)) {
+                  brt.setUTCDate(brt.getUTCDate() + 1);
+                  const nextDay = brt.getUTCDay();
+                  if (nextDay === 0) brt.setUTCDate(brt.getUTCDate() + 1);
+                  if (nextDay === 6) brt.setUTCDate(brt.getUTCDate() + 2);
+                  brt.setUTCHours(7, 50, 0, 0);
+                  return new Date(brt.getTime() + 3 * 60 * 60 * 1000);
+                }
+                return d;
+              };
+              const nextSync = getNextSync(ultima);
+              return (
+                <p className="text-xs text-muted-foreground">
+                  Próxima sync prevista: {format(nextSync, "dd/MM 'às' HH:mm", { locale: ptBR })}
+                  <span className="ml-2 opacity-70">(Seg-Sex 07:50–18:30)</span>
+                </p>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
