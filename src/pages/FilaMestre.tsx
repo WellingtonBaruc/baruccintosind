@@ -346,10 +346,6 @@ export default function FilaMestre() {
       else totalTec += qtd;
       if (concludedPedidoIds.has(item.pedido_id)) totalConcl += qtd;
     }
-        return fimDate.getFullYear() === currentYear && fimDate.getMonth() === month && fimDate.getDate() >= fromDay && fimDate.getDate() <= toDay;
-      });
-      if (concluded) totalConcl += pecas;
-    }
     setWeekSummary({ sintetico: totalSint, tecido: totalTec, concluido: totalConcl });
   }, []);
 
