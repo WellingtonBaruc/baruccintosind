@@ -988,19 +988,26 @@ export default function KanbanProducao() {
     }
   };
 
-  const handleEnviarParaComercial = async (card: KanbanCard) => {
-    if (!profile) return;
+   const handleEnviarParaComercial = async (card: KanbanCard) => {
+    if (!profile) { console.error('handleEnviarParaComercial: no profile'); return; }
     setWhatsappLoading(true);
     try {
       // Fetch full pedido data for the WhatsApp message
-      const { data: pedido } = await supabase
+      const { data: pedido, error: pedidoError } = await supabase
         .from('pedidos')
         .select('numero_pedido, cliente_nome, cliente_telefone, cliente_endereco, canal_venda, data_previsao_entrega, valor_liquido, observacao_api, observacao_comercial')
         .eq('id', card.pedido_id)
         .single();
+      console.log('handleEnviarParaComercial pedido:', pedido, 'error:', pedidoError, 'card.pedido_id:', card.pedido_id);
+      if (pedidoError) {
+        toast.error('Erro ao carregar dados da venda');
+        setWhatsappLoading(false);
+        return;
+      }
       setWhatsappPedidoData(pedido);
       setWhatsappModal({ open: true, card });
-    } catch {
+    } catch (err) {
+      console.error('handleEnviarParaComercial catch:', err);
       toast.error('Erro ao carregar dados da venda');
     }
     setWhatsappLoading(false);
