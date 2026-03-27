@@ -805,6 +805,77 @@ export default function FilaMestre() {
     );
   };
 
+  const renderCompactCard = (r: VendaRow) => {
+    const tipoBadge = TIPO_PRODUTO_BADGE[r.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border';
+    const tipoLabel = r.tipo_produto === 'SINTETICO' ? 'Sint' : r.tipo_produto === 'TECIDO' ? 'Tec' : r.tipo_produto === 'FIVELA_COBERTA' ? 'Fiv' : '—';
+    const etapas = r.etapas || [];
+    return (
+      <div
+        key={r.id}
+        className={`rounded-md border bg-card cursor-pointer hover:shadow-md transition-shadow ${
+          r.prioridade === 'URGENTE' ? 'border-l-[3px] border-l-destructive' :
+          r.prioridade === 'ATENCAO' ? 'border-l-[3px] border-l-warning' :
+          'border-l-[3px] border-l-[hsl(var(--success))]'
+        }`}
+        onClick={() => openDetail(r.id)}
+      >
+        <div className="px-3 py-1.5 space-y-0.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-bold text-xs tabular-nums">{r.api_venda_id || r.numero_pedido}</span>
+              <span className={`text-[10px] font-semibold px-1.5 py-0 rounded border ${tipoBadge}`}>{tipoLabel}</span>
+              {r.is_piloto && <span className="text-[10px] px-1 rounded bg-purple-500/15 text-purple-600 border border-purple-500/30 font-semibold">P</span>}
+            </div>
+            <span className="text-xs font-bold tabular-nums text-foreground whitespace-nowrap">{fmt(r.valor_liquido)}</span>
+          </div>
+          <p className="text-sm font-bold text-foreground truncate leading-tight">{r.cliente_nome}</p>
+          <div className="flex items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
+            <span title="Entrega">🚚 {fmtDate(r.dataEntregaEfetiva)}</span>
+            <span className={`font-bold ${r.atrasoDias < 0 ? 'text-destructive' : r.atrasoDias <= 2 ? 'text-warning' : 'text-muted-foreground'}`} title="Atraso">⚠ {r.atrasoDias}d</span>
+            <span title="Início ideal">⏱ {fmtDate(r.dataInicioIdeal)}</span>
+            <span title="Início PCP">🕒 {r.data_inicio_pcp ? fmtDateTime(r.data_inicio_pcp).split(' ')[0] : '—'}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase">ETAPA:</span>
+            <span className="text-[11px] font-bold text-primary">{r.etapa_atual}</span>
+          </div>
+          {etapas.length > 0 && (
+            <TooltipProvider delayDuration={200}>
+              <div className="flex items-center gap-0.5 pt-0.5">
+                {etapas.map((etapa) => {
+                  const isConcluida = etapa.status === 'CONCLUIDA';
+                  const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
+                  const shortName = etapa.nome_etapa.length > 4 ? etapa.nome_etapa.substring(0, 4) : etapa.nome_etapa;
+                  return (
+                    <Tooltip key={etapa.id}>
+                      <TooltipTrigger asChild>
+                        <button
+                          className={`px-1 py-0 rounded text-[9px] font-semibold transition-all ${isAdmin ? 'cursor-pointer hover:ring-1 hover:ring-primary/40' : 'cursor-default'} ${isConcluida ? 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]' : isEmAndamento ? 'bg-primary/20 text-primary ring-1 ring-primary/30' : 'bg-muted/60 text-muted-foreground'}`}
+                          onClick={(e) => { e.stopPropagation(); if (isAdmin) handleMoveToEtapa(r, etapa); }}
+                        >{shortName}</button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs"><p>{etapa.nome_etapa} — {isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}</p></TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className={`px-1 py-0 rounded text-[9px] font-semibold ${isAdmin ? 'cursor-pointer hover:ring-1 hover:ring-primary/40' : 'cursor-default'} ${r.ordem_status === 'CONCLUIDA' ? 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]' : 'bg-muted/60 text-muted-foreground'}`}
+                      onClick={(e) => { e.stopPropagation(); if (isAdmin) handleMoveToConcluido(r); }}
+                    >Fim</button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">Concluído</TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
