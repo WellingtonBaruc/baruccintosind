@@ -1190,9 +1190,8 @@ export default function FilaMestre() {
 
       </div>
 
-      {/* Summary + Global Export */}
+      {/* Summary */}
       <div className="flex items-center gap-3 flex-wrap text-sm">
-        <Badge variant="outline" className="text-sm py-1 px-3 font-semibold">{sorted.length} pedidos</Badge>
         <Badge className="bg-destructive/15 text-destructive border-destructive/30 py-1 px-3 font-semibold">
           {sorted.filter(r => r.prioridade === 'URGENTE').length} urgentes
         </Badge>
