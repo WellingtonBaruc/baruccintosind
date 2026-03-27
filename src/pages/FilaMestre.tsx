@@ -1065,20 +1065,8 @@ export default function FilaMestre() {
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">Fila Mestre</h1>
-          <Badge variant="outline" className="text-sm py-1 px-3 font-bold">{sorted.length} vendas</Badge>
-          <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 font-medium bg-blue-500/10 text-blue-600 border-blue-500/30">
-            {sorted.filter(r => r.tipo_produto === 'SINTETICO').length} Sint
-          </Badge>
-          <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 font-medium bg-amber-500/10 text-amber-600 border-amber-500/30">
-            {sorted.filter(r => r.tipo_produto === 'TECIDO').length} Tec
-          </Badge>
-          <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 font-medium bg-muted text-muted-foreground border-border">
-            {sorted.filter(r => r.tipo_produto !== 'SINTETICO' && r.tipo_produto !== 'TECIDO').length} Outro
-          </Badge>
-        </div>
-        <div className="flex gap-2 items-center flex-1 justify-end">
+        <h1 className="text-2xl font-bold tracking-tight">Fila Mestre</h1>
+        <div className="flex gap-2 items-center">
           {canEdit && (
             <Button variant="outline" size="sm" className="text-xs h-7 px-2" onClick={() => setConfigOpen(true)}>
               <Settings className="h-3 w-3 mr-1" /> PCP
@@ -1191,14 +1179,38 @@ export default function FilaMestre() {
 
       </div>
 
-      {/* Summary */}
-      <div className="flex items-center gap-3 flex-wrap text-sm">
-        <Badge className="bg-destructive/15 text-destructive border-destructive/30 py-1 px-3 font-semibold">
-          {sorted.filter(r => r.prioridade === 'URGENTE').length} urgentes
-        </Badge>
-        <Badge className="bg-warning/15 text-warning border-warning/30 py-1 px-3 font-semibold">
-          {sorted.filter(r => r.prioridade === 'ATENCAO').length} atenção
-        </Badge>
+      {/* KPI Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <Card className="border-border/60">
+          <CardContent className="p-4 text-center">
+            <p className="text-3xl font-bold tabular-nums">{sorted.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">Total Vendas</p>
+          </CardContent>
+        </Card>
+        <Card className="border-blue-500/30 bg-blue-500/5">
+          <CardContent className="p-4 text-center">
+            <p className="text-3xl font-bold tabular-nums text-blue-600">{sorted.filter(r => r.tipo_produto === 'SINTETICO').length}</p>
+            <p className="text-xs text-blue-600/70 mt-1">Sintético</p>
+          </CardContent>
+        </Card>
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="p-4 text-center">
+            <p className="text-3xl font-bold tabular-nums text-amber-600">{sorted.filter(r => r.tipo_produto === 'TECIDO').length}</p>
+            <p className="text-xs text-amber-600/70 mt-1">Tecido</p>
+          </CardContent>
+        </Card>
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="p-4 text-center">
+            <p className="text-3xl font-bold tabular-nums text-destructive">{sorted.filter(r => r.prioridade === 'URGENTE').length}</p>
+            <p className="text-xs text-destructive/70 mt-1">Urgentes</p>
+          </CardContent>
+        </Card>
+        <Card className="border-warning/30 bg-warning/5">
+          <CardContent className="p-4 text-center">
+            <p className="text-3xl font-bold tabular-nums text-warning">{sorted.filter(r => r.prioridade === 'ATENCAO').length}</p>
+            <p className="text-xs text-warning/70 mt-1">Atenção</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Content */}
