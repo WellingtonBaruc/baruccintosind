@@ -1787,23 +1787,37 @@ export default function KanbanProducao() {
             {vendedorasDb.length === 0 && (
               <p className="text-center text-sm text-muted-foreground py-4">Nenhuma vendedora cadastrada. Cadastre em Usuários.</p>
             )}
-            {vendedorasDb.map((v) => (
-              <Button
-                key={v.id}
-                variant="outline"
-                className="h-14 justify-start gap-3 text-left hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all group"
-                onClick={() => handleSelectVendedora(v)}
-              >
-                <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm shrink-0 group-hover:bg-emerald-200 transition-colors">
-                  {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{v.nome}</p>
-                  <p className="text-xs text-muted-foreground font-mono">{v.whatsapp.replace(/(\d{2})(\d{2})(\d{5})(\d{4})/, '+$1 ($2) $3-$4')}</p>
-                </div>
-                <MessageCircle className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </Button>
-            ))}
+            {vendedorasDb.map((v) => {
+              const message = whatsappPedidoData ? buildWhatsappMessage(whatsappPedidoData) : '';
+              const whatsappUrl = buildWhatsappUrl(v.whatsapp, message);
+
+              return (
+                <Button
+                  key={v.id}
+                  asChild
+                  variant="outline"
+                  className="h-14 justify-start gap-3 text-left hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all group"
+                >
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      void handleSelectVendedora(v);
+                    }}
+                  >
+                    <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm shrink-0 group-hover:bg-emerald-200 transition-colors">
+                      {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{v.nome}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{formatWhatsappDisplay(v.whatsapp)}</p>
+                    </div>
+                    <MessageCircle className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                </Button>
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>
