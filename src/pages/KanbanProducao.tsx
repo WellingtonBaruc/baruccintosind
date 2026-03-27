@@ -1030,6 +1030,8 @@ export default function KanbanProducao() {
       lines.push(``);
     }
 
+    lines.push(`Verifique os itens e finalize sua venda! ✅`);
+    lines.push(`──────────────────────`);
     lines.push(`Qualquer dúvida, estamos à disposição! 😊`);
 
     return lines.join('\n');
