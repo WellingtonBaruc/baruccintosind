@@ -430,11 +430,11 @@ export default function FilaMestre() {
       const tipoProduto = ordem?.tipo_produto || null;
       
       if (tipoProduto === 'TECIDO') {
-        // Remove final "Concluído"/"Produção Finalizada" from Tecido trail
-        const concNames = ['concluido', 'producao finalizada'];
+        // Filter Tecido: remove "Aguardando Início" and final "Concluído"/"Produção Finalizada"
+        const skipNames = ['concluido', 'producao finalizada', 'aguardando inicio'];
         const tecidoEtapas = unifiedEtapas.filter(e => {
           const norm = e.nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          return !concNames.includes(norm);
+          return !skipNames.includes(norm);
         });
         
         // Find the Sintético OP for this pedido
@@ -444,13 +444,17 @@ export default function FilaMestre() {
             .filter((e: any) => e.ordem_id === sinteticoOrdem.id)
             .sort((a: any, b: any) => a.ordem_sequencia - b.ordem_sequencia);
           
-          // Skip "Corte" (auto-completed) from Sintético, keep Preparação→Montagem→Embalagem→Concluído/Prod.Finalizada
+          // Skip "Corte" and "Aguardando Início" from Sintético, keep Preparação→Montagem→Embalagem→Concluído
+          const skipSintetico = ['corte', 'aguardando inicio'];
           const sinteticoTrail = sinteticoEtapas
-            .filter((e: any) => e.nome_etapa !== 'Corte')
+            .filter((e: any) => {
+              const norm = e.nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              return !skipSintetico.includes(norm);
+            })
             .map((e: any, idx: number) => ({
               id: e.id,
-              nome_etapa: e.nome_etapa,
-              ordem_sequencia: 100 + idx, // ensure they sort after Tecido etapas
+              nome_etapa: e.nome_etapa === 'Produção Finalizada' ? 'Concluído' : e.nome_etapa,
+              ordem_sequencia: 100 + idx,
               status: e.status as string,
             }));
           
