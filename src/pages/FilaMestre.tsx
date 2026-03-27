@@ -1422,17 +1422,17 @@ export default function FilaMestre() {
             <p className="text-lg font-bold text-foreground truncate leading-tight">{r.cliente_nome}</p>
           </div>
 
-          {/* Row 3: Status line */}
+          {/* Row 3: Situação Simplifica */}
           <div className="px-5 pb-3 flex items-center gap-2 flex-wrap">
-            <Badge className={`text-[11px] font-medium ${(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).color || 'bg-muted text-muted-foreground'}`}>
-              {(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual}
-            </Badge>
             {r.status_api && (
-              <span className="text-[11px] text-muted-foreground border border-border/60 rounded px-2 py-0.5 font-medium">{r.status_api}</span>
-            )}
-            {r.ordem_status && (
-              <Badge variant="outline" className="text-[11px] font-medium">
-                OP: {r.ordem_status === 'AGUARDANDO' ? 'Aguardando' : r.ordem_status === 'EM_ANDAMENTO' ? 'Em Andamento' : r.ordem_status === 'CONCLUIDA' ? 'Concluída' : r.ordem_status}
+              <Badge className={`text-[11px] font-semibold ${
+                r.status_api === 'Em Produção' ? 'bg-blue-500/15 text-blue-700 border-blue-300' :
+                r.status_api === 'Pedido Enviado' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-300' :
+                r.status_api === 'Finalizado' ? 'bg-muted text-muted-foreground border-border' :
+                r.status_api === 'Cancelado' ? 'bg-destructive/15 text-destructive border-destructive/30' :
+                'bg-muted text-muted-foreground border-border'
+              }`}>
+                Simplifica: {r.status_api}
               </Badge>
             )}
             {r.operador_atual !== '—' && (
