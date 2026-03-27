@@ -1422,17 +1422,17 @@ export default function FilaMestre() {
             <p className="text-lg font-bold text-foreground truncate leading-tight">{r.cliente_nome}</p>
           </div>
 
-          {/* Row 3: Status line */}
+          {/* Row 3: Situação Simplifica */}
           <div className="px-5 pb-3 flex items-center gap-2 flex-wrap">
-            <Badge className={`text-[11px] font-medium ${(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).color || 'bg-muted text-muted-foreground'}`}>
-              {(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual}
-            </Badge>
             {r.status_api && (
-              <span className="text-[11px] text-muted-foreground border border-border/60 rounded px-2 py-0.5 font-medium">{r.status_api}</span>
-            )}
-            {r.ordem_status && (
-              <Badge variant="outline" className="text-[11px] font-medium">
-                OP: {r.ordem_status === 'AGUARDANDO' ? 'Aguardando' : r.ordem_status === 'EM_ANDAMENTO' ? 'Em Andamento' : r.ordem_status === 'CONCLUIDA' ? 'Concluída' : r.ordem_status}
+              <Badge className={`text-[11px] font-semibold ${
+                r.status_api === 'Em Produção' ? 'bg-blue-500/15 text-blue-700 border-blue-300' :
+                r.status_api === 'Pedido Enviado' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-300' :
+                r.status_api === 'Finalizado' ? 'bg-muted text-muted-foreground border-border' :
+                r.status_api === 'Cancelado' ? 'bg-destructive/15 text-destructive border-destructive/30' :
+                'bg-muted text-muted-foreground border-border'
+              }`}>
+                Simplifica: {r.status_api}
               </Badge>
             )}
             {r.operador_atual !== '—' && (
@@ -1725,9 +1725,15 @@ export default function FilaMestre() {
 
             {/* Lado direito — Status, Etapa e Progresso */}
             <div className="pl-2 space-y-1.5">
-              {/* Status + Etapa */}
+              {/* Situação Simplifica + Etapa */}
               <div className="flex items-center gap-5 text-[13px]">
-                <span className="text-muted-foreground">Status: <Badge className={`text-[11px] font-medium ml-1 ${(statusCfg as any).color || ''}`}>{(statusCfg as any).label || r.status_atual}</Badge></span>
+                {r.status_api && (
+                  <span className="text-muted-foreground">Simplifica: <Badge className={`text-[11px] font-semibold ml-1 ${
+                    r.status_api === 'Em Produção' ? 'bg-blue-500/15 text-blue-700 border-blue-300' :
+                    r.status_api === 'Pedido Enviado' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-300' :
+                    'bg-muted text-muted-foreground border-border'
+                  }`}>{r.status_api}</Badge></span>
+                )}
                 <span className="text-muted-foreground">Etapa: <span className="font-bold text-primary">{r.etapa_atual}</span></span>
               </div>
 
@@ -1780,6 +1786,40 @@ export default function FilaMestre() {
                     {isAdmin && <p className="text-primary mt-0.5">Clique para concluir</p>}
                   </TooltipContent>
                 </Tooltip>
+                {/* Post-production stages (Kanban Venda) — shown after production concludes */}
+                {r.ordem_status === 'CONCLUIDA' && (() => {
+                  const POST_PROD_STAGES = [
+                    { key: 'comercial', label: 'Comercial', statuses: ['PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL', 'LOJA_OK', 'LOJA_PENDENTE_FINALIZACAO'] },
+                    { key: 'financeiro', label: 'Financeiro', statuses: ['VALIDADO_COMERCIAL', 'AGUARDANDO_FINANCEIRO'] },
+                    { key: 'logistica', label: 'Logística', statuses: ['VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO'] },
+                    { key: 'entregue', label: 'Entregue', statuses: ['ENVIADO', 'ENTREGUE', 'AGUARDANDO_CIENCIA_COMERCIAL'] },
+                  ];
+                  // Determine which stage is current/done
+                  const currentIdx = POST_PROD_STAGES.findIndex(s => s.statuses.includes(r.status_atual));
+                  return (
+                    <>
+                      <div className="w-px h-4 bg-border mx-1" />
+                      {POST_PROD_STAGES.map((stage, idx) => {
+                        const isDone = currentIdx >= 0 && idx < currentIdx;
+                        const isCurrent = idx === currentIdx;
+                        return (
+                          <Tooltip key={stage.key}>
+                            <TooltipTrigger asChild>
+                              <div className={`flex-1 px-2 py-1 rounded-md text-[11px] font-semibold text-center cursor-default ${
+                                isDone ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]' :
+                                isCurrent ? 'bg-amber-500/15 text-amber-700 font-bold ring-1 ring-amber-400/40' :
+                                'bg-muted/60 text-muted-foreground'
+                              }`}>{stage.label}</div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              <p>{stage.label} — {isDone ? 'Concluído' : isCurrent ? 'Em andamento' : 'Pendente'}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
               </div>
               {/* Countdown to delivery date (15h cutoff) */}
               {(() => {
