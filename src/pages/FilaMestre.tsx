@@ -396,7 +396,7 @@ export default function FilaMestre() {
     const pedidoIds = pedidos.map(p => p.id);
 
     const [ordensRes, itensRes] = await Promise.all([
-      supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp').in('pedido_id', pedidoIds),
+      supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp, origem_op, produtos_descricao').in('pedido_id', pedidoIds),
       supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', pedidoIds),
     ]);
     const ordens = ordensRes.data || [];
@@ -539,6 +539,8 @@ export default function FilaMestre() {
         prioridade: pcp.prioridade,
         etapas: unifiedEtapas,
         dataEntregaEfetiva,
+        origem_op: (ordem as any)?.origem_op || 'SISTEMA',
+        produtos_descricao: (ordem as any)?.produtos_descricao || null,
       };
     });
 
