@@ -1705,15 +1705,26 @@ export default function FilaMestre() {
                 </div>
               )}
               {canEdit && r.ordem_status !== 'CONCLUIDA' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
-                  onClick={(e) => { e.stopPropagation(); setDeleteOpTarget(r); setDeleteOpDialogOpen(true); }}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  <span className="text-[11px]">Excluir</span>
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-primary hover:bg-primary/10 shrink-0"
+                    onClick={(e) => { e.stopPropagation(); openEditOpDialog(r); }}
+                  >
+                    <Pencil className="h-3.5 w-3.5 mr-1" />
+                    <span className="text-[11px]">Editar</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
+                    onClick={(e) => { e.stopPropagation(); setDeleteOpTarget(r); setDeleteOpDialogOpen(true); }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    <span className="text-[11px]">Excluir</span>
+                  </Button>
+                </>
               )}
             </div>
           )}
