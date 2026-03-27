@@ -725,7 +725,6 @@ export default function FilaMestre() {
     if (!profile) return;
     if (opProdutos.length === 0) { toast.error('Adicione pelo menos um produto'); return; }
     if (!gerarOpDataEntrega) { toast.error('Informe a data de entrega'); return; }
-    if (gerarOpQuantidade < 1) { toast.error('Quantidade inválida'); return; }
     setGerarOpLoading(true);
     try {
       const pipelineMap: Record<string, string> = {
@@ -735,7 +734,6 @@ export default function FilaMestre() {
       };
       const pipelineId = pipelineMap[gerarOpTipo] || pipelineMap['SINTETICO'];
 
-      // Generate sequential OP number
       const { data: existingPcpPedidos } = await supabase
         .from('pedidos')
         .select('numero_pedido')
@@ -750,7 +748,9 @@ export default function FilaMestre() {
       const numeroPedido = `OP-PCP-${String(nextNum).padStart(4, '0')}`;
       const dataEntregaStr = format(gerarOpDataEntrega, 'yyyy-MM-dd');
 
-      // Create virtual pedido
+      const produtosDescList = opProdutos.map(p => `${buildProdutoDesc(p)} (${p.quantidade}un)`);
+      const produtosDescStr = produtosDescList.join(' | ');
+
       const { data: novoPedido, error: pedidoErr } = await supabase
         .from('pedidos')
         .insert({
@@ -768,16 +768,16 @@ export default function FilaMestre() {
         .single();
       if (pedidoErr) throw pedidoErr;
 
-      // Create pedido_item
-      await supabase.from('pedido_itens').insert({
+      const itensToInsert = opProdutos.map(p => ({
         pedido_id: novoPedido.id,
-        descricao_produto: gerarOpProduto,
-        quantidade: gerarOpQuantidade,
+        descricao_produto: buildProdutoDesc(p),
+        quantidade: p.quantidade,
         valor_unitario: 0,
         valor_total: 0,
-      } as any);
+        observacao_producao: `Fivela: ${p.fivela} | Banho: ${p.banhoFivela} | Abertura: ${p.aberturaFivela} | Tamanho: ${p.tamanho} | Material: ${p.material} | Cor: ${p.cor}`,
+      }));
+      await supabase.from('pedido_itens').insert(itensToInsert as any);
 
-      // Create OP
       const { data: novaOrdem, error: ordemErr } = await supabase
         .from('ordens_producao')
         .insert({
@@ -789,13 +789,12 @@ export default function FilaMestre() {
           observacao: gerarOpObs || null,
           origem_op: 'PCP',
           criado_por_id: profile.id,
-          produtos_descricao: `${gerarOpProduto} (${gerarOpQuantidade}un)`,
+          produtos_descricao: produtosDescStr,
         } as any)
         .select()
         .single();
       if (ordemErr) throw ordemErr;
 
-      // Create etapas
       const { data: pipelineEtapas } = await supabase
         .from('pipeline_etapas')
         .select('*')
@@ -813,12 +812,11 @@ export default function FilaMestre() {
         await supabase.from('op_etapas').insert(opEtapas as any);
       }
 
-      // Register history
       await supabase.from('pedido_historico').insert({
         pedido_id: novoPedido.id,
         usuario_id: profile.id,
         tipo_acao: 'TRANSICAO',
-        observacao: `OP PCP criada. Tipo: ${gerarOpTipo}. Produto: ${gerarOpProduto}. Qtd: ${gerarOpQuantidade}.`,
+        observacao: `OP PCP criada. Tipo: ${gerarOpTipo}. ${opProdutos.length} produto(s). Total: ${totalOpQuantidade}un.`,
       });
 
       toast.success(`OP PCP ${numeroPedido} criada com sucesso!`);
