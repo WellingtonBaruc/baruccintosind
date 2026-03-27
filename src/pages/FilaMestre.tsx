@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid, Clock } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import * as XLSX from 'xlsx';
@@ -1028,8 +1028,7 @@ export default function FilaMestre() {
                 const dataEntrega = r.data_entrega_ajustada_pcp || r.data_previsao_entrega;
                 if (!dataEntrega) return null;
                 const now = new Date();
-                const deadlineStr = dataEntrega + 'T15:00:00-03:00';
-                const deadline = new Date(deadlineStr);
+                const deadline = new Date(dataEntrega + 'T15:00:00-03:00');
                 const diffMs = deadline.getTime() - now.getTime();
                 const isOverdue = diffMs < 0;
                 const absDiffMs = Math.abs(diffMs);
@@ -1037,11 +1036,19 @@ export default function FilaMestre() {
                 const days = Math.floor(totalHours / 24);
                 const hours = totalHours % 24;
                 const label = days > 0 ? `${days}d ${hours}h` : `${hours}h`;
+                const colorClass = isOverdue
+                  ? 'bg-destructive/15 text-destructive border-destructive/30'
+                  : days <= 1
+                    ? 'bg-amber-500/15 text-amber-600 border-amber-500/30'
+                    : days <= 3
+                      ? 'bg-blue-500/15 text-blue-600 border-blue-500/30'
+                      : 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30';
                 return (
-                  <div className={`text-[10px] font-semibold text-center mt-0.5 ${
-                    isOverdue ? 'text-destructive' : days <= 1 ? 'text-amber-600' : 'text-muted-foreground'
-                  }`}>
-                    {isOverdue ? `⚠ Atrasado ${label}` : `⏱ Faltam ${label}`}
+                  <div className="flex justify-center mt-1">
+                    <div className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-full border text-xs font-bold ${colorClass}`}>
+                      <Clock className="w-3.5 h-3.5" />
+                      {isOverdue ? `Atrasado ${label}` : `Faltam ${label}`}
+                    </div>
                   </div>
                 );
               })()}
