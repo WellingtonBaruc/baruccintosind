@@ -165,10 +165,8 @@ export default function KanbanProducao() {
   const [obsCorteTexts, setObsCorteTexts] = useState<Map<string, string>>(new Map());
   const [savingObsCorte, setSavingObsCorte] = useState(false);
 
-  // WhatsApp vendedora menu
-  const [whatsappMenuCardId, setWhatsappMenuCardId] = useState<string | null>(null);
-  const [whatsappPedidoData, setWhatsappPedidoData] = useState<any>(null);
-  const [whatsappLoading, setWhatsappLoading] = useState(false);
+  // WhatsApp inline expansion
+  const [whatsappExpandedCardId, setWhatsappExpandedCardId] = useState<string | null>(null);
 
   const [vendedorasDb, setVendedorasDb] = useState<{ id: string; nome: string; whatsapp: string }[]>([]);
 
