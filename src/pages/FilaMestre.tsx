@@ -702,7 +702,7 @@ export default function FilaMestre() {
   };
 
   const resetFormProduto = () => {
-    setFormProduto({ id: '', fivela: '', banhoFivela: '', aberturaFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1 });
+    setFormProduto({ id: '', fivela: '', banhoFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1 });
   };
 
   const handleAddProduto = () => {
@@ -729,9 +729,11 @@ export default function FilaMestre() {
     setOpProdutos(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const buildProdutoDesc = (p: OpProdutoItem) => {
-    const parts = [gerarOpTipo === 'SINTETICO' ? 'Cinto Sintético' : 'Cinto Tecido', p.tamanho, p.cor, p.banhoFivela].filter(Boolean);
-    return parts.join(' • ');
+  const buildProdutoDesc = (p: OpProdutoItem, tipo?: string) => {
+    const tipoStr = (tipo || gerarOpTipo) === 'SINTETICO' ? 'CINTO SINTETICO' : 'CINTO TECIDO';
+    // Order: tipo, fivela, banho, mm (from fivela), tamanho, material, cor
+    const parts = [tipoStr, p.fivela, p.banhoFivela, p.tamanho, p.material, p.cor].filter(Boolean);
+    return parts.join(' ');
   };
 
   const handleGerarOpPcp = async () => {
@@ -787,7 +789,7 @@ export default function FilaMestre() {
         quantidade: p.quantidade,
         valor_unitario: 0,
         valor_total: 0,
-        observacao_producao: `Fivela: ${p.fivela} | Banho: ${p.banhoFivela} | Abertura: ${p.aberturaFivela} | Tamanho: ${p.tamanho} | Material: ${p.material} | Cor: ${p.cor}`,
+        observacao_producao: `Fivela: ${p.fivela} | Banho: ${p.banhoFivela} | Tamanho: ${p.tamanho} | Material: ${p.material} | Cor: ${p.cor}`,
       }));
       await supabase.from('pedido_itens').insert(itensToInsert as any);
 
