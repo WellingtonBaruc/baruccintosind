@@ -1725,9 +1725,15 @@ export default function FilaMestre() {
 
             {/* Lado direito — Status, Etapa e Progresso */}
             <div className="pl-2 space-y-1.5">
-              {/* Status + Etapa */}
+              {/* Situação Simplifica + Etapa */}
               <div className="flex items-center gap-5 text-[13px]">
-                <span className="text-muted-foreground">Status: <Badge className={`text-[11px] font-medium ml-1 ${(statusCfg as any).color || ''}`}>{(statusCfg as any).label || r.status_atual}</Badge></span>
+                {r.status_api && (
+                  <span className="text-muted-foreground">Simplifica: <Badge className={`text-[11px] font-semibold ml-1 ${
+                    r.status_api === 'Em Produção' ? 'bg-blue-500/15 text-blue-700 border-blue-300' :
+                    r.status_api === 'Pedido Enviado' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-300' :
+                    'bg-muted text-muted-foreground border-border'
+                  }`}>{r.status_api}</Badge></span>
+                )}
                 <span className="text-muted-foreground">Etapa: <span className="font-bold text-primary">{r.etapa_atual}</span></span>
               </div>
 
