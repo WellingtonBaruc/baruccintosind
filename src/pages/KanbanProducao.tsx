@@ -1007,7 +1007,7 @@ export default function KanbanProducao() {
         .select('numero_pedido, cliente_nome, cliente_telefone, cliente_endereco, canal_venda, data_previsao_entrega, valor_liquido, observacao_api, observacao_comercial')
         .eq('id', card.pedido_id)
         .single();
-      console.log('handleEnviarParaComercial pedido:', pedido, 'error:', pedidoError, 'card.pedido_id:', card.pedido_id);
+      console.log('prepareWhatsappContext pedido:', pedido, 'error:', pedidoError, 'card.pedido_id:', card.pedido_id);
       if (pedidoError) {
         toast.error('Erro ao carregar dados da venda');
         resetWhatsappState();
@@ -1061,12 +1061,6 @@ export default function KanbanProducao() {
     ];
 
     return lines.join('\n');
-  };
-
-  const buildWhatsappUrl = (phone: string, message: string) => {
-    const cleanPhone = phone.replace(/\D/g, '');
-    const encodedMessage = encodeURIComponent(message);
-    return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
   };
 
   const openWhatsApp = (phone: string, message: string) => {
