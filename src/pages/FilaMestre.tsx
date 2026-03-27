@@ -103,6 +103,14 @@ interface GrupoInfo {
   outrosPecas: number;
 }
 
+// Filter: only valid production items (CINTO/TIRA SINTETICO/TECIDO)
+const isValidProductionItem = (desc: string | null): boolean => {
+  if (!desc) return false;
+  const normalized = desc.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  return normalized.startsWith('CINTO SINTETICO') || normalized.startsWith('TIRA SINTETICO')
+    || normalized.startsWith('CINTO TECIDO') || normalized.startsWith('TIRA TECIDO');
+};
+
 export default function FilaMestre() {
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -284,7 +292,7 @@ export default function FilaMestre() {
           .select('id, pedido_id, tipo_produto, status, data_fim_pcp')
           .in('pedido_id', batch)
           .in('tipo_produto', ['SINTETICO', 'TECIDO']),
-        supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', batch),
+        supabase.from('pedido_itens').select('pedido_id, quantidade, descricao_produto').in('pedido_id', batch),
       ]);
       allOrdens.push(...(ordensRes.data || []));
       allItens.push(...(itensRes.data || []));
@@ -296,6 +304,7 @@ export default function FilaMestre() {
     const qtdByPedido = new Map<string, number>();
     for (const item of allItens) {
       if (!pedidoIdsWithOrdens.has(item.pedido_id)) continue;
+      if (!isValidProductionItem(item.descricao_produto)) continue;
       qtdByPedido.set(item.pedido_id, (qtdByPedido.get(item.pedido_id) || 0) + (item.quantidade || 0));
     }
 
@@ -360,6 +369,7 @@ export default function FilaMestre() {
     const itensByPedido = new Map<string, { desc: string; qtd: number }[]>();
     for (const item of allItens) {
       if (!pedidoIdsWithOrdens.has(item.pedido_id)) continue;
+      if (!isValidProductionItem(item.descricao_produto)) continue;
       qtdByPedido.set(item.pedido_id, (qtdByPedido.get(item.pedido_id) || 0) + (item.quantidade || 0));
       if (!itensByPedido.has(item.pedido_id)) itensByPedido.set(item.pedido_id, []);
       itensByPedido.get(item.pedido_id)!.push({ desc: item.descricao_produto || 'Sem descrição', qtd: item.quantidade || 0 });
@@ -494,14 +504,15 @@ export default function FilaMestre() {
 
     const [ordensRes, itensRes] = await Promise.all([
       supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp, origem_op, produtos_descricao').in('pedido_id', pedidoIds),
-      supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', pedidoIds),
+      supabase.from('pedido_itens').select('pedido_id, quantidade, descricao_produto').in('pedido_id', pedidoIds),
     ]);
     const ordens = ordensRes.data || [];
     const itensData = itensRes.data || [];
 
-    // Aggregate quantities per pedido
+    // Aggregate quantities per pedido (only valid production items)
     const qtdMap = new Map<string, number>();
     for (const item of itensData) {
+      if (!isValidProductionItem(item.descricao_produto)) continue;
       qtdMap.set(item.pedido_id, (qtdMap.get(item.pedido_id) || 0) + (item.quantidade || 0));
     }
 
