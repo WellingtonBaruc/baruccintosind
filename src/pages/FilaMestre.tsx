@@ -1427,6 +1427,15 @@ export default function FilaMestre() {
           <Badge variant="outline" className="text-lg py-2 px-4 font-bold bg-muted text-muted-foreground">
             {sorted.filter(r => r.tipo_produto !== 'SINTETICO' && r.tipo_produto !== 'TECIDO').length} Outro
           </Badge>
+          <div className="h-6 w-px bg-border mx-1" />
+          <Badge variant="outline" className="text-sm py-1.5 px-3 font-bold bg-purple-500/10 text-purple-600 border-purple-500/30">
+            <Store className="h-3.5 w-3.5 mr-1" />
+            {rows.filter(r => r.origem_op === 'LOJA').length} OP Loja
+          </Badge>
+          <Badge variant="outline" className="text-sm py-1.5 px-3 font-bold bg-orange-500/10 text-orange-600 border-orange-500/30">
+            <Wrench className="h-3.5 w-3.5 mr-1" />
+            {rows.filter(r => r.origem_op === 'PCP').length} OP PCP
+          </Badge>
         </div>
         <div className="flex gap-2 items-center">
           {canEdit && (
