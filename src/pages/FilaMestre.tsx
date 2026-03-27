@@ -939,7 +939,7 @@ export default function FilaMestre() {
               {/* Progresso — apenas etapas do Kanban */}
               {etapas.length > 0 && (
             <TooltipProvider delayDuration={200}>
-              <div className="flex items-center gap-1 flex-wrap">
+              <div className="flex items-center gap-1">
                 {etapas.filter(etapa => {
                   // Mostrar apenas etapas do Kanban de produção (excluir pós-produção)
                   const nome = etapa.nome_etapa?.toLowerCase() || '';
