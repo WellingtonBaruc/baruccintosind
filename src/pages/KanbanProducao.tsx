@@ -1424,8 +1424,8 @@ export default function KanbanProducao() {
                                   </Button>
                                 )}
                                 {inConcluido && canSendToComercial(card) && (
-                                  <Button size="sm" className="w-full mt-2 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => handleEnviarParaComercial(card)}>
-                                    <ArrowRight className="h-3 w-3 mr-1" /> Enviar para o Comercial
+                                  <Button size="sm" className="w-full mt-2 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleEnviarParaComercial(card)} disabled={whatsappLoading}>
+                                    <MessageCircle className="h-3 w-3 mr-1" /> Enviar para o Comercial
                                   </Button>
                                 )}
 
