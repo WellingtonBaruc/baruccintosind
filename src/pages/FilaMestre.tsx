@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid, Clock, Plus, Store, Wrench, Trash2, Pencil } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid, Clock, Plus, Store, Wrench, Trash2, Pencil, Ban } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -193,6 +193,12 @@ export default function FilaMestre() {
   const [deleteOpDialogOpen, setDeleteOpDialogOpen] = useState(false);
   const [deleteOpTarget, setDeleteOpTarget] = useState<VendaRow | null>(null);
   const [deleteOpLoading, setDeleteOpLoading] = useState(false);
+
+  // Cancelar Venda state
+  const [cancelVendaDialogOpen, setCancelVendaDialogOpen] = useState(false);
+  const [cancelVendaTarget, setCancelVendaTarget] = useState<VendaRow | null>(null);
+  const [cancelVendaLoading, setCancelVendaLoading] = useState(false);
+  const [cancelVendaObs, setCancelVendaObs] = useState('');
 
   // Editar OP PCP state
   const [editOpDialogOpen, setEditOpDialogOpen] = useState(false);
@@ -948,6 +954,51 @@ export default function FilaMestre() {
       toast.error('Erro ao excluir OP: ' + (err.message || err));
     } finally {
       setDeleteOpLoading(false);
+    }
+  };
+
+  // Cancelar Venda
+  const handleCancelVenda = async () => {
+    if (!cancelVendaTarget || !profile) return;
+    setCancelVendaLoading(true);
+    try {
+      const { error } = await supabase
+        .from('pedidos')
+        .update({
+          status_atual: 'CANCELADO',
+          status_api: 'Cancelado',
+          sincronizacao_bloqueada: true,
+        } as any)
+        .eq('id', cancelVendaTarget.id);
+      if (error) throw error;
+
+      // Cancel all associated ordens
+      await supabase
+        .from('ordens_producao')
+        .update({ status: 'CANCELADA' } as any)
+        .eq('pedido_id', cancelVendaTarget.id);
+
+      // Log action
+      await supabase.from('pedido_historico').insert({
+        pedido_id: cancelVendaTarget.id,
+        usuario_id: profile.id,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: cancelVendaTarget.status_atual,
+        status_novo: 'CANCELADO',
+        observacao: cancelVendaObs
+          ? `Cancelado manualmente por ${profile.nome}. Motivo: ${cancelVendaObs}`
+          : `Cancelado manualmente por ${profile.nome} — venda cancelada no Simplifica.`,
+      });
+
+      toast.success('Venda cancelada com sucesso');
+      setCancelVendaDialogOpen(false);
+      setCancelVendaTarget(null);
+      setCancelVendaObs('');
+      fetchAll();
+    } catch (err: any) {
+      toast.error('Erro ao cancelar venda: ' + (err.message || err));
+    } finally {
+      setCancelVendaLoading(false);
     }
   };
 
@@ -1792,6 +1843,21 @@ export default function FilaMestre() {
                   </Button>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Cancelar Venda button - for admin/gestor */}
+          {isAdmin && !isPcpOp && r.ordem_status !== 'CONCLUIDA' && (
+            <div className="px-4 pb-2 flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
+                onClick={(e) => { e.stopPropagation(); setCancelVendaTarget(r); setCancelVendaObs(''); setCancelVendaDialogOpen(true); }}
+              >
+                <Ban className="h-3.5 w-3.5 mr-1" />
+                <span className="text-[11px]">Cancelar Venda</span>
+              </Button>
             </div>
           )}
 
@@ -2668,6 +2734,46 @@ export default function FilaMestre() {
             >
               {deleteOpLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
               Excluir OP
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AlertDialog para cancelar Venda */}
+      <AlertDialog open={cancelVendaDialogOpen} onOpenChange={(open) => { setCancelVendaDialogOpen(open); if (!open) setCancelVendaObs(''); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar Venda</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                Tem certeza que deseja cancelar esta venda? A sincronização será bloqueada e todas as OPs serão canceladas.
+                {cancelVendaTarget && (
+                  <span className="block mt-2 font-semibold text-foreground">
+                    {cancelVendaTarget.api_venda_id || cancelVendaTarget.numero_pedido} — {cancelVendaTarget.cliente_nome}
+                  </span>
+                )}
+                <div className="mt-3">
+                  <Label className="text-sm font-medium text-foreground">Observação (opcional)</Label>
+                  <Textarea
+                    className="mt-1"
+                    placeholder="Motivo do cancelamento..."
+                    value={cancelVendaObs}
+                    onChange={(e) => setCancelVendaObs(e.target.value)}
+                  />
+                </div>
+                <span className="block mt-2 text-destructive font-medium">Essa ação não poderá ser desfeita.</span>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelVendaLoading}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelVenda}
+              disabled={cancelVendaLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelVendaLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Ban className="h-4 w-4 mr-1" />}
+              Cancelar Venda
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
