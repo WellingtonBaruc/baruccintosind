@@ -457,18 +457,17 @@ export default function FilaMestre() {
           realEtapasMap.set('concluido', { ...pf, nome_etapa: 'Concluído' });
         }
 
-        // Determine if all real Tecido etapas are CONCLUIDA (to mark post-Finalização stages)
-        const tecidoConcluida = ordem?.status === 'CONCLUIDA';
-        
-        unifiedEtapas = tecidoFullTrail.map((name, idx) => {
-          const norm = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          const real = realEtapasMap.get(norm);
-          if (real) {
-            return { id: real.id, nome_etapa: name, ordem_sequencia: idx, status: real.status };
-          }
-          // For stages without real etapa (Preparação/Montagem/Embalagem/Concluído from Sintético), show PENDENTE
-          return { id: `virtual-${idx}`, nome_etapa: name, ordem_sequencia: idx, status: 'PENDENTE' };
-        });
+        unifiedEtapas = tecidoFullTrail
+          .filter((name) => name !== 'Concluído')
+          .map((name, idx) => {
+            const norm = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const real = realEtapasMap.get(norm);
+            if (real) {
+              return { id: real.id, nome_etapa: name, ordem_sequencia: idx, status: real.status };
+            }
+            // For stages without real etapa (Preparação/Montagem/Embalagem), show PENDENTE
+            return { id: `virtual-${idx}`, nome_etapa: name, ordem_sequencia: idx, status: 'PENDENTE' };
+          });
       }
 
       // Find active etapa across unified trail
