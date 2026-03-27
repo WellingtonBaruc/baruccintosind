@@ -899,32 +899,63 @@ export default function FilaMestre() {
                   </p>
                 </div>
               </div>
-              {/* Linha 3: Tempo de Produção */}
-              <div>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Tempo Produção</span>
-                <p className={`font-bold text-[11px] ${r.atrasoDias < 0 ? 'text-destructive' : r.atrasoDias <= 2 ? 'text-warning' : 'text-[hsl(var(--success))]'}`}>
-                  {(() => {
-                    if (r.data_inicio_pcp && r.data_fim_pcp) {
-                      const inicio = new Date(r.data_inicio_pcp);
-                      const fim = new Date(r.data_fim_pcp);
-                      const diffMs = fim.getTime() - inicio.getTime();
-                      const hours = Math.floor(diffMs / (1000 * 60 * 60));
-                      const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                      const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
-                      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-                    }
-                    if (r.data_inicio_pcp) {
-                      const inicio = new Date(r.data_inicio_pcp);
-                      const agora = new Date();
-                      const diffMs = agora.getTime() - inicio.getTime();
-                      const hours = Math.floor(diffMs / (1000 * 60 * 60));
-                      const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                      const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
-                      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} ⏱`;
-                    }
-                    return '—';
-                  })()}
-                </p>
+              {/* Linha 3: Tempo de Produção + Ajustar Data */}
+              <div className="flex items-end justify-between gap-2">
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Tempo Produção</span>
+                  <p className={`font-bold text-[11px] ${r.atrasoDias < 0 ? 'text-destructive' : r.atrasoDias <= 2 ? 'text-warning' : 'text-[hsl(var(--success))]'}`}>
+                    {(() => {
+                      if (r.data_inicio_pcp && r.data_fim_pcp) {
+                        const inicio = new Date(r.data_inicio_pcp);
+                        const fim = new Date(r.data_fim_pcp);
+                        const diffMs = fim.getTime() - inicio.getTime();
+                        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                        const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                        const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
+                        return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                      }
+                      if (r.data_inicio_pcp) {
+                        const inicio = new Date(r.data_inicio_pcp);
+                        const agora = new Date();
+                        const diffMs = agora.getTime() - inicio.getTime();
+                        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                        const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                        const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
+                        return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} ⏱`;
+                      }
+                      return '—';
+                    })()}
+                  </p>
+                </div>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className={`text-[10px] font-semibold px-2 py-1 rounded border transition-colors ${
+                        r.data_entrega_ajustada_pcp ? 'bg-primary/10 text-primary border-primary/30' : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                      }`}>
+                        <CalendarIcon className="inline-block w-3 h-3 mr-1" />
+                        {r.data_entrega_ajustada_pcp ? fmtDate(r.data_entrega_ajustada_pcp) : 'PCP'}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <div className="p-2 border-b border-border flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">Ajustar data de entrega</span>
+                        {r.data_entrega_ajustada_pcp && (
+                          <Button variant="ghost" size="sm" className="h-6 text-xs text-destructive" onClick={() => saveEntregaAjustada(r.id, undefined)}>
+                            Remover
+                          </Button>
+                        )}
+                      </div>
+                      <CalendarPicker
+                        mode="single"
+                        selected={r.data_entrega_ajustada_pcp ? new Date(r.data_entrega_ajustada_pcp + 'T00:00:00') : undefined}
+                        onSelect={(date) => saveEntregaAjustada(r.id, date)}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             </div>
 
