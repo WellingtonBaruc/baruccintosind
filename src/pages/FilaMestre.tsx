@@ -128,7 +128,6 @@ export default function FilaMestre() {
   const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<PedidoDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
@@ -138,10 +137,11 @@ export default function FilaMestre() {
   // Gerar OP PCP dialog state
   const [gerarOpDialogOpen, setGerarOpDialogOpen] = useState(false);
   const [gerarOpTipo, setGerarOpTipo] = useState<string>('SINTETICO');
+  const [gerarOpProduto, setGerarOpProduto] = useState('');
+  const [gerarOpQuantidade, setGerarOpQuantidade] = useState<number>(1);
+  const [gerarOpDataEntrega, setGerarOpDataEntrega] = useState<Date | undefined>();
   const [gerarOpObs, setGerarOpObs] = useState('');
   const [gerarOpLoading, setGerarOpLoading] = useState(false);
-  const [gerarOpItens, setGerarOpItens] = useState<any[]>([]);
-  const [gerarOpItensSelecionados, setGerarOpItensSelecionados] = useState<Set<string>>(new Set());
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedFetchAll = useCallback(() => {
@@ -371,8 +371,16 @@ export default function FilaMestre() {
   const fetchRows = async (cal: PcpCalendarData, lts: Record<string, number>) => {
     const { data: pedidosEmProducao } = await supabase
       .from('pedidos')
-      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
+      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
       .eq('status_api', 'Em Produção')
+      .order('criado_em', { ascending: false });
+
+    // Also fetch PCP-internal pedidos (independent OPs)
+    const { data: pedidosPcp } = await supabase
+      .from('pedidos')
+      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
+      .eq('tipo_fluxo', 'PCP_INTERNO')
+      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
       .order('criado_em', { ascending: false });
 
     const { data: todasOrdens } = await supabase
@@ -381,9 +389,11 @@ export default function FilaMestre() {
       .not('status', 'in', '("CONCLUIDA","CANCELADA")');
 
     const emProducaoIds = new Set((pedidosEmProducao || []).map(p => p.id));
+    const pcpIds = new Set((pedidosPcp || []).map(p => p.id));
+    const allKnownIds = new Set([...emProducaoIds, ...pcpIds]);
     const complementaryOpPedidoIds = new Set<string>();
     for (const o of (todasOrdens || [])) {
-      if ((o as any).sequencia > 1 && !emProducaoIds.has(o.pedido_id)) {
+      if ((o as any).sequencia > 1 && !allKnownIds.has(o.pedido_id)) {
         complementaryOpPedidoIds.add(o.pedido_id);
       }
     }
@@ -393,13 +403,21 @@ export default function FilaMestre() {
     if (backfillIds.length > 0) {
       const { data } = await supabase
         .from('pedidos')
-        .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas')
+        .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
         .in('id', backfillIds)
         .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")');
       pedidosComOp = data || [];
     }
 
-    const pedidos = [...(pedidosEmProducao || []), ...pedidosComOp];
+    // Merge all, deduplicating by id
+    const seenIds = new Set<string>();
+    const pedidos: any[] = [];
+    for (const p of [...(pedidosEmProducao || []), ...(pedidosPcp || []), ...pedidosComOp]) {
+      if (!seenIds.has(p.id)) {
+        seenIds.add(p.id);
+        pedidos.push(p);
+      }
+    }
     if (pedidos.length === 0) { setRows([]); setLoading(false); return; }
 
     const pedidoIds = pedidos.map(p => p.id);
@@ -625,24 +643,21 @@ export default function FilaMestre() {
     toast.success(value ? `Entrega ajustada para ${format(date!, 'dd/MM/yy')}` : 'Entrega ajustada removida');
     fetchAll();
   };
-  // Open Gerar OP PCP dialog for selected cards
-  const openGerarOpDialog = async () => {
-    const pedidoIds = [...selectedCards];
-    if (pedidoIds.length === 0) { toast.error('Selecione pelo menos um card'); return; }
+  // Open Gerar OP PCP dialog
+  const openGerarOpDialog = () => {
     setGerarOpTipo('SINTETICO');
+    setGerarOpProduto('');
+    setGerarOpQuantidade(1);
+    setGerarOpDataEntrega(undefined);
     setGerarOpObs('');
-    setGerarOpItensSelecionados(new Set());
-    // Fetch items for all selected pedidos
-    const { data: itens } = await supabase.from('pedido_itens').select('*').in('pedido_id', pedidoIds);
-    setGerarOpItens(itens || []);
-    setGerarOpItensSelecionados(new Set((itens || []).map((i: any) => i.id)));
     setGerarOpDialogOpen(true);
   };
 
   const handleGerarOpPcp = async () => {
     if (!profile) return;
-    const pedidoIds = [...selectedCards];
-    if (pedidoIds.length === 0) return;
+    if (!gerarOpProduto.trim()) { toast.error('Informe o produto'); return; }
+    if (!gerarOpDataEntrega) { toast.error('Informe a data de entrega'); return; }
+    if (gerarOpQuantidade < 1) { toast.error('Quantidade inválida'); return; }
     setGerarOpLoading(true);
     try {
       const pipelineMap: Record<string, string> = {
@@ -652,74 +667,94 @@ export default function FilaMestre() {
       };
       const pipelineId = pipelineMap[gerarOpTipo] || pipelineMap['SINTETICO'];
 
-      // Get pipeline etapas once
+      // Generate sequential OP number
+      const { data: existingPcpPedidos } = await supabase
+        .from('pedidos')
+        .select('numero_pedido')
+        .eq('tipo_fluxo', 'PCP_INTERNO')
+        .order('criado_em', { ascending: false })
+        .limit(1);
+      let nextNum = 1;
+      if (existingPcpPedidos && existingPcpPedidos.length > 0) {
+        const match = existingPcpPedidos[0].numero_pedido.match(/OP-PCP-(\d+)/);
+        if (match) nextNum = parseInt(match[1]) + 1;
+      }
+      const numeroPedido = `OP-PCP-${String(nextNum).padStart(4, '0')}`;
+      const dataEntregaStr = format(gerarOpDataEntrega, 'yyyy-MM-dd');
+
+      // Create virtual pedido
+      const { data: novoPedido, error: pedidoErr } = await supabase
+        .from('pedidos')
+        .insert({
+          numero_pedido: numeroPedido,
+          cliente_nome: 'Produção PCP',
+          status_atual: 'EM_PRODUCAO',
+          tipo_fluxo: 'PCP_INTERNO',
+          data_previsao_entrega: dataEntregaStr,
+          valor_liquido: 0,
+          valor_bruto: 0,
+          valor_desconto: 0,
+          observacao_comercial: gerarOpObs || null,
+        } as any)
+        .select()
+        .single();
+      if (pedidoErr) throw pedidoErr;
+
+      // Create pedido_item
+      await supabase.from('pedido_itens').insert({
+        pedido_id: novoPedido.id,
+        descricao_produto: gerarOpProduto,
+        quantidade: gerarOpQuantidade,
+        valor_unitario: 0,
+        valor_total: 0,
+      } as any);
+
+      // Create OP
+      const { data: novaOrdem, error: ordemErr } = await supabase
+        .from('ordens_producao')
+        .insert({
+          pedido_id: novoPedido.id,
+          pipeline_id: pipelineId,
+          sequencia: 1,
+          status: 'AGUARDANDO',
+          tipo_produto: gerarOpTipo,
+          observacao: gerarOpObs || null,
+          origem_op: 'PCP',
+          criado_por_id: profile.id,
+          produtos_descricao: `${gerarOpProduto} (${gerarOpQuantidade}un)`,
+        } as any)
+        .select()
+        .single();
+      if (ordemErr) throw ordemErr;
+
+      // Create etapas
       const { data: pipelineEtapas } = await supabase
         .from('pipeline_etapas')
         .select('*')
         .eq('pipeline_id', pipelineId)
         .order('ordem');
 
-      // Get items per pedido
-      const itensByPedido = new Map<string, any[]>();
-      for (const item of gerarOpItens) {
-        if (!gerarOpItensSelecionados.has(item.id)) continue;
-        const list = itensByPedido.get(item.pedido_id) || [];
-        list.push(item);
-        itensByPedido.set(item.pedido_id, list);
+      if (pipelineEtapas && pipelineEtapas.length > 0 && novaOrdem) {
+        const opEtapas = pipelineEtapas.map((e: any) => ({
+          ordem_id: novaOrdem.id,
+          pipeline_etapa_id: e.id,
+          nome_etapa: e.nome,
+          ordem_sequencia: e.ordem,
+          status: 'PENDENTE',
+        }));
+        await supabase.from('op_etapas').insert(opEtapas as any);
       }
 
-      for (const pedidoId of pedidoIds) {
-        // Get max sequencia
-        const { data: existingOrdens } = await supabase
-          .from('ordens_producao')
-          .select('sequencia')
-          .eq('pedido_id', pedidoId)
-          .order('sequencia', { ascending: false })
-          .limit(1);
-        const nextSeq = (existingOrdens && existingOrdens[0] ? existingOrdens[0].sequencia : 0) + 1;
+      // Register history
+      await supabase.from('pedido_historico').insert({
+        pedido_id: novoPedido.id,
+        usuario_id: profile.id,
+        tipo_acao: 'TRANSICAO',
+        observacao: `OP PCP criada. Tipo: ${gerarOpTipo}. Produto: ${gerarOpProduto}. Qtd: ${gerarOpQuantidade}.`,
+      });
 
-        const selectedItens = itensByPedido.get(pedidoId) || [];
-        const prodDesc = selectedItens.map((i: any) => `${i.descricao_produto} (${i.quantidade}un)`).join(', ');
-
-        const { data: novaOrdem, error: ordemErr } = await supabase
-          .from('ordens_producao')
-          .insert({
-            pedido_id: pedidoId,
-            pipeline_id: pipelineId,
-            sequencia: nextSeq,
-            status: 'AGUARDANDO',
-            tipo_produto: gerarOpTipo,
-            observacao: gerarOpObs || null,
-            origem_op: 'PCP',
-            criado_por_id: profile.id,
-            produtos_descricao: prodDesc || null,
-          } as any)
-          .select()
-          .single();
-        if (ordemErr) throw ordemErr;
-
-        if (pipelineEtapas && pipelineEtapas.length > 0 && novaOrdem) {
-          const opEtapas = pipelineEtapas.map((e: any) => ({
-            ordem_id: novaOrdem.id,
-            pipeline_etapa_id: e.id,
-            nome_etapa: e.nome,
-            ordem_sequencia: e.ordem,
-            status: 'PENDENTE',
-          }));
-          await supabase.from('op_etapas').insert(opEtapas as any);
-        }
-
-        await supabase.from('pedido_historico').insert({
-          pedido_id: pedidoId,
-          usuario_id: profile.id,
-          tipo_acao: 'TRANSICAO',
-          observacao: `OP de Produção gerada pelo PCP. Tipo: ${gerarOpTipo}. ${gerarOpObs ? 'Obs: ' + gerarOpObs : ''}`,
-        });
-      }
-
-      toast.success(`${pedidoIds.length} OP(s) PCP gerada(s) com sucesso!`);
+      toast.success(`OP PCP ${numeroPedido} criada com sucesso!`);
       setGerarOpDialogOpen(false);
-      setSelectedCards(new Set());
       fetchAll();
     } catch (err: any) {
       toast.error('Erro ao gerar OP: ' + (err.message || err));
