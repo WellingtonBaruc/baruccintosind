@@ -1,42 +1,29 @@
 
 
-## Diagnóstico: Venda 3103964 mostrando "Produção Finalizada" incorretamente
+## Problema
 
-### Causa Raiz
+A venda **3104397** (PED-00273) foi cancelada no Simplifica, mas como o Simplifica não retorna mais essa venda na API, a sincronização automática não consegue atualizar o status. O pedido continua aparecendo na Fila Mestre com `status_api = 'Em Produção'` e `status_atual = EM_PRODUCAO`.
 
-A venda 3103964 possui **duas Ordens de Produção**:
-1. OP SINTETICO (status: EM_ANDAMENTO) -- a principal, ainda ativa no Kanban
-2. OP OUTROS (status: CONCLUIDA) -- secundária, já finalizada
+## Solução
 
-No arquivo `src/pages/FilaMestre.tsx`, linha 230, o código usa `ordens.find(o => o.pedido_id === p.id)` que retorna a **primeira** OP encontrada. Quando a OP OUTROS (CONCLUIDA) aparece antes da OP SINTETICO na lista, o card exibe "Concluída" e as etapas da OP errada (incluindo "Produção Finalizada").
+Adicionar um botão **"Cancelar Venda"** no card da Fila Mestre (no menu de ações ou via botão dedicado) que permita ao PCP/Admin marcar manualmente uma venda como cancelada.
 
-### Solução
+### Ação do botão:
+1. Atualizar o pedido: `status_atual = 'CANCELADO'`, `status_api = 'Cancelado'`, `sincronizacao_bloqueada = true`
+2. Cancelar todas as OPs vinculadas: `status = 'CANCELADA'`
+3. Registrar no histórico (`pedido_historico`) com observação "Cancelado manualmente — venda cancelada no Simplifica"
+4. O pedido deixa de aparecer na Fila Mestre (já é filtrado por `CANCELADO`)
 
-**Arquivo: `src/pages/FilaMestre.tsx`** (linha ~230)
+### Detalhes técnicos:
 
-Substituir o `ordens.find()` simples por uma lógica de priorização:
+**`src/pages/FilaMestre.tsx`**:
+- Adicionar estado para o dialog de confirmação de cancelamento
+- Adicionar botão "Cancelar Venda" no menu de ações do card (ao lado do botão de excluir OP PCP que já existe)
+- Dialog de confirmação com campo de observação opcional
+- Ao confirmar: update no `pedidos` + update em `ordens_producao` + insert no `pedido_historico`
+- Bloquear sincronização (`sincronizacao_bloqueada = true`) para evitar que uma sync futura sobrescreva o cancelamento
 
-1. Buscar todas as ordens do pedido (não apenas a primeira)
-2. Priorizar a ordem **principal** (tipo != OUTROS) sobre a secundária
-3. Entre as principais, priorizar a que está EM_ANDAMENTO > AGUARDANDO > CONCLUIDA
-4. Usar as etapas da ordem selecionada
-
-Mudança de ~10 linhas no bloco de mapeamento de vendas. A lógica:
-
-```text
-todas_ordens_do_pedido = ordens.filter(pedido_id)
-ordem = priorizar:
-  1. EM_ANDAMENTO e tipo != OUTROS
-  2. AGUARDANDO e tipo != OUTROS  
-  3. qualquer EM_ANDAMENTO
-  4. qualquer AGUARDANDO
-  5. fallback: primeira encontrada
-```
-
-Isso garante que o card sempre reflita a OP principal ativa, não a OP OUTROS concluída.
-
-### Impacto
-- Corrige também qualquer outro pedido com múltiplas OPs (ex: 3103921 que tem TECIDO + OUTROS)
-- Sem mudança de banco de dados
-- Arquivo único: `src/pages/FilaMestre.tsx`
+### Para o caso imediato (PED-00273):
+- Assim que o botão estiver implementado, o usuário poderá cancelar diretamente pela interface
+- A venda sairá automaticamente da Fila Mestre, Kanban e todos os fluxos
 
