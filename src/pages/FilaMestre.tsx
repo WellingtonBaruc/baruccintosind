@@ -430,38 +430,45 @@ export default function FilaMestre() {
       const tipoProduto = ordem?.tipo_produto || null;
       
       if (tipoProduto === 'TECIDO') {
-        // Filter Tecido: remove "Aguardando Início" and final "Concluído"/"Produção Finalizada"
-        const skipNames = ['concluido', 'producao finalizada', 'aguardando inicio'];
-        const tecidoEtapas = unifiedEtapas.filter(e => {
-          const norm = e.nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          return !skipNames.includes(norm);
-        });
+        // TECIDO must always show 8 stages: Conferência→Fusionagem→Colagem/Viração→Finalização→Preparação→Montagem→Embalagem→Concluído
+        const tecidoFullTrail = [
+          'Conferência', 'Fusionagem', 'Colagem / Viração', 'Finalização',
+          'Preparação', 'Montagem', 'Embalagem', 'Concluído'
+        ];
         
-        // Find the Sintético OP for this pedido
+        // Map real etapas by normalized name
+        const realEtapasMap = new Map<string, EtapaInfo>();
+        for (const e of unifiedEtapas) {
+          const norm = e.nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          realEtapasMap.set(norm, e);
+        }
+        // Also check Sintético OP etapas if they exist
         const sinteticoOrdem = ordensDoPedido.find(o => o.tipo_produto === 'SINTETICO');
         if (sinteticoOrdem) {
-          const sinteticoEtapas = (etapas || [])
-            .filter((e: any) => e.ordem_id === sinteticoOrdem.id)
-            .sort((a: any, b: any) => a.ordem_sequencia - b.ordem_sequencia);
-          
-          // Skip "Corte" and "Aguardando Início" from Sintético, keep Preparação→Montagem→Embalagem→Concluído
-          const skipSintetico = ['corte', 'aguardando inicio'];
-          const sinteticoTrail = sinteticoEtapas
-            .filter((e: any) => {
-              const norm = e.nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-              return !skipSintetico.includes(norm);
-            })
-            .map((e: any, idx: number) => ({
-              id: e.id,
-              nome_etapa: e.nome_etapa === 'Produção Finalizada' ? 'Concluído' : e.nome_etapa,
-              ordem_sequencia: 100 + idx,
-              status: e.status as string,
-            }));
-          
-          unifiedEtapas = [...tecidoEtapas, ...sinteticoTrail];
-        } else {
-          unifiedEtapas = tecidoEtapas;
+          const sinEtapas = (etapas || []).filter((e: any) => e.ordem_id === sinteticoOrdem.id);
+          for (const e of sinEtapas) {
+            const norm = (e as any).nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            realEtapasMap.set(norm, { id: (e as any).id, nome_etapa: (e as any).nome_etapa, ordem_sequencia: (e as any).ordem_sequencia, status: (e as any).status });
+          }
         }
+        // Also map "Produção Finalizada" → "Concluído"
+        if (realEtapasMap.has('producao finalizada') && !realEtapasMap.has('concluido')) {
+          const pf = realEtapasMap.get('producao finalizada')!;
+          realEtapasMap.set('concluido', { ...pf, nome_etapa: 'Concluído' });
+        }
+
+        // Determine if all real Tecido etapas are CONCLUIDA (to mark post-Finalização stages)
+        const tecidoConcluida = ordem?.status === 'CONCLUIDA';
+        
+        unifiedEtapas = tecidoFullTrail.map((name, idx) => {
+          const norm = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const real = realEtapasMap.get(norm);
+          if (real) {
+            return { id: real.id, nome_etapa: name, ordem_sequencia: idx, status: real.status };
+          }
+          // For stages without real etapa (Preparação/Montagem/Embalagem/Concluído from Sintético), show PENDENTE
+          return { id: `virtual-${idx}`, nome_etapa: name, ordem_sequencia: idx, status: 'PENDENTE' };
+        });
       }
 
       // Find active etapa across unified trail
