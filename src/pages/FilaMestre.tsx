@@ -111,6 +111,14 @@ const isValidProductionItem = (desc: string | null): boolean => {
     || normalized.startsWith('CINTO TECIDO') || normalized.startsWith('TIRA TECIDO');
 };
 
+const getItemTipo = (desc: string | null): 'SINTETICO' | 'TECIDO' | null => {
+  if (!desc) return null;
+  const normalized = desc.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  if (normalized.startsWith('CINTO SINTETICO') || normalized.startsWith('TIRA SINTETICO')) return 'SINTETICO';
+  if (normalized.startsWith('CINTO TECIDO') || normalized.startsWith('TIRA TECIDO')) return 'TECIDO';
+  return null;
+};
+
 export default function FilaMestre() {
   const { profile } = useAuth();
   const navigate = useNavigate();
