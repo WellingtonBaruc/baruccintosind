@@ -1023,6 +1023,28 @@ export default function FilaMestre() {
                   </TooltipContent>
                 </Tooltip>
               </div>
+              {/* Countdown to delivery date (15h cutoff) */}
+              {(() => {
+                const dataEntrega = r.data_entrega_ajustada_pcp || r.data_previsao_entrega;
+                if (!dataEntrega) return null;
+                const now = new Date();
+                const deadlineStr = dataEntrega + 'T15:00:00-03:00';
+                const deadline = new Date(deadlineStr);
+                const diffMs = deadline.getTime() - now.getTime();
+                const isOverdue = diffMs < 0;
+                const absDiffMs = Math.abs(diffMs);
+                const totalHours = Math.floor(absDiffMs / (1000 * 60 * 60));
+                const days = Math.floor(totalHours / 24);
+                const hours = totalHours % 24;
+                const label = days > 0 ? `${days}d ${hours}h` : `${hours}h`;
+                return (
+                  <div className={`text-[10px] font-semibold text-center mt-0.5 ${
+                    isOverdue ? 'text-destructive' : days <= 1 ? 'text-amber-600' : 'text-muted-foreground'
+                  }`}>
+                    {isOverdue ? `⚠ Atrasado ${label}` : `⏱ Faltam ${label}`}
+                  </div>
+                );
+              })()}
             </TooltipProvider>
           )}
             </div>
