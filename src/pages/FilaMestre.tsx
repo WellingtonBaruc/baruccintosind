@@ -950,6 +950,8 @@ export default function FilaMestre() {
               </div>
             </TooltipProvider>
           )}
+            </div>
+          </div>
         </div>
       </div>
     );
