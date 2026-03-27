@@ -80,6 +80,7 @@ interface PedidoDetail {
 }
 
 type AgrupamentoType = 'data_entrega' | 'tipo' | 'status';
+type ViewMode = 'compact' | 'detailed';
 
 interface GrupoInfo {
   key: string;
@@ -110,6 +111,7 @@ export default function FilaMestre() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [exportDateFrom, setExportDateFrom] = useState<Date | undefined>();
   const [exportDateTo, setExportDateTo] = useState<Date | undefined>();
+  const [viewMode, setViewMode] = useState<ViewMode>('compact');
 
   const [calendarData, setCalendarData] = useState<PcpCalendarData>({ sabadoAtivo: false, domingoAtivo: false, feriados: [], pausas: [] });
   const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
