@@ -1735,6 +1735,49 @@ export default function KanbanProducao() {
           </ScrollArea>
         </SheetContent>
       </Sheet>
+
+      {/* WhatsApp Vendedora Modal */}
+      <Dialog open={whatsappModal.open} onOpenChange={(open) => { if (!open) { setWhatsappModal({ open: false, card: null }); setWhatsappPedidoData(null); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <MessageCircle className="h-5 w-5 text-emerald-600" />
+              Encaminhar para Vendedora
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Selecione a vendedora para enviar os dados da venda via WhatsApp
+            </DialogDescription>
+          </DialogHeader>
+          {whatsappPedidoData && (
+            <div className="rounded-lg border bg-muted/30 p-3 mb-2">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Venda #{whatsappPedidoData.numero_pedido}</p>
+              <p className="text-sm font-semibold">{whatsappPedidoData.cliente_nome}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {Number(whatsappPedidoData.valor_liquido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </p>
+            </div>
+          )}
+          <div className="grid gap-2">
+            {VENDEDORAS.map((v, i) => (
+              <Button
+                key={i}
+                variant="outline"
+                className="h-14 justify-start gap-3 text-left hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all group"
+                onClick={() => handleSelectVendedora(v)}
+              >
+                <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm shrink-0 group-hover:bg-emerald-200 transition-colors">
+                  {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{v.nome}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{v.whatsapp.replace(/(\d{2})(\d{2})(\d{5})(\d{4})/, '+$1 ($2) $3-$4')}</p>
+                </div>
+                <MessageCircle className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
