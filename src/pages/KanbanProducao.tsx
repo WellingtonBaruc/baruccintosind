@@ -1038,7 +1038,7 @@ export default function KanbanProducao() {
   const buildWhatsappUrl = (phone: string, message: string) => {
     const cleanPhone = sanitizeWhatsappPhone(phone);
     const encodedMessage = encodeURIComponent(message);
-    return `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMessage}`;
+    return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
   };
 
   const copyTextToClipboard = async (text: string) => {
