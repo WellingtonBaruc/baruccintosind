@@ -482,8 +482,8 @@ export default function FilaMestre() {
       .from('pedidos')
       .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
       .eq('is_deleted', false)
+      .eq('status_api', 'Em Produção')
       .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
-      .or('status_api.eq.Em Produção,status_atual.in.(AGUARDANDO_PRODUCAO,EM_PRODUCAO,PRODUCAO_CONCLUIDA,AGUARDANDO_COMERCIAL,VALIDADO_COMERCIAL,AGUARDANDO_FINANCEIRO,VALIDADO_FINANCEIRO,LIBERADO_LOGISTICA,AGUARDANDO_LOJA,LOJA_VERIFICANDO,LOJA_OK,LOJA_PENDENTE_FINALIZACAO,AGUARDANDO_OP_COMPLEMENTAR,AGUARDANDO_ALMOXARIFADO,AGUARDANDO_CIENCIA_COMERCIAL)')
       .order('criado_em', { ascending: false });
 
     // Also fetch PCP-internal pedidos (independent OPs)
