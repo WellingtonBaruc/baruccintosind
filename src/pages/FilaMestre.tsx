@@ -1301,12 +1301,19 @@ export default function FilaMestre() {
         );
       })()}
 
-      {selectedPlanDay && (
+      {(selectedPlanDay || selectedWeekFilter) && (
         <div className="flex items-center gap-2">
-          <Badge className="bg-primary/10 text-primary border-primary/30">
-            Filtrando: {(() => { const d = new Date(selectedPlanDay + 'T00:00:00'); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`; })()}
-          </Badge>
-          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setSelectedPlanDay(null)}>Limpar filtro</Button>
+          {selectedPlanDay && (
+            <Badge className="bg-primary/10 text-primary border-primary/30">
+              Filtrando: {(() => { const d = new Date(selectedPlanDay + 'T00:00:00'); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`; })()}
+            </Badge>
+          )}
+          {selectedWeekFilter && (
+            <Badge className="bg-primary/10 text-primary border-primary/30">
+              Filtrando: Semana {selectedWeek}
+            </Badge>
+          )}
+          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => { setSelectedPlanDay(null); setSelectedWeekFilter(null); }}>Limpar filtro</Button>
         </div>
       )}
 
