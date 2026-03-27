@@ -72,6 +72,8 @@ interface VendaRow {
   prioridade: 'URGENTE' | 'ATENCAO' | 'NORMAL';
   etapas: EtapaInfo[];
   dataEntregaEfetiva: string | null;
+  origem_op: string | null;
+  produtos_descricao: string | null;
 }
 
 interface PedidoDetail {
