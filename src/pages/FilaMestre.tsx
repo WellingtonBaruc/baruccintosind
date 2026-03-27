@@ -1847,7 +1847,7 @@ export default function FilaMestre() {
           )}
 
           {/* Cancelar Venda button - for admin/gestor */}
-          {isAdmin && !isPcpOp && r.ordem_status !== 'CONCLUIDA' && (
+          {isAdmin && (
             <div className="px-4 pb-2 flex justify-end">
               <Button
                 variant="ghost"
