@@ -273,6 +273,7 @@ export default function FilaMestre() {
       .from('pedidos')
       .select('id')
       .eq('is_deleted', false)
+      .not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA")')
       .gte('data_entrega_ajustada_pcp', dateFrom)
       .lte('data_entrega_ajustada_pcp', dateTo);
 
@@ -281,6 +282,7 @@ export default function FilaMestre() {
       .from('pedidos')
       .select('id')
       .eq('is_deleted', false)
+      .not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA")')
       .is('data_entrega_ajustada_pcp', null)
       .gte('data_previsao_entrega', dateFrom)
       .lte('data_previsao_entrega', dateTo);
@@ -361,8 +363,8 @@ export default function FilaMestre() {
     const dateTo = days[days.length - 1];
 
     const [ajRes, prevRes] = await Promise.all([
-      supabase.from('pedidos').select('id, data_entrega_ajustada_pcp').eq('is_deleted', false).gte('data_entrega_ajustada_pcp', dateFrom).lte('data_entrega_ajustada_pcp', dateTo),
-      supabase.from('pedidos').select('id, data_previsao_entrega').eq('is_deleted', false).is('data_entrega_ajustada_pcp', null).gte('data_previsao_entrega', dateFrom).lte('data_previsao_entrega', dateTo),
+      supabase.from('pedidos').select('id, data_entrega_ajustada_pcp').eq('is_deleted', false).not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA")').gte('data_entrega_ajustada_pcp', dateFrom).lte('data_entrega_ajustada_pcp', dateTo),
+      supabase.from('pedidos').select('id, data_previsao_entrega').eq('is_deleted', false).not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA")').is('data_entrega_ajustada_pcp', null).gte('data_previsao_entrega', dateFrom).lte('data_previsao_entrega', dateTo),
     ]);
     const pedidoDateMap = new Map<string, string>();
     for (const p of (ajRes.data || [])) pedidoDateMap.set(p.id, p.data_entrega_ajustada_pcp);
