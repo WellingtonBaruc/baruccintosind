@@ -1066,7 +1066,7 @@ export default function FilaMestre() {
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Fila Mestre</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           {canEdit && (
             <Button variant="outline" onClick={() => setConfigOpen(true)}>
               <Settings className="h-4 w-4 mr-1.5" /> Configurar PCP
@@ -1075,6 +1075,55 @@ export default function FilaMestre() {
           <Button variant="outline" onClick={() => navigate('/painel-dia')}>
             <Calendar className="h-4 w-4 mr-1.5" /> Painel do Dia
           </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="gap-1.5">
+                <Download className="h-4 w-4" /> Exportar <ChevronDown className="h-3 w-3 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-3" align="end">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-muted-foreground">Filtrar por data de entrega:</span>
+                <div className="flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                        {exportDateFrom ? format(exportDateFrom, 'dd/MM/yy') : 'De'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarPicker mode="single" selected={exportDateFrom} onSelect={setExportDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} />
+                    </PopoverContent>
+                  </Popover>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                        {exportDateTo ? format(exportDateTo, 'dd/MM/yy') : 'Até'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarPicker mode="single" selected={exportDateTo} onSelect={setExportDateTo} initialFocus className={cn("p-3 pointer-events-auto")} />
+                    </PopoverContent>
+                  </Popover>
+                  {(exportDateFrom || exportDateTo) && (
+                    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setExportDateFrom(undefined); setExportDateTo(undefined); }}>
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 flex-1" onClick={exportAllToExcel}>
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-[hsl(var(--success))]" /> Excel
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 flex-1" onClick={exportAllToPdf}>
+                    <FileText className="h-3.5 w-3.5 text-destructive" /> PDF
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
