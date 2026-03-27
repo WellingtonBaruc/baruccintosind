@@ -1011,8 +1011,6 @@ export default function FilaMestre() {
               <TooltipProvider delayDuration={200}>
                 <div className="flex items-center gap-1 flex-wrap">
                   {(() => {
-                    const lastEtapaNorm = etapas.length > 0 ? etapas[etapas.length - 1].nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-                    const lastEtapaIsConcluido = ['concluido', 'producao finalizada', 'conclusao', 'concluida'].includes(lastEtapaNorm) || r.tipo_produto === 'TECIDO';
                     return (
                       <>
                         {etapas.map((etapa) => {
@@ -1046,30 +1044,6 @@ export default function FilaMestre() {
                             </Tooltip>
                           );
                         })}
-                        {!lastEtapaIsConcluido && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all ${
-                                  isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
-                                } ${
-                                  r.ordem_status === 'CONCLUIDA' ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] font-bold' : 'bg-muted/60 text-muted-foreground'
-                                }`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (isAdmin) handleMoveToConcluido(r);
-                                }}
-                              >
-                                {r.ordem_status === 'CONCLUIDA' && <CheckCircle2 className="h-3 w-3" />}
-                                <span>Concluído</span>
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs">
-                              <p className="font-medium">Concluído</p>
-                              {isAdmin && <p className="text-primary mt-0.5">Clique para concluir</p>}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
                       </>
                     );
                   })()}
