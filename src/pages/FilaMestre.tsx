@@ -1392,7 +1392,7 @@ export default function FilaMestre() {
           )}
           {selectedWeekFilter && (
             <Badge className="bg-primary/10 text-primary border-primary/30">
-              Filtrando: Semana {selectedWeek}
+              Filtrando: {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][selectedMonth]} {selectedWeek === 0 ? '(mês inteiro)' : `Semana ${selectedWeek}`}
             </Badge>
           )}
           <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => { setSelectedPlanDay(null); setSelectedWeekFilter(null); }}>Limpar filtro</Button>
