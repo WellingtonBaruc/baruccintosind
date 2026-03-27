@@ -103,6 +103,14 @@ interface GrupoInfo {
   outrosPecas: number;
 }
 
+// Filter: only valid production items (CINTO/TIRA SINTETICO/TECIDO)
+const isValidProductionItem = (desc: string | null): boolean => {
+  if (!desc) return false;
+  const normalized = desc.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  return normalized.startsWith('CINTO SINTETICO') || normalized.startsWith('TIRA SINTETICO')
+    || normalized.startsWith('CINTO TECIDO') || normalized.startsWith('TIRA TECIDO');
+};
+
 export default function FilaMestre() {
   const { profile } = useAuth();
   const navigate = useNavigate();
