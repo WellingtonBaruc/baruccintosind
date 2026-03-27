@@ -114,6 +114,8 @@ export default function FilaMestre() {
   const [exportDateTo, setExportDateTo] = useState<Date | undefined>();
   const [viewMode, setViewMode] = useState<ViewMode>('compact');
   const [selectedPlanDay, setSelectedPlanDay] = useState<string | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
+  const [selectedWeekFilter, setSelectedWeekFilter] = useState<string | null>(null);
 
   const [calendarData, setCalendarData] = useState<PcpCalendarData>({ sabadoAtivo: false, domingoAtivo: false, feriados: [], pausas: [] });
   const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
