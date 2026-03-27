@@ -114,10 +114,8 @@ export default function FilaMestre() {
   const [exportDateTo, setExportDateTo] = useState<Date | undefined>();
   const [viewMode, setViewMode] = useState<ViewMode>('compact');
   const [selectedPlanDay, setSelectedPlanDay] = useState<string | null>(null);
-  const [selectedWeek, setSelectedWeek] = useState<number>(() => {
-    const today = new Date();
-    return Math.ceil(today.getDate() / 7);
-  });
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => new Date().getMonth());
+  const [selectedWeek, setSelectedWeek] = useState<number>(0); // 0 = todas
   const [selectedWeekFilter, setSelectedWeekFilter] = useState<string | null>(null);
   const [weekSummary, setWeekSummary] = useState<{ sintetico: number; tecido: number; concluido: number }>({ sintetico: 0, tecido: 0, concluido: 0 });
 
