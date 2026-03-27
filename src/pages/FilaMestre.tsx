@@ -1422,9 +1422,9 @@ export default function FilaMestre() {
             <p className="text-lg font-bold text-foreground truncate leading-tight">{r.cliente_nome}</p>
           </div>
 
-          {/* Row 3: Situação Simplifica */}
+          {/* Row 3: Situação */}
           <div className="px-5 pb-3 flex items-center gap-2 flex-wrap">
-            {r.status_api && (
+            {r.status_api ? (
               <Badge className={`text-[11px] font-semibold ${
                 r.status_api === 'Em Produção' ? 'bg-blue-500/15 text-blue-700 border-blue-300' :
                 r.status_api === 'Pedido Enviado' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-300' :
@@ -1433,6 +1433,10 @@ export default function FilaMestre() {
                 'bg-muted text-muted-foreground border-border'
               }`}>
                 Simplifica: {r.status_api}
+              </Badge>
+            ) : (
+              <Badge className="text-[11px] font-semibold bg-orange-500/15 text-orange-700 border-orange-300">
+                Venda PCP — Em Produção
               </Badge>
             )}
             {r.operador_atual !== '—' && (
