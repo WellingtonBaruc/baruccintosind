@@ -823,13 +823,15 @@ export default function FilaMestre() {
       >
         <div className="px-4 py-2.5 space-y-1.5">
           {/* Linha 1 — Identificação */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs tabular-nums text-muted-foreground font-medium shrink-0">#{r.api_venda_id || r.numero_pedido}</span>
-            <span className="text-[15px] font-bold text-foreground truncate leading-tight min-w-0">{r.cliente_nome}</span>
-            <span className="text-sm font-bold tabular-nums text-foreground whitespace-nowrap shrink-0">{fmt(r.valor_liquido)}</span>
-            <Badge className={`text-[11px] font-semibold shrink-0 ${tipoBadge}`}>{tipoLabel}</Badge>
-            {r.is_piloto && <Badge className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30 shrink-0">Piloto</Badge>}
-            <span className="text-xs tabular-nums text-muted-foreground shrink-0">{fmtDate(r.data_venda_api)}</span>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs tabular-nums text-muted-foreground font-medium shrink-0">#{r.api_venda_id || r.numero_pedido}</span>
+              <span className="text-[15px] font-bold text-foreground truncate leading-tight min-w-0">{r.cliente_nome}</span>
+              <span className="text-sm font-bold tabular-nums text-foreground whitespace-nowrap shrink-0">{fmt(r.valor_liquido)}</span>
+              <Badge className={`text-[11px] font-semibold shrink-0 ${tipoBadge}`}>{tipoLabel}</Badge>
+              {r.is_piloto && <Badge className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30 shrink-0">Piloto</Badge>}
+            </div>
+            <span className="text-xs tabular-nums text-muted-foreground shrink-0 whitespace-nowrap">Venda: <span className="font-semibold text-foreground">{fmtDate(r.data_venda_api)}</span></span>
           </div>
 
           {/* Linha 2 — Datas principais */}
