@@ -118,6 +118,7 @@ export default function FilaMestre() {
   const [selectedWeek, setSelectedWeek] = useState<number>(0); // 0 = todas
   const [selectedWeekFilter, setSelectedWeekFilter] = useState<string | null>(null);
   const [weekSummary, setWeekSummary] = useState<{ sintetico: number; tecido: number; concluido: number }>({ sintetico: 0, tecido: 0, concluido: 0 });
+  const [dailySummary, setDailySummary] = useState<Record<string, { sintetico: number; tecido: number; concluido: number }>>({});
 
   const [calendarData, setCalendarData] = useState<PcpCalendarData>({ sabadoAtivo: false, domingoAtivo: false, feriados: [], pausas: [] });
   const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
@@ -261,14 +262,97 @@ export default function FilaMestre() {
     setWeekSummary({ sintetico: totalSint, tecido: totalTec, concluido: totalConcl });
   }, []);
 
+  const fetchDailySummary = useCallback(async (days: string[]) => {
+    if (days.length === 0) return;
+    const dateFrom = days[0];
+    const dateTo = days[days.length - 1];
+
+    const [ajRes, prevRes] = await Promise.all([
+      supabase.from('pedidos').select('id, data_entrega_ajustada_pcp').gte('data_entrega_ajustada_pcp', dateFrom).lte('data_entrega_ajustada_pcp', dateTo),
+      supabase.from('pedidos').select('id, data_previsao_entrega').is('data_entrega_ajustada_pcp', null).gte('data_previsao_entrega', dateFrom).lte('data_previsao_entrega', dateTo),
+    ]);
+    const pedidoDateMap = new Map<string, string>();
+    for (const p of (ajRes.data || [])) pedidoDateMap.set(p.id, p.data_entrega_ajustada_pcp);
+    for (const p of (prevRes.data || [])) pedidoDateMap.set(p.id, p.data_previsao_entrega);
+
+    const pedidoIds = [...pedidoDateMap.keys()];
+    if (pedidoIds.length === 0) { setDailySummary({}); return; }
+
+    const batchSize = 200;
+    const allOrdens: any[] = [];
+    const allItens: any[] = [];
+    for (let i = 0; i < pedidoIds.length; i += batchSize) {
+      const batch = pedidoIds.slice(i, i + batchSize);
+      const [oRes, iRes] = await Promise.all([
+        supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status, data_fim_pcp').in('pedido_id', batch).in('tipo_produto', ['SINTETICO', 'TECIDO']),
+        supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', batch),
+      ]);
+      allOrdens.push(...(oRes.data || []));
+      allItens.push(...(iRes.data || []));
+    }
+
+    const pedidoIdsWithOrdens = new Set(allOrdens.map(o => o.pedido_id));
+    const qtdByPedido = new Map<string, number>();
+    for (const item of allItens) {
+      if (!pedidoIdsWithOrdens.has(item.pedido_id)) continue;
+      qtdByPedido.set(item.pedido_id, (qtdByPedido.get(item.pedido_id) || 0) + (item.quantidade || 0));
+    }
+    const ordensByPedido = new Map<string, any[]>();
+    for (const o of allOrdens) {
+      if (!ordensByPedido.has(o.pedido_id)) ordensByPedido.set(o.pedido_id, []);
+      ordensByPedido.get(o.pedido_id)!.push(o);
+    }
+
+    const result: Record<string, { sintetico: number; tecido: number; concluido: number }> = {};
+    for (const day of days) result[day] = { sintetico: 0, tecido: 0, concluido: 0 };
+
+    for (const [pedidoId, ordens] of ordensByPedido) {
+      const deliveryDate = pedidoDateMap.get(pedidoId);
+      if (!deliveryDate || !result[deliveryDate]) continue;
+      const pecas = qtdByPedido.get(pedidoId) || 0;
+      const mainOrdem = ordens.find((o: any) => o.tipo_produto === 'SINTETICO') || ordens.find((o: any) => o.tipo_produto === 'TECIDO');
+      if (!mainOrdem) continue;
+      if (mainOrdem.tipo_produto === 'SINTETICO') result[deliveryDate].sintetico += pecas;
+      else result[deliveryDate].tecido += pecas;
+
+      const concluded = ordens.some((o: any) => {
+        if (o.status !== 'CONCLUIDA' || !o.data_fim_pcp) return false;
+        const fimStr = new Date(o.data_fim_pcp).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+        return fimStr === deliveryDate;
+      });
+      if (concluded) result[deliveryDate].concluido += pecas;
+    }
+    setDailySummary(result);
+  }, []);
+
   useEffect(() => {
     fetchWeeklySummary(selectedMonth, selectedWeek);
   }, [selectedMonth, selectedWeek, fetchWeeklySummary]);
+
+  const computeNext5Days = useCallback((cal: PcpCalendarData) => {
+    const todayStr = hojeBrasilia();
+    const today = new Date(todayStr + 'T00:00:00');
+    const next5: string[] = [];
+    const cursor = new Date(today);
+    if (isDiaUtil(cursor, cal)) next5.push(todayStr);
+    while (next5.length < 5) {
+      cursor.setDate(cursor.getDate() + 1);
+      if (isDiaUtil(cursor, cal)) {
+        const y = cursor.getFullYear();
+        const m = String(cursor.getMonth() + 1).padStart(2, '0');
+        const dd = String(cursor.getDate()).padStart(2, '0');
+        next5.push(`${y}-${m}-${dd}`);
+      }
+    }
+    return next5;
+  }, []);
 
   const fetchAll = async () => {
     const { cal, lts } = await fetchCalendarData();
     await fetchRows(cal, lts);
     fetchWeeklySummary(selectedMonth, selectedWeek);
+    const days = computeNext5Days(cal);
+    fetchDailySummary(days);
   };
 
   const fetchRows = async (cal: PcpCalendarData, lts: Record<string, number>) => {
@@ -1297,15 +1381,11 @@ export default function FilaMestre() {
               const dayDate = new Date(dayStr + 'T00:00:00');
               const dayLabel = `${String(dayDate.getDate()).padStart(2, '0')}/${String(dayDate.getMonth() + 1).padStart(2, '0')}`;
 
-              const dayRows = rows.filter(r => r.dataEntregaEfetiva === dayStr);
-              const sinteticoPecas = dayRows.filter(r => r.tipo_produto === 'SINTETICO').reduce((s, r) => s + r.quantidade_itens, 0);
-              const tecidoPecas = dayRows.filter(r => r.tipo_produto === 'TECIDO').reduce((s, r) => s + r.quantidade_itens, 0);
+              const daySummaryData = dailySummary[dayStr] || { sintetico: 0, tecido: 0, concluido: 0 };
+              const sinteticoPecas = daySummaryData.sintetico;
+              const tecidoPecas = daySummaryData.tecido;
               const totalPecas = sinteticoPecas + tecidoPecas;
-              const concluidoPecas = dayRows.filter(r => {
-                if (!r.data_fim_pcp) return false;
-                const fimDate = new Date(r.data_fim_pcp).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-                return fimDate === dayStr;
-              }).reduce((s, r) => s + r.quantidade_itens, 0);
+              const concluidoPecas = daySummaryData.concluido;
 
               return (
                 <button
