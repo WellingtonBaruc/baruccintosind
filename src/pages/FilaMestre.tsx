@@ -1127,7 +1127,7 @@ export default function FilaMestre() {
         </div>
       </div>
 
-      <PcpIntelligenceBar stats={tipoStats} />
+      
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap items-center">
