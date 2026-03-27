@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, User, Search, CheckCircle2, ArrowRight, AlertTriangle, Plus, X, Package, MessageSquare, Eye, MoreHorizontal, Star, Scissors, BarChart3, CalendarDays, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { hojeBrasilia } from '@/lib/dateUtils';
+import { cn } from '@/lib/utils';
 
 interface KanbanCard {
   id: string;
@@ -1062,50 +1063,19 @@ export default function KanbanProducao() {
     return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
   };
 
-  const openWhatsappExternally = (phone: string, message: string) => {
-    const url = buildWhatsappUrl(phone, message);
-
-    const popup = window.open(url, '_blank', 'noopener,noreferrer');
-    if (popup) {
-      return true;
-    }
-
-    try {
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.info('Se o navegador bloquear a nova aba, libere pop-ups e tente novamente.');
-      return true;
-    } catch (error) {
-      console.error('openWhatsappExternally error:', error);
-      toast.error('Não foi possível abrir o WhatsApp. Libere pop-ups e tente novamente.');
-      return false;
-    }
-  };
-
-  const handleWhatsappButtonClick = (vendedora: { id: string; nome: string; whatsapp: string }) => {
+  const handleWhatsappAnchorClick = (vendedora: { id: string; nome: string; whatsapp: string }) => {
     const card = whatsappModal.card;
 
     if (!card || !whatsappPedidoData) {
-      console.error('handleWhatsappButtonClick: missing data', { card: !!card, whatsappPedidoData: !!whatsappPedidoData });
+      console.error('handleWhatsappAnchorClick: missing data', { card: !!card, whatsappPedidoData: !!whatsappPedidoData });
       toast.error('Dados da venda indisponíveis para abrir o WhatsApp.');
       return;
     }
 
-    const message = buildWhatsappMessage(whatsappPedidoData);
-    const opened = openWhatsappExternally(vendedora.whatsapp, message);
-
-    if (!opened) {
-      return;
-    }
-
-    closeWhatsappModal();
-    void registerWhatsappReferral(card, vendedora);
+    window.setTimeout(() => {
+      closeWhatsappModal();
+      void registerWhatsappReferral(card, vendedora);
+    }, 0);
   };
 
   const formatWhatsappDisplay = (phone: string) => {
@@ -1833,12 +1803,20 @@ export default function KanbanProducao() {
               <p className="text-center text-sm text-muted-foreground py-4">Nenhuma vendedora cadastrada. Cadastre em Usuários.</p>
             )}
             {vendedorasDb.map((v) => {
+              const message = whatsappPedidoData ? buildWhatsappMessage(whatsappPedidoData) : '';
+              const whatsappUrl = buildWhatsappUrl(v.whatsapp, message);
+
               return (
-                <Button
+                <a
                   key={v.id}
-                  variant="outline"
-                  className="h-14 justify-start gap-3 text-left hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all group"
-                  onClick={() => handleWhatsappButtonClick(v)}
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    buttonVariants({ variant: 'outline' }),
+                    'h-14 w-full justify-start gap-3 text-left hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all group'
+                  )}
+                  onClick={() => handleWhatsappAnchorClick(v)}
                 >
                   <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm shrink-0 group-hover:bg-emerald-200 transition-colors">
                     {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
@@ -1848,7 +1826,7 @@ export default function KanbanProducao() {
                     <p className="text-xs text-muted-foreground font-mono">{formatWhatsappDisplay(v.whatsapp)}</p>
                   </div>
                   <MessageCircle className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </Button>
+                </a>
               );
             })}
           </div>
