@@ -944,7 +944,10 @@ export default function FilaMestre() {
             <div className="px-5 pb-4 pt-1">
               <TooltipProvider delayDuration={200}>
                 <div className="flex items-center gap-1 flex-wrap">
-                  {etapas.map((etapa) => {
+                  {etapas.filter((etapa) => {
+                    const nomeNorm = etapa.nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    return !['concluido', 'producao finalizada'].includes(nomeNorm);
+                  }).map((etapa) => {
                     const isConcluida = etapa.status === 'CONCLUIDA';
                     const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
                     return (

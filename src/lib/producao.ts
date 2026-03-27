@@ -213,8 +213,11 @@ export async function concluirEtapa(
       iniciado_em: new Date().toISOString(),
     }).eq('id', nextEtapa.id);
   } else {
-    // All steps done — mark order as concluded
-    await supabase.from('ordens_producao').update({ status: 'CONCLUIDA' }).eq('id', ordemId);
+    // All steps done — mark order as concluded with data_fim_pcp
+    await supabase.from('ordens_producao').update({
+      status: 'CONCLUIDA',
+      data_fim_pcp: new Date().toISOString(),
+    }).eq('id', ordemId);
 
     // Check if ALL orders for this pedido are now CONCLUIDA
     const { data: allOrdens } = await supabase
@@ -235,10 +238,18 @@ export async function concluirEtapa(
 
 // Supervisor aprova ordem
 export async function aprovarOrdem(ordemId: string, pedidoId: string, supervisorId: string) {
+  // Set data_fim_pcp if not already set
+  const { data: ordemAtual } = await supabase
+    .from('ordens_producao')
+    .select('data_fim_pcp')
+    .eq('id', ordemId)
+    .single();
+
   await supabase.from('ordens_producao').update({
     status: 'CONCLUIDA',
     supervisor_id: supervisorId,
     aprovado_em: new Date().toISOString(),
+    ...(ordemAtual && !ordemAtual.data_fim_pcp ? { data_fim_pcp: new Date().toISOString() } : {}),
   }).eq('id', ordemId);
 
   // Check if ALL orders for this pedido are approved
