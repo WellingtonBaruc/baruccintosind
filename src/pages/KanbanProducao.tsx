@@ -1000,8 +1000,7 @@ export default function KanbanProducao() {
     }
   };
 
-  const buildWhatsappUrl = (vendedoraPhone: string, card: KanbanCard) => {
-    const cleanPhone = vendedoraPhone.replace(/\D/g, '');
+  const buildWhatsappMessage = (card: KanbanCard) => {
     const lines = [
       `📋 *Venda #${card.numero_pedido}*`,
       `👤 Cliente: ${card.cliente_nome || '—'}`,
@@ -1012,7 +1011,21 @@ export default function KanbanProducao() {
       `💰 Valor Total: ${card.valor_liquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
       `📝 Observação: ${card.observacao_api || card.observacao_comercial || '—'}`,
     ];
-    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(lines.join('\n'))}`;
+
+    return lines.join('\n');
+  };
+
+  const openWhatsApp = (phone: string, message: string) => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const encodedMessage = encodeURIComponent(message);
+    const url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const registerWhatsappReferral = async (card: KanbanCard, vendedora: { nome: string }) => {
@@ -1431,13 +1444,12 @@ export default function KanbanProducao() {
                                           <p className="text-xs text-muted-foreground p-2">Nenhuma vendedora cadastrada.</p>
                                         ) : (
                                           vendedorasDb.map((v) => (
-                                            <a
+                                            <button
                                               key={v.id}
-                                              href={buildWhatsappUrl(v.whatsapp, card)}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="flex items-center gap-3 py-2 px-2 rounded-sm hover:bg-accent transition-colors cursor-pointer no-underline"
+                                              type="button"
+                                              className="flex w-full items-center gap-3 rounded-sm px-2 py-2 text-left transition-colors hover:bg-accent"
                                               onClick={() => {
+                                                openWhatsApp(v.whatsapp, buildWhatsappMessage(card));
                                                 void registerWhatsappReferral(card, v);
                                               }}
                                             >
@@ -1449,7 +1461,7 @@ export default function KanbanProducao() {
                                                 <p className="text-xs text-muted-foreground font-mono mt-1">{formatWhatsappDisplay(v.whatsapp)}</p>
                                               </div>
                                               <MessageCircle className="h-4 w-4 text-emerald-500 shrink-0" />
-                                            </a>
+                                            </button>
                                           ))
                                         )}
                                       </div>
