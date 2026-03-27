@@ -329,10 +329,30 @@ export default function FilaMestre() {
     fetchWeeklySummary(selectedMonth, selectedWeek);
   }, [selectedMonth, selectedWeek, fetchWeeklySummary]);
 
+  const computeNext5Days = useCallback((cal: PcpCalendarData) => {
+    const todayStr = hojeBrasilia();
+    const today = new Date(todayStr + 'T00:00:00');
+    const next5: string[] = [];
+    const cursor = new Date(today);
+    if (isDiaUtil(cursor, cal)) next5.push(todayStr);
+    while (next5.length < 5) {
+      cursor.setDate(cursor.getDate() + 1);
+      if (isDiaUtil(cursor, cal)) {
+        const y = cursor.getFullYear();
+        const m = String(cursor.getMonth() + 1).padStart(2, '0');
+        const dd = String(cursor.getDate()).padStart(2, '0');
+        next5.push(`${y}-${m}-${dd}`);
+      }
+    }
+    return next5;
+  }, []);
+
   const fetchAll = async () => {
     const { cal, lts } = await fetchCalendarData();
     await fetchRows(cal, lts);
     fetchWeeklySummary(selectedMonth, selectedWeek);
+    const days = computeNext5Days(cal);
+    fetchDailySummary(days);
   };
 
   const fetchRows = async (cal: PcpCalendarData, lts: Record<string, number>) => {
