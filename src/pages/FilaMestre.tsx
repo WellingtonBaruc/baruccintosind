@@ -2263,11 +2263,6 @@ export default function FilaMestre() {
                         )}
                       </div>
                     </div>
-                    {/* Abertura */}
-                    <div className="space-y-1">
-                      <Label className="text-xs">Abertura da Fivela</Label>
-                      <Input placeholder="Ex: 35mm" value={formProduto.aberturaFivela} onChange={(e) => setFormProduto(prev => ({ ...prev, aberturaFivela: e.target.value }))} className="h-9 text-sm" />
-                    </div>
                     {/* Tamanho */}
                     <div className="space-y-1">
                       <Label className="text-xs">Tamanho *</Label>
