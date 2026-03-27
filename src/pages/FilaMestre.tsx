@@ -820,7 +820,7 @@ export default function FilaMestre() {
         onClick={() => openDetail(r.id)}
       >
         <div className="px-3 py-1.5 space-y-0.5">
-          {/* Line 1: Venda + Cliente + Tipo + Valor */}
+          {/* Row 1: Venda + Cliente + Tipo + Valor */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-[11px] tabular-nums text-muted-foreground font-medium">#{r.api_venda_id || r.numero_pedido}</span>
@@ -831,47 +831,63 @@ export default function FilaMestre() {
             </div>
             <span className="text-xs font-bold tabular-nums text-foreground whitespace-nowrap">{fmt(r.valor_liquido)}</span>
           </div>
-          <div className="flex items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
-            <span title="Entrega">🚚 {fmtDate(r.dataEntregaEfetiva)}</span>
-            <span className={`font-bold ${r.atrasoDias < 0 ? 'text-destructive' : r.atrasoDias <= 2 ? 'text-warning' : 'text-muted-foreground'}`} title="Atraso">⚠ {r.atrasoDias}d</span>
-            <span title="Início ideal">⏱ {fmtDate(r.dataInicioIdeal)}</span>
-            <span title="Início PCP">🕒 {r.data_inicio_pcp ? fmtDateTime(r.data_inicio_pcp).split(' ')[0] : '—'}</span>
+
+          {/* Row 2: Two-area layout — VENDA | PRODUÇÃO */}
+          <div className="flex items-center gap-0 text-[11px] tabular-nums text-muted-foreground">
+            {/* Left: Venda */}
+            <div className="flex items-center gap-2.5 pr-3">
+              <span title="Entrega">🚚 {fmtDate(r.dataEntregaEfetiva)}</span>
+              <span title="Data venda">📅 {fmtDate(r.data_venda_api)}</span>
+              <span className={`font-bold ${r.atrasoDias < 0 ? 'text-destructive' : r.atrasoDias <= 2 ? 'text-warning' : 'text-muted-foreground'}`} title="Atraso">⚠ {r.atrasoDias > 0 ? '+' : ''}{r.atrasoDias}d</span>
+            </div>
+            {/* Separator */}
+            <div className="w-px h-3.5 bg-border mx-1 shrink-0" />
+            {/* Right: Produção */}
+            <div className="flex items-center gap-2.5 pl-3">
+              <span title="Início ideal">⏱ {fmtDate(r.dataInicioIdeal)}</span>
+              <span title="Início PCP">🕒 {r.data_inicio_pcp ? fmtDateTime(r.data_inicio_pcp).split(' ')[0] : '—'}</span>
+              <span title="Fim PCP">🏁 {r.data_fim_pcp ? fmtDateTime(r.data_fim_pcp).split(' ')[0] : '—'}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase">ETAPA:</span>
-            <span className="text-[11px] font-bold text-primary">{r.etapa_atual}</span>
+
+          {/* Row 3: Etapa + Progresso */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase">ETAPA:</span>
+              <span className="text-[11px] font-bold text-primary">{r.etapa_atual}</span>
+            </div>
+            {etapas.length > 0 && (
+              <TooltipProvider delayDuration={200}>
+                <div className="flex items-center gap-0.5 ml-auto">
+                  {etapas.map((etapa) => {
+                    const isConcluida = etapa.status === 'CONCLUIDA';
+                    const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
+                    const shortName = etapa.nome_etapa.length > 4 ? etapa.nome_etapa.substring(0, 4) : etapa.nome_etapa;
+                    return (
+                      <Tooltip key={etapa.id}>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={`px-1 py-0 rounded text-[9px] font-semibold transition-all ${isAdmin ? 'cursor-pointer hover:ring-1 hover:ring-primary/40' : 'cursor-default'} ${isConcluida ? 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]' : isEmAndamento ? 'bg-primary/20 text-primary ring-1 ring-primary/30' : 'bg-muted/60 text-muted-foreground'}`}
+                            onClick={(e) => { e.stopPropagation(); if (isAdmin) handleMoveToEtapa(r, etapa); }}
+                          >{shortName}</button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs"><p>{etapa.nome_etapa} — {isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}</p></TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className={`px-1 py-0 rounded text-[9px] font-semibold ${isAdmin ? 'cursor-pointer hover:ring-1 hover:ring-primary/40' : 'cursor-default'} ${r.ordem_status === 'CONCLUIDA' ? 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]' : 'bg-muted/60 text-muted-foreground'}`}
+                        onClick={(e) => { e.stopPropagation(); if (isAdmin) handleMoveToConcluido(r); }}
+                      >Fim</button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">Concluído</TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
+            )}
           </div>
-          {etapas.length > 0 && (
-            <TooltipProvider delayDuration={200}>
-              <div className="flex items-center gap-0.5 pt-0.5">
-                {etapas.map((etapa) => {
-                  const isConcluida = etapa.status === 'CONCLUIDA';
-                  const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
-                  const shortName = etapa.nome_etapa.length > 4 ? etapa.nome_etapa.substring(0, 4) : etapa.nome_etapa;
-                  return (
-                    <Tooltip key={etapa.id}>
-                      <TooltipTrigger asChild>
-                        <button
-                          className={`px-1 py-0 rounded text-[9px] font-semibold transition-all ${isAdmin ? 'cursor-pointer hover:ring-1 hover:ring-primary/40' : 'cursor-default'} ${isConcluida ? 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]' : isEmAndamento ? 'bg-primary/20 text-primary ring-1 ring-primary/30' : 'bg-muted/60 text-muted-foreground'}`}
-                          onClick={(e) => { e.stopPropagation(); if (isAdmin) handleMoveToEtapa(r, etapa); }}
-                        >{shortName}</button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs"><p>{etapa.nome_etapa} — {isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}</p></TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      className={`px-1 py-0 rounded text-[9px] font-semibold ${isAdmin ? 'cursor-pointer hover:ring-1 hover:ring-primary/40' : 'cursor-default'} ${r.ordem_status === 'CONCLUIDA' ? 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]' : 'bg-muted/60 text-muted-foreground'}`}
-                      onClick={(e) => { e.stopPropagation(); if (isAdmin) handleMoveToConcluido(r); }}
-                    >Fim</button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">Concluído</TooltipContent>
-                </Tooltip>
-              </div>
-            </TooltipProvider>
-          )}
         </div>
       </div>
     );
