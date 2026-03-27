@@ -147,7 +147,6 @@ export default function FilaMestre() {
     id: string;
     fivela: string;
     banhoFivela: string;
-    aberturaFivela: string;
     tamanho: string;
     material: string;
     cor: string;
@@ -156,7 +155,7 @@ export default function FilaMestre() {
   const [opProdutos, setOpProdutos] = useState<OpProdutoItem[]>([]);
   const [editingProdutoIdx, setEditingProdutoIdx] = useState<number | null>(null);
   const [formProduto, setFormProduto] = useState<OpProdutoItem>({
-    id: '', fivela: '', banhoFivela: '', aberturaFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1,
+    id: '', fivela: '', banhoFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1,
   });
   const [customBanhos, setCustomBanhos] = useState<string[]>([]);
   const [customCores, setCustomCores] = useState<string[]>([]);
@@ -174,6 +173,20 @@ export default function FilaMestre() {
   const [deleteOpDialogOpen, setDeleteOpDialogOpen] = useState(false);
   const [deleteOpTarget, setDeleteOpTarget] = useState<VendaRow | null>(null);
   const [deleteOpLoading, setDeleteOpLoading] = useState(false);
+
+  // Editar OP PCP state
+  const [editOpDialogOpen, setEditOpDialogOpen] = useState(false);
+  const [editOpTarget, setEditOpTarget] = useState<VendaRow | null>(null);
+  const [editOpTipo, setEditOpTipo] = useState<string>('SINTETICO');
+  const [editOpProdutos, setEditOpProdutos] = useState<OpProdutoItem[]>([]);
+  const [editOpDataEntrega, setEditOpDataEntrega] = useState<Date | undefined>();
+  const [editOpObs, setEditOpObs] = useState('');
+  const [editOpLoading, setEditOpLoading] = useState(false);
+  const [editShowProdutoForm, setEditShowProdutoForm] = useState(false);
+  const [editingEditProdutoIdx, setEditingEditProdutoIdx] = useState<number | null>(null);
+  const [editFormProduto, setEditFormProduto] = useState<OpProdutoItem>({
+    id: '', fivela: '', banhoFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1,
+  });
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedFetchAll = useCallback(() => {
