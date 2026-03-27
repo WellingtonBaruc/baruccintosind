@@ -771,6 +771,47 @@ export default function FilaMestre() {
     }
   };
 
+  // Excluir OP PCP (soft delete)
+  const handleDeleteOpPcp = async () => {
+    if (!deleteOpTarget || !profile) return;
+    setDeleteOpLoading(true);
+    try {
+      // Soft delete the pedido
+      const { error } = await supabase
+        .from('pedidos')
+        .update({ is_deleted: true, deleted_at: new Date().toISOString(), status_atual: 'CANCELADO' } as any)
+        .eq('id', deleteOpTarget.id);
+      if (error) throw error;
+
+      // Cancel associated ordens
+      if (deleteOpTarget.ordem_id) {
+        await supabase
+          .from('ordens_producao')
+          .update({ status: 'CANCELADA' } as any)
+          .eq('pedido_id', deleteOpTarget.id);
+      }
+
+      // Log action
+      await supabase.from('pedido_historico').insert({
+        pedido_id: deleteOpTarget.id,
+        usuario_id: profile.id,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: deleteOpTarget.status_atual,
+        status_novo: 'CANCELADO',
+        observacao: `OP PCP excluída (soft delete) por ${profile.nome}.`,
+      });
+
+      toast.success('OP PCP excluída com sucesso');
+      setDeleteOpDialogOpen(false);
+      setDeleteOpTarget(null);
+      fetchAll();
+    } catch (err: any) {
+      toast.error('Erro ao excluir OP: ' + (err.message || err));
+    } finally {
+      setDeleteOpLoading(false);
+    }
+  };
+
 
   const filtered = rows.filter(r => {
     if (search && !r.cliente_nome.toLowerCase().includes(search.toLowerCase()) && !r.numero_pedido.toLowerCase().includes(search.toLowerCase()) && !(r.api_venda_id || '').toLowerCase().includes(search.toLowerCase())) return false;
