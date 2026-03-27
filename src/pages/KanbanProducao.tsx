@@ -1000,104 +1000,33 @@ export default function KanbanProducao() {
     }
   };
 
-  const resetWhatsappState = () => {
-    setWhatsappMenuCardId(null);
-    setWhatsappPedidoData(null);
-    setWhatsappLoading(false);
+  const buildWhatsappUrl = (vendedoraPhone: string, card: KanbanCard) => {
+    const cleanPhone = vendedoraPhone.replace(/\D/g, '');
+    const lines = [
+      `📋 *Venda #${card.numero_pedido}*`,
+      `👤 Cliente: ${card.cliente_nome || '—'}`,
+      `📞 Telefone: ${card.cliente_telefone || '—'}`,
+      `📍 Cidade/UF: ${card.cliente_endereco || '—'}`,
+      `🏷️ Segmento: ${card.canal_venda || '—'}`,
+      `📅 Data de Entrega: ${card.data_previsao_entrega ? new Date(card.data_previsao_entrega + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}`,
+      `💰 Valor Total: ${card.valor_liquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+      `📝 Observação: ${card.observacao_api || card.observacao_comercial || '—'}`,
+    ];
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(lines.join('\n'))}`;
   };
 
-  const prepareWhatsappContext = async (card: KanbanCard) => {
-    if (!profile) { console.error('handleEnviarParaComercial: no profile'); return; }
-
-    setWhatsappMenuCardId(card.id);
-    setWhatsappLoading(true);
-
+  const registerWhatsappReferral = async (card: KanbanCard, vendedora: { nome: string }) => {
+    if (!profile) return;
     try {
-      const { data: pedido, error: pedidoError } = await supabase
-        .from('pedidos')
-        .select('numero_pedido, cliente_nome, cliente_telefone, cliente_endereco, canal_venda, data_previsao_entrega, valor_liquido, observacao_api, observacao_comercial')
-        .eq('id', card.pedido_id)
-        .single();
-      console.log('prepareWhatsappContext pedido:', pedido, 'error:', pedidoError, 'card.pedido_id:', card.pedido_id);
-      if (pedidoError) {
-        toast.error('Erro ao carregar dados da venda');
-        resetWhatsappState();
-        return;
-      }
-
-      setWhatsappPedidoData(pedido);
-    } catch (err) {
-      console.error('handleEnviarParaComercial catch:', err);
-      toast.error('Erro ao carregar dados da venda');
-      resetWhatsappState();
-      return;
-    }
-
-    setWhatsappLoading(false);
-  };
-
-  const registerWhatsappReferral = async (card: KanbanCard, vendedora: { nome: string; whatsapp: string }) => {
-    if (!profile) {
-      return;
-    }
-
-    try {
-      const { error: histError } = await supabase.from('pedido_historico').insert({
+      await supabase.from('pedido_historico').insert({
         pedido_id: card.pedido_id,
         usuario_id: profile.id,
         tipo_acao: 'COMENTARIO',
         observacao: `Encaminhado para ${vendedora.nome} via WhatsApp`,
       });
-
-      if (histError) {
-        console.error('pedido_historico insert error:', histError);
-        toast.error('Erro ao registrar encaminhamento');
-      }
     } catch (err) {
       console.error('registerWhatsappReferral catch:', err);
-      toast.error('Erro ao registrar encaminhamento');
     }
-  };
-
-  const buildWhatsappMessage = (pedidoData: any) => {
-    const lines = [
-      `📋 *Venda #${pedidoData.numero_pedido}*`,
-      `👤 Cliente: ${pedidoData.cliente_nome || '—'}`,
-      `📞 Telefone: ${pedidoData.cliente_telefone || '—'}`,
-      `📍 Cidade/UF: ${pedidoData.cliente_endereco || '—'}`,
-      `🏷️ Segmento: ${pedidoData.canal_venda || '—'}`,
-      `📅 Data de Entrega: ${pedidoData.data_previsao_entrega ? new Date(pedidoData.data_previsao_entrega + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}`,
-      `💰 Valor Total: ${Number(pedidoData.valor_liquido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
-      `📝 Observação: ${pedidoData.observacao_api || pedidoData.observacao_comercial || '—'}`,
-    ];
-
-    return lines.join('\n');
-  };
-
-  const openWhatsApp = (phone: string, message: string) => {
-    const cleanPhone = phone.replace(/\D/g, '');
-    const encodedMessage = encodeURIComponent(message);
-    const url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleWhatsappSelection = (card: KanbanCard, vendedora: { id: string; nome: string; whatsapp: string }) => {
-    if (!whatsappPedidoData || whatsappMenuCardId !== card.id) {
-      console.error('handleWhatsappSelection: missing data', { cardId: card.id, whatsappMenuCardId, hasPedidoData: !!whatsappPedidoData });
-      toast.error('Dados da venda indisponíveis para abrir o WhatsApp.');
-      return;
-    }
-
-    openWhatsApp(vendedora.whatsapp, buildWhatsappMessage(whatsappPedidoData));
-    resetWhatsappState();
-    void registerWhatsappReferral(card, vendedora);
   };
 
   const formatWhatsappDisplay = (phone: string) => {
