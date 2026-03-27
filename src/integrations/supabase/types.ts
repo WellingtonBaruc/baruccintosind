@@ -352,6 +352,7 @@ export type Database = {
         Row: {
           aprovado_em: string | null
           criado_em: string
+          criado_por_id: string | null
           data_fim_pcp: string | null
           data_inicio_pcp: string | null
           data_programacao: string | null
@@ -359,8 +360,10 @@ export type Database = {
           fivelas_recebidas: boolean | null
           id: string
           observacao: string | null
+          origem_op: string | null
           pedido_id: string
           pipeline_id: string
+          produtos_descricao: string | null
           programado_conclusao_data: string | null
           programado_inicio_data: string | null
           programado_para_hoje: boolean | null
@@ -374,6 +377,7 @@ export type Database = {
         Insert: {
           aprovado_em?: string | null
           criado_em?: string
+          criado_por_id?: string | null
           data_fim_pcp?: string | null
           data_inicio_pcp?: string | null
           data_programacao?: string | null
@@ -381,8 +385,10 @@ export type Database = {
           fivelas_recebidas?: boolean | null
           id?: string
           observacao?: string | null
+          origem_op?: string | null
           pedido_id: string
           pipeline_id: string
+          produtos_descricao?: string | null
           programado_conclusao_data?: string | null
           programado_inicio_data?: string | null
           programado_para_hoje?: boolean | null
@@ -396,6 +402,7 @@ export type Database = {
         Update: {
           aprovado_em?: string | null
           criado_em?: string
+          criado_por_id?: string | null
           data_fim_pcp?: string | null
           data_inicio_pcp?: string | null
           data_programacao?: string | null
@@ -403,8 +410,10 @@ export type Database = {
           fivelas_recebidas?: boolean | null
           id?: string
           observacao?: string | null
+          origem_op?: string | null
           pedido_id?: string
           pipeline_id?: string
+          produtos_descricao?: string | null
           programado_conclusao_data?: string | null
           programado_inicio_data?: string | null
           programado_para_hoje?: boolean | null
@@ -416,6 +425,13 @@ export type Database = {
           tipo_produto?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ordens_producao_criado_por_id_fkey"
+            columns: ["criado_por_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ordens_producao_pedido_id_fkey"
             columns: ["pedido_id"]

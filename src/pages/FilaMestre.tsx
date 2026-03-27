@@ -18,9 +18,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid, Clock } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid, Clock, Plus, Store, Wrench } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -70,6 +72,8 @@ interface VendaRow {
   prioridade: 'URGENTE' | 'ATENCAO' | 'NORMAL';
   etapas: EtapaInfo[];
   dataEntregaEfetiva: string | null;
+  origem_op: string | null;
+  produtos_descricao: string | null;
 }
 
 interface PedidoDetail {
@@ -129,6 +133,15 @@ export default function FilaMestre() {
 
   const [editingPcp, setEditingPcp] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
+
+  // Gerar OP PCP dialog state
+  const [gerarOpDialogOpen, setGerarOpDialogOpen] = useState(false);
+  const [gerarOpPedidoId, setGerarOpPedidoId] = useState<string | null>(null);
+  const [gerarOpTipo, setGerarOpTipo] = useState<string>('SINTETICO');
+  const [gerarOpObs, setGerarOpObs] = useState('');
+  const [gerarOpLoading, setGerarOpLoading] = useState(false);
+  const [gerarOpItens, setGerarOpItens] = useState<any[]>([]);
+  const [gerarOpItensSelecionados, setGerarOpItensSelecionados] = useState<Set<string>>(new Set());
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedFetchAll = useCallback(() => {
@@ -392,7 +405,7 @@ export default function FilaMestre() {
     const pedidoIds = pedidos.map(p => p.id);
 
     const [ordensRes, itensRes] = await Promise.all([
-      supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp').in('pedido_id', pedidoIds),
+      supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp, origem_op, produtos_descricao').in('pedido_id', pedidoIds),
       supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', pedidoIds),
     ]);
     const ordens = ordensRes.data || [];
@@ -535,6 +548,8 @@ export default function FilaMestre() {
         prioridade: pcp.prioridade,
         etapas: unifiedEtapas,
         dataEntregaEfetiva,
+        origem_op: (ordem as any)?.origem_op || 'SISTEMA',
+        produtos_descricao: (ordem as any)?.produtos_descricao || null,
       };
     });
 
@@ -610,8 +625,99 @@ export default function FilaMestre() {
     toast.success(value ? `Entrega ajustada para ${format(date!, 'dd/MM/yy')}` : 'Entrega ajustada removida');
     fetchAll();
   };
+  // Open Gerar OP PCP dialog
+  const openGerarOpDialog = async (pedidoId: string) => {
+    setGerarOpPedidoId(pedidoId);
+    setGerarOpTipo('SINTETICO');
+    setGerarOpObs('');
+    setGerarOpItensSelecionados(new Set());
+    // Fetch items for this pedido
+    const { data: itens } = await supabase.from('pedido_itens').select('*').eq('pedido_id', pedidoId);
+    setGerarOpItens(itens || []);
+    setGerarOpItensSelecionados(new Set((itens || []).map((i: any) => i.id)));
+    setGerarOpDialogOpen(true);
+  };
 
-  // Filters
+  const handleGerarOpPcp = async () => {
+    if (!profile || !gerarOpPedidoId) return;
+    setGerarOpLoading(true);
+    try {
+      // Determine pipeline based on tipo
+      const pipelineMap: Record<string, string> = {
+        'SINTETICO': '00000000-0000-0000-0000-000000000001',
+        'TECIDO': '00000000-0000-0000-0000-000000000002',
+        'FIVELA_COBERTA': '00000000-0000-0000-0000-000000000003',
+      };
+      const pipelineId = pipelineMap[gerarOpTipo] || pipelineMap['SINTETICO'];
+
+      // Get max sequencia for this pedido
+      const { data: existingOrdens } = await supabase
+        .from('ordens_producao')
+        .select('sequencia')
+        .eq('pedido_id', gerarOpPedidoId)
+        .order('sequencia', { ascending: false })
+        .limit(1);
+      const nextSeq = (existingOrdens && existingOrdens[0] ? existingOrdens[0].sequencia : 0) + 1;
+
+      // Build product description
+      const selectedItens = gerarOpItens.filter(i => gerarOpItensSelecionados.has(i.id));
+      const prodDesc = selectedItens.map((i: any) => `${i.descricao_produto} (${i.quantidade}un)`).join(', ');
+
+      // Create OP
+      const { data: novaOrdem, error: ordemErr } = await supabase
+        .from('ordens_producao')
+        .insert({
+          pedido_id: gerarOpPedidoId,
+          pipeline_id: pipelineId,
+          sequencia: nextSeq,
+          status: 'AGUARDANDO',
+          tipo_produto: gerarOpTipo,
+          observacao: gerarOpObs || null,
+          origem_op: 'PCP',
+          criado_por_id: profile.id,
+          produtos_descricao: prodDesc || null,
+        } as any)
+        .select()
+        .single();
+      if (ordemErr) throw ordemErr;
+
+      // Create etapas
+      const { data: etapas } = await supabase
+        .from('pipeline_etapas')
+        .select('*')
+        .eq('pipeline_id', pipelineId)
+        .order('ordem');
+
+      if (etapas && etapas.length > 0 && novaOrdem) {
+        const opEtapas = etapas.map((e: any) => ({
+          ordem_id: novaOrdem.id,
+          pipeline_etapa_id: e.id,
+          nome_etapa: e.nome,
+          ordem_sequencia: e.ordem,
+          status: 'PENDENTE',
+        }));
+        await supabase.from('op_etapas').insert(opEtapas as any);
+      }
+
+      // Register history
+      await supabase.from('pedido_historico').insert({
+        pedido_id: gerarOpPedidoId,
+        usuario_id: profile.id,
+        tipo_acao: 'TRANSICAO',
+        observacao: `OP de Produção gerada pelo PCP. Tipo: ${gerarOpTipo}. ${gerarOpObs ? 'Obs: ' + gerarOpObs : ''}`,
+      });
+
+      toast.success('OP PCP gerada com sucesso!');
+      setGerarOpDialogOpen(false);
+      fetchAll();
+    } catch (err: any) {
+      toast.error('Erro ao gerar OP: ' + (err.message || err));
+    } finally {
+      setGerarOpLoading(false);
+    }
+  };
+
+
   const filtered = rows.filter(r => {
     if (search && !r.cliente_nome.toLowerCase().includes(search.toLowerCase()) && !r.numero_pedido.toLowerCase().includes(search.toLowerCase()) && !(r.api_venda_id || '').toLowerCase().includes(search.toLowerCase())) return false;
     if (tipoFilter !== 'all' && r.tipo_produto !== tipoFilter) return false;
@@ -1060,14 +1166,16 @@ export default function FilaMestre() {
     const tipoLabel = TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || 'A classificar';
     const etapas = r.etapas || [];
     const statusCfg = STATUS_PEDIDO_CONFIG[r.status_atual] || {};
+    const isPcpOp = r.origem_op === 'PCP';
 
     return (
       <div
         key={r.id}
-        className={`rounded-lg border bg-card cursor-pointer hover:shadow-md transition-shadow ${
-          r.prioridade === 'URGENTE' ? 'border-l-4 border-l-destructive' :
-          r.prioridade === 'ATENCAO' ? 'border-l-4 border-l-warning' :
-          'border-l-4 border-l-[hsl(var(--success))]'
+        className={`rounded-lg border cursor-pointer hover:shadow-md transition-shadow ${
+          isPcpOp ? 'bg-orange-50 dark:bg-orange-950/20 border-l-4 border-l-orange-500' :
+          r.prioridade === 'URGENTE' ? 'border-l-4 border-l-destructive bg-card' :
+          r.prioridade === 'ATENCAO' ? 'border-l-4 border-l-warning bg-card' :
+          'border-l-4 border-l-[hsl(var(--success))] bg-card'
         }`}
         onClick={() => openDetail(r.id)}
       >
@@ -1088,9 +1196,11 @@ export default function FilaMestre() {
             </div>
             <div className="px-2 py-0.5 border-r border-border text-center">
               <span className="text-[11px] text-muted-foreground">Tipo</span>
-              <div className="mt-0.5">
+              <div className="mt-0.5 flex items-center gap-1 flex-wrap">
                 <Badge className={`text-[10px] font-semibold ${tipoBadge}`}>{tipoLabel}</Badge>
-                {r.is_piloto && <Badge className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30 ml-1">Piloto</Badge>}
+                {r.is_piloto && <Badge className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30">Piloto</Badge>}
+                {isPcpOp && <Badge className="text-[10px] bg-orange-500/15 text-orange-600 border-orange-500/30 font-bold">OP PCP</Badge>}
+                {r.origem_op === 'LOJA' && <Badge className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30 font-bold">OP Loja</Badge>}
               </div>
             </div>
             <div className="px-2 py-0.5 text-right">
@@ -1300,6 +1410,30 @@ export default function FilaMestre() {
           )}
             </div>
           </div>
+
+          {/* PCP OP: Produto a produzir */}
+          {isPcpOp && r.produtos_descricao && (
+            <div className="px-4 pb-2">
+              <div className="rounded-md border border-orange-300/50 bg-orange-100/30 dark:bg-orange-900/10 p-2 text-[11px]">
+                <span className="text-muted-foreground font-medium">Produto a produzir: </span>
+                <span className="font-bold text-foreground">{r.produtos_descricao}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Gerar OP PCP button */}
+          {canEdit && !isPcpOp && (
+            <div className="px-4 pb-2" onClick={(e) => e.stopPropagation()}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[11px] gap-1 border-orange-400/50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:hover:bg-orange-950/20"
+                onClick={() => openGerarOpDialog(r.id)}
+              >
+                <Plus className="h-3 w-3" /> Gerar OP PCP
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1320,6 +1454,15 @@ export default function FilaMestre() {
           </Badge>
           <Badge variant="outline" className="text-lg py-2 px-4 font-bold bg-muted text-muted-foreground">
             {sorted.filter(r => r.tipo_produto !== 'SINTETICO' && r.tipo_produto !== 'TECIDO').length} Outro
+          </Badge>
+          <div className="h-6 w-px bg-border mx-1" />
+          <Badge variant="outline" className="text-sm py-1.5 px-3 font-bold bg-purple-500/10 text-purple-600 border-purple-500/30">
+            <Store className="h-3.5 w-3.5 mr-1" />
+            {rows.filter(r => r.origem_op === 'LOJA').length} OP Loja
+          </Badge>
+          <Badge variant="outline" className="text-sm py-1.5 px-3 font-bold bg-orange-500/10 text-orange-600 border-orange-500/30">
+            <Wrench className="h-3.5 w-3.5 mr-1" />
+            {rows.filter(r => r.origem_op === 'PCP').length} OP PCP
           </Badge>
         </div>
         <div className="flex gap-2 items-center">
@@ -1841,6 +1984,74 @@ export default function FilaMestre() {
       </Sheet>
 
       <ConfigurarPcpDialog open={configOpen} onOpenChange={setConfigOpen} onSaved={fetchAll} />
+
+      {/* Dialog: Gerar OP PCP */}
+      <Dialog open={gerarOpDialogOpen} onOpenChange={setGerarOpDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-orange-600" />
+              Gerar OP de Produção (PCP)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Tipo de Produto</Label>
+              <Select value={gerarOpTipo} onValueChange={setGerarOpTipo}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SINTETICO">Cinto Sintético</SelectItem>
+                  <SelectItem value="TECIDO">Cinto Tecido</SelectItem>
+                  <SelectItem value="FIVELA_COBERTA">Fivela Coberta</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {gerarOpItens.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Itens para produção</Label>
+                <div className="rounded-lg border border-border/60 divide-y divide-border/40 max-h-48 overflow-y-auto">
+                  {gerarOpItens.map((item: any) => (
+                    <label key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/40 cursor-pointer text-sm">
+                      <Checkbox
+                        checked={gerarOpItensSelecionados.has(item.id)}
+                        onCheckedChange={(checked) => {
+                          const next = new Set(gerarOpItensSelecionados);
+                          if (checked) next.add(item.id); else next.delete(item.id);
+                          setGerarOpItensSelecionados(next);
+                        }}
+                      />
+                      <span className="flex-1 truncate">{item.descricao_produto}</span>
+                      <span className="text-muted-foreground text-xs">{item.quantidade}un</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Observação (opcional)</Label>
+              <Textarea
+                placeholder="Motivo ou detalhes da OP..."
+                value={gerarOpObs}
+                onChange={(e) => setGerarOpObs(e.target.value)}
+                className="text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGerarOpDialogOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={handleGerarOpPcp}
+              disabled={gerarOpLoading || gerarOpItensSelecionados.size === 0}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {gerarOpLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+              Gerar OP PCP
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
