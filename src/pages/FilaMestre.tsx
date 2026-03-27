@@ -504,14 +504,15 @@ export default function FilaMestre() {
 
     const [ordensRes, itensRes] = await Promise.all([
       supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp, origem_op, produtos_descricao').in('pedido_id', pedidoIds),
-      supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', pedidoIds),
+      supabase.from('pedido_itens').select('pedido_id, quantidade, descricao_produto').in('pedido_id', pedidoIds),
     ]);
     const ordens = ordensRes.data || [];
     const itensData = itensRes.data || [];
 
-    // Aggregate quantities per pedido
+    // Aggregate quantities per pedido (only valid production items)
     const qtdMap = new Map<string, number>();
     for (const item of itensData) {
+      if (!isValidProductionItem(item.descricao_produto)) continue;
       qtdMap.set(item.pedido_id, (qtdMap.get(item.pedido_id) || 0) + (item.quantidade || 0));
     }
 
