@@ -1045,41 +1045,24 @@ export default function KanbanProducao() {
     }
   };
 
-  const openWhatsApp = async (phone: string, message: string) => {
-    const url = buildWhatsappUrl(phone, message);
+  const openWhatsApp = (phone: string, message: string) => {
+    const cleanPhone = sanitizeWhatsappPhone(phone);
+    const encodedMessage = encodeURIComponent(message);
+    const url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 
-    try {
-      const popup = window.open('', '_blank', 'noopener,noreferrer');
-      if (popup) {
-        popup.opener = null;
-        popup.location.replace(url);
-        return true;
-      }
-    } catch {
-      // fallback below
-    }
+    console.log('CLICK BOTÃO WhatsApp');
+    console.log('URL GERADA:', url);
+    console.log('MÉTODO: createElement("a") + click()');
 
-    try {
-      const popup = window.open(url, '_blank', 'noopener,noreferrer');
-      if (popup) return true;
-    } catch {
-      // fallback below
-    }
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
-    const copiedLink = await copyTextToClipboard(url);
-    if (copiedLink) {
-      toast.error('O preview bloqueou a aba externa; o link do WhatsApp foi copiado.');
-      return false;
-    }
-
-    const copiedMessage = await copyTextToClipboard(message);
-    if (copiedMessage) {
-      toast.error('O preview bloqueou a aba externa; a mensagem foi copiada.');
-      return false;
-    }
-
-    toast.error('O preview bloqueou a abertura externa do WhatsApp.');
-    return false;
+    console.log('LINK CLICADO - aguardando abertura externa');
   };
 
   const registerWhatsappReferral = async (card: KanbanCard, vendedora: { nome: string }) => {
@@ -1125,6 +1108,23 @@ export default function KanbanProducao() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">Kanban de Produção</h1>
+          <Button variant="outline" size="sm" className="gap-1.5 border-emerald-500 text-emerald-600"
+            onClick={() => {
+              console.log('TESTE WhatsApp - botão isolado');
+              const testUrl = 'https://wa.me/5500000000000?text=Teste%20Lovable';
+              console.log('URL TESTE:', testUrl);
+              const link = document.createElement('a');
+              link.href = testUrl;
+              link.target = '_blank';
+              link.rel = 'noopener noreferrer';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              console.log('TESTE - link clicado');
+            }}
+          >
+            <MessageCircle className="h-3.5 w-3.5" /> Teste WhatsApp
+          </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/relatorios/producao')} className="gap-1.5">
             <BarChart3 className="h-3.5 w-3.5" /> Relatórios
           </Button>
@@ -1501,28 +1501,44 @@ export default function KanbanProducao() {
                                             const hasValidWhatsapp = sanitizeWhatsappPhone(v.whatsapp).length >= 12;
 
                                             return (
-                                            <button
-                                              key={v.id}
-                                              type="button"
-                                               disabled={!hasValidWhatsapp}
-                                               className="flex w-full items-center gap-3 rounded-sm px-2 py-2 text-left transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
-                                               onClick={() => {
-                                                 setWhatsappExpandedCardId(null);
-                                                 void openWhatsApp(v.whatsapp, buildWhatsappMessage(card));
-                                                void registerWhatsappReferral(card, v);
-                                              }}
-                                            >
-                                               <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted text-foreground font-bold text-xs shrink-0">
-                                                {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                                              </div>
-                                              <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-sm leading-none text-foreground">{v.nome}</p>
-                                                 <p className="text-xs text-muted-foreground font-mono mt-1">
-                                                   {hasValidWhatsapp ? formatWhatsappDisplay(v.whatsapp) : 'WhatsApp inválido'}
-                                                 </p>
-                                              </div>
-                                               <MessageCircle className="h-4 w-4 text-primary shrink-0" />
-                                            </button>
+                                            <div key={v.id} className="flex w-full items-center gap-2 rounded-sm px-2 py-2">
+                                              <button
+                                                type="button"
+                                                disabled={!hasValidWhatsapp}
+                                                className="flex flex-1 items-center gap-3 text-left transition-colors hover:bg-accent rounded-sm px-1 py-1 disabled:cursor-not-allowed disabled:opacity-60"
+                                                onClick={() => {
+                                                  console.log('CLICK VENDEDORA:', v.nome, v.whatsapp);
+                                                  setWhatsappExpandedCardId(null);
+                                                  openWhatsApp(v.whatsapp, buildWhatsappMessage(card));
+                                                  void registerWhatsappReferral(card, v);
+                                                }}
+                                              >
+                                                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted text-foreground font-bold text-xs shrink-0">
+                                                  {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                  <p className="font-medium text-sm leading-none text-foreground">{v.nome}</p>
+                                                  <p className="text-xs text-muted-foreground font-mono mt-1">
+                                                    {hasValidWhatsapp ? formatWhatsappDisplay(v.whatsapp) : 'WhatsApp inválido'}
+                                                  </p>
+                                                </div>
+                                                <MessageCircle className="h-4 w-4 text-primary shrink-0" />
+                                              </button>
+                                              {hasValidWhatsapp && (
+                                                <button
+                                                  type="button"
+                                                  className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded border border-border hover:bg-accent shrink-0"
+                                                  onClick={async () => {
+                                                    const url = buildWhatsappUrl(v.whatsapp, buildWhatsappMessage(card));
+                                                    const ok = await copyTextToClipboard(url);
+                                                    if (ok) toast.success(`Link copiado para ${v.nome}`);
+                                                    else toast.error('Erro ao copiar');
+                                                  }}
+                                                >
+                                                  Copiar
+                                                </button>
+                                              )}
+                                            </div>
                                             );
                                           })
                                         )}
