@@ -1021,32 +1021,6 @@ export default function KanbanProducao() {
     }
     const p = whatsappPedidoData;
 
-    // Build WhatsApp message
-    const lines = [
-      `📋 *Venda #${p.numero_pedido}*`,
-      `👤 Cliente: ${p.cliente_nome || '—'}`,
-      `📞 Telefone: ${p.cliente_telefone || '—'}`,
-      `📍 Cidade/UF: ${p.cliente_endereco || '—'}`,
-      `🏷️ Segmento: ${p.canal_venda || '—'}`,
-      `📅 Data de Entrega: ${p.data_previsao_entrega ? new Date(p.data_previsao_entrega + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}`,
-      `💰 Valor Total: ${Number(p.valor_liquido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
-      `📝 Observação: ${p.observacao_api || p.observacao_comercial || '—'}`,
-    ];
-    const message = lines.join('\n');
-    const whatsappNumber = vendedora.whatsapp.replace(/\D/g, '');
-    const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-    console.log('WhatsApp URL:', url);
-
-    // Create a real <a> element and click it to avoid sandbox/iframe blocking
-    const link = document.createElement('a');
-    link.href = url;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    // Log to history
     try {
       const { error: histError } = await supabase.from('pedido_historico').insert({
         pedido_id: card.pedido_id,
@@ -1054,11 +1028,10 @@ export default function KanbanProducao() {
         tipo_acao: 'COMENTARIO',
         observacao: `Encaminhado para ${vendedora.nome} via WhatsApp`,
       });
+
       if (histError) {
         console.error('pedido_historico insert error:', histError);
         toast.error('Erro ao registrar encaminhamento');
-      } else {
-        toast.success(`Encaminhado para ${vendedora.nome} via WhatsApp`);
       }
     } catch (err) {
       console.error('handleSelectVendedora catch:', err);
@@ -1067,6 +1040,33 @@ export default function KanbanProducao() {
 
     setWhatsappModal({ open: false, card: null });
     setWhatsappPedidoData(null);
+  };
+
+  const buildWhatsappMessage = (pedidoData: any) => {
+    const lines = [
+      `📋 *Venda #${pedidoData.numero_pedido}*`,
+      `👤 Cliente: ${pedidoData.cliente_nome || '—'}`,
+      `📞 Telefone: ${pedidoData.cliente_telefone || '—'}`,
+      `📍 Cidade/UF: ${pedidoData.cliente_endereco || '—'}`,
+      `🏷️ Segmento: ${pedidoData.canal_venda || '—'}`,
+      `📅 Data de Entrega: ${pedidoData.data_previsao_entrega ? new Date(pedidoData.data_previsao_entrega + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}`,
+      `💰 Valor Total: ${Number(pedidoData.valor_liquido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+      `📝 Observação: ${pedidoData.observacao_api || pedidoData.observacao_comercial || '—'}`,
+    ];
+
+    return lines.join('\n');
+  };
+
+  const buildWhatsappUrl = (phone: string, message: string) => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const encodedMessage = encodeURIComponent(message);
+    return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+  };
+
+  const formatWhatsappDisplay = (phone: string) => {
+    if (phone.length === 13) return phone.replace(/(\d{2})(\d{2})(\d{5})(\d{4})/, '+$1 ($2) $3-$4');
+    if (phone.length === 12) return phone.replace(/(\d{2})(\d{2})(\d{4})(\d{4})/, '+$1 ($2) $3-$4');
+    return phone;
   };
 
   const filteredCards = getFilteredCards();
@@ -1787,23 +1787,37 @@ export default function KanbanProducao() {
             {vendedorasDb.length === 0 && (
               <p className="text-center text-sm text-muted-foreground py-4">Nenhuma vendedora cadastrada. Cadastre em Usuários.</p>
             )}
-            {vendedorasDb.map((v) => (
-              <Button
-                key={v.id}
-                variant="outline"
-                className="h-14 justify-start gap-3 text-left hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all group"
-                onClick={() => handleSelectVendedora(v)}
-              >
-                <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm shrink-0 group-hover:bg-emerald-200 transition-colors">
-                  {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{v.nome}</p>
-                  <p className="text-xs text-muted-foreground font-mono">{v.whatsapp.replace(/(\d{2})(\d{2})(\d{5})(\d{4})/, '+$1 ($2) $3-$4')}</p>
-                </div>
-                <MessageCircle className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </Button>
-            ))}
+            {vendedorasDb.map((v) => {
+              const message = whatsappPedidoData ? buildWhatsappMessage(whatsappPedidoData) : '';
+              const whatsappUrl = buildWhatsappUrl(v.whatsapp, message);
+
+              return (
+                <Button
+                  key={v.id}
+                  asChild
+                  variant="outline"
+                  className="h-14 justify-start gap-3 text-left hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all group"
+                >
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      void handleSelectVendedora(v);
+                    }}
+                  >
+                    <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm shrink-0 group-hover:bg-emerald-200 transition-colors">
+                      {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{v.nome}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{formatWhatsappDisplay(v.whatsapp)}</p>
+                    </div>
+                    <MessageCircle className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                </Button>
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>
