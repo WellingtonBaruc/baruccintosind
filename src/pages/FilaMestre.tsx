@@ -1179,11 +1179,14 @@ export default function FilaMestre() {
     const statusCfg = STATUS_PEDIDO_CONFIG[r.status_atual] || {};
     const isPcpOp = r.origem_op === 'PCP';
 
+    const isSelected = selectedCards.has(r.id);
+
     return (
       <div
         key={r.id}
         className={`rounded-lg border cursor-pointer hover:shadow-md transition-shadow ${
           isPcpOp ? 'bg-orange-50 dark:bg-orange-950/20 border-l-4 border-l-orange-500' :
+          isSelected ? 'ring-2 ring-orange-400 border-l-4 border-l-orange-400 bg-orange-50/30 dark:bg-orange-950/10' :
           r.prioridade === 'URGENTE' ? 'border-l-4 border-l-destructive bg-card' :
           r.prioridade === 'ATENCAO' ? 'border-l-4 border-l-warning bg-card' :
           'border-l-4 border-l-[hsl(var(--success))] bg-card'
@@ -1192,7 +1195,23 @@ export default function FilaMestre() {
       >
         <div className="px-4 py-2.5 space-y-1.5">
           {/* Linha 1 — Identificação */}
-          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-0 border-b border-border pb-1.5">
+          <div className="grid grid-cols-[auto_auto_1fr_auto_auto_auto] items-center gap-0 border-b border-border pb-1.5">
+            {/* Checkbox for selection */}
+            {canEdit && (
+              <div className="pr-2 flex items-center" onClick={(e) => e.stopPropagation()}>
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={(checked) => {
+                    setSelectedCards(prev => {
+                      const next = new Set(prev);
+                      if (checked) next.add(r.id); else next.delete(r.id);
+                      return next;
+                    });
+                  }}
+                  className="h-4 w-4"
+                />
+              </div>
+            )}
             <div className="px-2 py-0.5 border-r border-border">
               <span className="text-[11px] text-muted-foreground">Nº Venda</span>
               <p className="text-xs font-bold tabular-nums text-foreground">#{r.api_venda_id || r.numero_pedido}</p>
@@ -1432,19 +1451,6 @@ export default function FilaMestre() {
             </div>
           )}
 
-          {/* Gerar OP PCP button */}
-          {canEdit && !isPcpOp && (
-            <div className="px-4 pb-2" onClick={(e) => e.stopPropagation()}>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-[11px] gap-1 border-orange-400/50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:hover:bg-orange-950/20"
-                onClick={() => openGerarOpDialog(r.id)}
-              >
-                <Plus className="h-3 w-3" /> Gerar OP PCP
-              </Button>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -1485,6 +1491,17 @@ export default function FilaMestre() {
           <Button variant="outline" size="sm" className="text-xs h-7 px-2" onClick={() => navigate('/painel-dia')}>
             <Calendar className="h-3 w-3 mr-1" /> Painel
           </Button>
+          {canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-7 px-2 gap-1 border-orange-400/50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:hover:bg-orange-950/20"
+              onClick={openGerarOpDialog}
+              disabled={selectedCards.size === 0}
+            >
+              <Plus className="h-3 w-3" /> Gerar OP PCP {selectedCards.size > 0 && `(${selectedCards.size})`}
+            </Button>
+          )}
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="text-xs h-7 px-2 gap-1">
