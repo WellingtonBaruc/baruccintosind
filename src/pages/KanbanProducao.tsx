@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -158,8 +158,8 @@ export default function KanbanProducao() {
   const [obsCorteTexts, setObsCorteTexts] = useState<Map<string, string>>(new Map());
   const [savingObsCorte, setSavingObsCorte] = useState(false);
 
-  // WhatsApp vendedora modal
-  const [whatsappModal, setWhatsappModal] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
+  // WhatsApp vendedora menu
+  const [whatsappMenuCardId, setWhatsappMenuCardId] = useState<string | null>(null);
   const [whatsappPedidoData, setWhatsappPedidoData] = useState<any>(null);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
 
@@ -989,11 +989,19 @@ export default function KanbanProducao() {
     }
   };
 
-   const handleEnviarParaComercial = async (card: KanbanCard) => {
+  const resetWhatsappState = () => {
+    setWhatsappMenuCardId(null);
+    setWhatsappPedidoData(null);
+    setWhatsappLoading(false);
+  };
+
+  const prepareWhatsappContext = async (card: KanbanCard) => {
     if (!profile) { console.error('handleEnviarParaComercial: no profile'); return; }
+
+    setWhatsappMenuCardId(card.id);
     setWhatsappLoading(true);
+
     try {
-      // Fetch full pedido data for the WhatsApp message
       const { data: pedido, error: pedidoError } = await supabase
         .from('pedidos')
         .select('numero_pedido, cliente_nome, cliente_telefone, cliente_endereco, canal_venda, data_previsao_entrega, valor_liquido, observacao_api, observacao_comercial')
@@ -1002,21 +1010,19 @@ export default function KanbanProducao() {
       console.log('handleEnviarParaComercial pedido:', pedido, 'error:', pedidoError, 'card.pedido_id:', card.pedido_id);
       if (pedidoError) {
         toast.error('Erro ao carregar dados da venda');
-        setWhatsappLoading(false);
+        resetWhatsappState();
         return;
       }
+
       setWhatsappPedidoData(pedido);
-      setWhatsappModal({ open: true, card });
     } catch (err) {
       console.error('handleEnviarParaComercial catch:', err);
       toast.error('Erro ao carregar dados da venda');
+      resetWhatsappState();
+      return;
     }
-    setWhatsappLoading(false);
-  };
 
-  const closeWhatsappModal = () => {
-    setWhatsappModal({ open: false, card: null });
-    setWhatsappPedidoData(null);
+    setWhatsappLoading(false);
   };
 
   const registerWhatsappReferral = async (card: KanbanCard, vendedora: { nome: string; whatsapp: string }) => {
@@ -1063,19 +1069,30 @@ export default function KanbanProducao() {
     return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
   };
 
-  const handleWhatsappAnchorClick = (vendedora: { id: string; nome: string; whatsapp: string }) => {
-    const card = whatsappModal.card;
+  const openWhatsApp = (phone: string, message: string) => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const encodedMessage = encodeURIComponent(message);
+    const url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 
-    if (!card || !whatsappPedidoData) {
-      console.error('handleWhatsappAnchorClick: missing data', { card: !!card, whatsappPedidoData: !!whatsappPedidoData });
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleWhatsappSelection = (card: KanbanCard, vendedora: { id: string; nome: string; whatsapp: string }) => {
+    if (!whatsappPedidoData || whatsappMenuCardId !== card.id) {
+      console.error('handleWhatsappSelection: missing data', { cardId: card.id, whatsappMenuCardId, hasPedidoData: !!whatsappPedidoData });
       toast.error('Dados da venda indisponíveis para abrir o WhatsApp.');
       return;
     }
 
-    window.setTimeout(() => {
-      closeWhatsappModal();
-      void registerWhatsappReferral(card, vendedora);
-    }, 0);
+    openWhatsApp(vendedora.whatsapp, buildWhatsappMessage(whatsappPedidoData));
+    resetWhatsappState();
+    void registerWhatsappReferral(card, vendedora);
   };
 
   const formatWhatsappDisplay = (phone: string) => {
@@ -1465,9 +1482,54 @@ export default function KanbanProducao() {
                                   </Button>
                                 )}
                                 {inConcluido && canSendToComercial(card) && (
-                                  <Button size="sm" className="w-full mt-2 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleEnviarParaComercial(card)} disabled={whatsappLoading}>
-                                    <MessageCircle className="h-3 w-3 mr-1" /> Enviar para o Comercial
-                                  </Button>
+                                  <DropdownMenu
+                                    open={whatsappMenuCardId === card.id}
+                                    onOpenChange={(open) => {
+                                      if (open) {
+                                        void prepareWhatsappContext(card);
+                                        return;
+                                      }
+
+                                      if (whatsappMenuCardId === card.id) {
+                                        resetWhatsappState();
+                                      }
+                                    }}
+                                  >
+                                    <DropdownMenuTrigger asChild>
+                                      <Button size="sm" className="w-full mt-2 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" disabled={whatsappLoading && whatsappMenuCardId === card.id}>
+                                        <MessageCircle className="h-3 w-3 mr-1" /> Enviar para o Comercial
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-72">
+                                      {whatsappLoading && whatsappMenuCardId === card.id ? (
+                                        <DropdownMenuItem disabled>
+                                          <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> Carregando dados da venda...
+                                        </DropdownMenuItem>
+                                      ) : vendedorasDb.length === 0 ? (
+                                        <DropdownMenuItem disabled>Nenhuma vendedora cadastrada.</DropdownMenuItem>
+                                      ) : (
+                                        vendedorasDb.map((v) => (
+                                          <DropdownMenuItem
+                                            key={v.id}
+                                            onSelect={(event) => {
+                                              event.preventDefault();
+                                              handleWhatsappSelection(card, v);
+                                            }}
+                                            className="flex items-center gap-3 py-3"
+                                          >
+                                            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 font-bold text-xs shrink-0">
+                                              {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                              <p className="font-medium text-sm leading-none">{v.nome}</p>
+                                              <p className="text-xs text-muted-foreground font-mono mt-1">{formatWhatsappDisplay(v.whatsapp)}</p>
+                                            </div>
+                                            <MessageCircle className="h-4 w-4 text-emerald-500 shrink-0" />
+                                          </DropdownMenuItem>
+                                        ))
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 )}
 
                                 {!inConcluido && col !== 'Aguardando Início' && isSupervisor && (
@@ -1776,62 +1838,6 @@ export default function KanbanProducao() {
           </ScrollArea>
         </SheetContent>
       </Sheet>
-
-      {/* WhatsApp Vendedora Modal */}
-      <Dialog open={whatsappModal.open} onOpenChange={(open) => { if (!open) closeWhatsappModal(); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              <MessageCircle className="h-5 w-5 text-emerald-600" />
-              Encaminhar para Vendedora
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
-              Selecione a vendedora para enviar os dados da venda via WhatsApp
-            </DialogDescription>
-          </DialogHeader>
-          {whatsappPedidoData && (
-            <div className="rounded-lg border bg-muted/30 p-3 mb-2">
-              <p className="text-xs font-medium text-muted-foreground mb-1">Venda #{whatsappPedidoData.numero_pedido}</p>
-              <p className="text-sm font-semibold">{whatsappPedidoData.cliente_nome}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {Number(whatsappPedidoData.valor_liquido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </p>
-            </div>
-          )}
-          <div className="grid gap-2">
-            {vendedorasDb.length === 0 && (
-              <p className="text-center text-sm text-muted-foreground py-4">Nenhuma vendedora cadastrada. Cadastre em Usuários.</p>
-            )}
-            {vendedorasDb.map((v) => {
-              const message = whatsappPedidoData ? buildWhatsappMessage(whatsappPedidoData) : '';
-              const whatsappUrl = buildWhatsappUrl(v.whatsapp, message);
-
-              return (
-                <a
-                  key={v.id}
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    buttonVariants({ variant: 'outline' }),
-                    'h-14 w-full justify-start gap-3 text-left hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all group'
-                  )}
-                  onClick={() => handleWhatsappAnchorClick(v)}
-                >
-                  <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm shrink-0 group-hover:bg-emerald-200 transition-colors">
-                    {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{v.nome}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{formatWhatsappDisplay(v.whatsapp)}</p>
-                  </div>
-                  <MessageCircle className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
