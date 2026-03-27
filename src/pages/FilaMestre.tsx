@@ -168,94 +168,83 @@ export default function FilaMestre() {
     return { cal, lts };
   };
 
-  const fetchWeeklySummary = useCallback(async (weekNum: number) => {
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-    const weekStart = (weekNum - 1) * 7 + 1;
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const weekEnd = Math.min(weekNum * 7, daysInMonth);
-    const dateFrom = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(weekStart).padStart(2, '0')}`;
-    const dateTo = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(weekEnd).padStart(2, '0')}`;
+  const fetchWeeklySummary = useCallback(async (month: number, weekNum: number) => {
+    const currentYear = new Date().getFullYear();
+    const daysInMonth = new Date(currentYear, month + 1, 0).getDate();
 
-    // Fetch ALL orders in this week range (including completed/archived)
-    const { data: allOrdens } = await supabase
-      .from('ordens_producao')
-      .select('id, pedido_id, tipo_produto, status, data_fim_pcp')
-      .or(`data_programacao.gte.${dateFrom},data_programacao.lte.${dateTo},programado_inicio_data.gte.${dateFrom},programado_inicio_data.lte.${dateTo}`);
+    let dateFrom: string, dateTo: string;
+    if (weekNum === 0) {
+      // All weeks — full month
+      dateFrom = `${currentYear}-${String(month + 1).padStart(2, '0')}-01`;
+      dateTo = `${currentYear}-${String(month + 1).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+    } else {
+      const weekStart = (weekNum - 1) * 7 + 1;
+      const weekEnd = Math.min(weekNum * 7, daysInMonth);
+      dateFrom = `${currentYear}-${String(month + 1).padStart(2, '0')}-${String(weekStart).padStart(2, '0')}`;
+      dateTo = `${currentYear}-${String(month + 1).padStart(2, '0')}-${String(weekEnd).padStart(2, '0')}`;
+    }
 
-    // Also get orders linked to pedidos with delivery in this week
-    const { data: pedidosInWeek } = await supabase
+    // Fetch pedidos with delivery dates in range (using both previsao and ajustada)
+    const { data: pedidosInRange } = await supabase
       .from('pedidos')
       .select('id')
-      .or(`data_previsao_entrega.gte.${dateFrom},data_entrega_ajustada_pcp.gte.${dateFrom}`)
-      .or(`data_previsao_entrega.lte.${dateTo},data_entrega_ajustada_pcp.lte.${dateTo}`);
+      .or(`and(data_entrega_ajustada_pcp.gte.${dateFrom},data_entrega_ajustada_pcp.lte.${dateTo}),and(data_entrega_ajustada_pcp.is.null,data_previsao_entrega.gte.${dateFrom},data_previsao_entrega.lte.${dateTo})`);
 
-    const pedidoIdsFromDelivery = new Set((pedidosInWeek || []).map(p => p.id));
-    
-    // Get orders by pedido delivery dates too
-    let ordensByDelivery: any[] = [];
-    if (pedidoIdsFromDelivery.size > 0) {
-      const ids = [...pedidoIdsFromDelivery];
-      const { data } = await supabase
-        .from('ordens_producao')
-        .select('id, pedido_id, tipo_produto, status, data_fim_pcp')
-        .in('pedido_id', ids);
-      ordensByDelivery = data || [];
+    const pedidoIds = (pedidosInRange || []).map(p => p.id);
+    if (pedidoIds.length === 0) {
+      setWeekSummary({ sintetico: 0, tecido: 0, concluido: 0 });
+      return;
     }
 
-    // Merge and deduplicate
-    const allOrdensMap = new Map<string, any>();
-    for (const o of [...(allOrdens || []), ...ordensByDelivery]) {
-      allOrdensMap.set(o.id, o);
+    // Fetch orders and items in batches
+    const batchSize = 200;
+    const allOrdens: any[] = [];
+    const allItens: any[] = [];
+    for (let i = 0; i < pedidoIds.length; i += batchSize) {
+      const batch = pedidoIds.slice(i, i + batchSize);
+      const [ordensRes, itensRes] = await Promise.all([
+        supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status, data_fim_pcp').in('pedido_id', batch),
+        supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', batch),
+      ]);
+      allOrdens.push(...(ordensRes.data || []));
+      allItens.push(...(itensRes.data || []));
     }
-    const mergedOrdens = [...allOrdensMap.values()];
-    const mergedPedidoIds = [...new Set(mergedOrdens.map(o => o.pedido_id))];
 
-    // Get item quantities for these pedidos
+    const qtdByPedido = new Map<string, number>();
+    for (const item of allItens) {
+      qtdByPedido.set(item.pedido_id, (qtdByPedido.get(item.pedido_id) || 0) + (item.quantidade || 0));
+    }
+
+    const ordensByPedido = new Map<string, any[]>();
+    for (const o of allOrdens) {
+      if (!ordensByPedido.has(o.pedido_id)) ordensByPedido.set(o.pedido_id, []);
+      ordensByPedido.get(o.pedido_id)!.push(o);
+    }
+
     let totalSint = 0, totalTec = 0, totalConcl = 0;
-    if (mergedPedidoIds.length > 0) {
-      // Batch fetch items
-      const batchSize = 200;
-      const allItens: any[] = [];
-      for (let i = 0; i < mergedPedidoIds.length; i += batchSize) {
-        const batch = mergedPedidoIds.slice(i, i + batchSize);
-        const { data } = await supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', batch);
-        allItens.push(...(data || []));
-      }
-      const qtdByPedido = new Map<string, number>();
-      for (const item of allItens) {
-        qtdByPedido.set(item.pedido_id, (qtdByPedido.get(item.pedido_id) || 0) + (item.quantidade || 0));
-      }
+    for (const pedidoId of pedidoIds) {
+      const pecas = qtdByPedido.get(pedidoId) || 0;
+      const ordens = ordensByPedido.get(pedidoId) || [];
+      const mainOrdem = ordens.find(o => o.tipo_produto === 'SINTETICO') || ordens.find(o => o.tipo_produto === 'TECIDO') || ordens[0];
+      if (mainOrdem?.tipo_produto === 'SINTETICO') totalSint += pecas;
+      else if (mainOrdem?.tipo_produto === 'TECIDO') totalTec += pecas;
 
-      // Group orders by pedido for tipo
-      const ordensByPedido = new Map<string, any[]>();
-      for (const o of mergedOrdens) {
-        if (!ordensByPedido.has(o.pedido_id)) ordensByPedido.set(o.pedido_id, []);
-        ordensByPedido.get(o.pedido_id)!.push(o);
-      }
-
-      for (const [pedidoId, ordens] of ordensByPedido) {
-        const pecas = qtdByPedido.get(pedidoId) || 0;
-        const mainOrdem = ordens.find(o => o.tipo_produto === 'SINTETICO') || ordens.find(o => o.tipo_produto === 'TECIDO') || ordens[0];
-        if (mainOrdem?.tipo_produto === 'SINTETICO') totalSint += pecas;
-        else if (mainOrdem?.tipo_produto === 'TECIDO') totalTec += pecas;
-
-        // Concluído: check if any ordem was completed in this week
-        const concluded = ordens.some(o => {
-          if (o.status !== 'CONCLUIDA' || !o.data_fim_pcp) return false;
-          const fimDate = new Date(o.data_fim_pcp);
-          return fimDate.getFullYear() === currentYear && fimDate.getMonth() === currentMonth && fimDate.getDate() >= weekStart && fimDate.getDate() <= weekEnd;
-        });
-        if (concluded) totalConcl += pecas;
-      }
+      const concluded = ordens.some(o => {
+        if (o.status !== 'CONCLUIDA' || !o.data_fim_pcp) return false;
+        const fimDate = new Date(o.data_fim_pcp);
+        const fimDay = fimDate.getDate();
+        const fromDay = parseInt(dateFrom.split('-')[2]);
+        const toDay = parseInt(dateTo.split('-')[2]);
+        return fimDate.getFullYear() === currentYear && fimDate.getMonth() === month && fimDay >= fromDay && fimDay <= toDay;
+      });
+      if (concluded) totalConcl += pecas;
     }
     setWeekSummary({ sintetico: totalSint, tecido: totalTec, concluido: totalConcl });
   }, []);
 
   useEffect(() => {
-    fetchWeeklySummary(selectedWeek);
-  }, [selectedWeek, fetchWeeklySummary]);
+    fetchWeeklySummary(selectedMonth, selectedWeek);
+  }, [selectedMonth, selectedWeek, fetchWeeklySummary]);
 
   const fetchAll = async () => {
     const { cal, lts } = await fetchCalendarData();
