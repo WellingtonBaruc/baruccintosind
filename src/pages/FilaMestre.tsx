@@ -852,46 +852,74 @@ export default function FilaMestre() {
           {/* Corpo — Grid 30/70 */}
           <div className="grid grid-cols-[30%_70%] gap-0">
             {/* Lado esquerdo — Datas */}
-            <div className="border-r border-border pr-2 space-y-1 text-[12px] tabular-nums">
-              <div>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Entrega</span>
-                <p className="font-bold text-foreground">{fmtDate(r.dataEntregaEfetiva)}</p>
-              </div>
-              <div>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Início Ideal</span>
-                <p className="font-bold text-foreground">
-                  {(() => {
-                    if (r.data_venda_api && r.dataEntregaEfetiva && r.data_venda_api === r.dataEntregaEfetiva) {
-                      return 'ENT IMEDIATA';
-                    }
-                    if (r.data_venda_api && r.dataEntregaEfetiva && r.dataEntregaEfetiva > r.data_venda_api) {
-                      // Calculate 1 business day after sale date
-                      const vendaDate = new Date(r.data_venda_api + 'T00:00:00');
-                      const nextBizDay = new Date(vendaDate);
-                      let found = false;
-                      while (!found) {
-                        nextBizDay.setDate(nextBizDay.getDate() + 1);
-                        const dow = nextBizDay.getDay();
-                        if (dow !== 0 && dow !== 6) found = true;
+            <div className="border-r border-border pr-2 text-[12px] tabular-nums space-y-1">
+              {/* Linha 1: Entrega + Início Ideal lado a lado */}
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Entrega</span>
+                  <p className="font-bold text-foreground">{fmtDate(r.dataEntregaEfetiva)}</p>
+                </div>
+                <div className="flex-1">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Início Ideal</span>
+                  <p className={`font-bold ${r.data_venda_api && r.dataEntregaEfetiva && r.data_venda_api === r.dataEntregaEfetiva ? 'text-destructive' : 'text-foreground'}`}>
+                    {(() => {
+                      if (r.data_venda_api && r.dataEntregaEfetiva && r.data_venda_api === r.dataEntregaEfetiva) {
+                        return 'ENT IMEDIATA';
                       }
-                      const diffMs = new Date(r.dataEntregaEfetiva + 'T00:00:00').getTime() - vendaDate.getTime();
-                      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-                      return `${diffDays}D`;
-                    }
-                    return fmtDate(r.dataInicioIdeal);
-                  })()}
-                </p>
+                      if (r.data_venda_api) {
+                        // Início ideal = data da venda + 1 dia útil
+                        const vendaDate = new Date(r.data_venda_api + 'T00:00:00');
+                        const nextDay = new Date(vendaDate);
+                        nextDay.setDate(nextDay.getDate() + 1);
+                        while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
+                          nextDay.setDate(nextDay.getDate() + 1);
+                        }
+                        return format(nextDay, 'dd/MM/yy');
+                      }
+                      return fmtDate(r.dataInicioIdeal);
+                    })()}
+                  </p>
+                </div>
               </div>
-              <div>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Iniciado</span>
-                <div className="flex items-center justify-between gap-1">
-                  <p className="font-bold text-foreground">
+              {/* Linha 2: Iniciado + Finalizado lado a lado */}
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Iniciado</span>
+                  <p className="font-bold text-foreground text-[11px]">
                     {r.data_inicio_pcp ? new Date(r.data_inicio_pcp).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                   </p>
-                  <span className={`text-[11px] font-bold ${r.atrasoDias < 0 ? 'text-destructive' : r.atrasoDias <= 2 ? 'text-warning' : 'text-[hsl(var(--success))]'}`}>
-                    {r.atrasoDias < 0 ? `${Math.abs(r.atrasoDias)}d atraso` : r.atrasoDias === 0 ? 'Hoje' : `${r.atrasoDias}d`}
-                  </span>
                 </div>
+                <div className="flex-1">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Finalizado</span>
+                  <p className="font-bold text-foreground text-[11px]">
+                    {r.data_fim_pcp ? new Date(r.data_fim_pcp).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                  </p>
+                </div>
+              </div>
+              {/* Linha 3: Tempo de Produção */}
+              <div>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Tempo Produção</span>
+                <p className={`font-bold text-[11px] ${r.atrasoDias < 0 ? 'text-destructive' : r.atrasoDias <= 2 ? 'text-warning' : 'text-[hsl(var(--success))]'}`}>
+                  {(() => {
+                    if (r.data_inicio_pcp && r.data_fim_pcp) {
+                      const inicio = new Date(r.data_inicio_pcp);
+                      const fim = new Date(r.data_fim_pcp);
+                      const diffMs = fim.getTime() - inicio.getTime();
+                      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                      const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                      if (diffHours >= 24) {
+                        const days = Math.floor(diffHours / 24);
+                        const hrs = diffHours % 24;
+                        return `${days}d ${hrs}h`;
+                      }
+                      return `${diffHours}h ${diffMins}min`;
+                    }
+                    if (r.data_inicio_pcp) {
+                      return 'Em andamento';
+                    }
+                    return '—';
+                  })()}
+                </p>
               </div>
             </div>
 
