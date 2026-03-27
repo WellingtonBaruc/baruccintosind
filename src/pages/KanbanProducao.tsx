@@ -1049,16 +1049,26 @@ export default function KanbanProducao() {
 
   const openWhatsApp = (phone: string, message: string) => {
     const cleanPhone = sanitizeWhatsappPhone(phone);
+    if (!cleanPhone) {
+      toast.error('Número de telefone inválido');
+      return;
+    }
     const encodedMessage = encodeURIComponent(message);
     const url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 
-    const link = document.createElement('a');
-    link.href = url;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Tenta abrir em nova aba
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
+
+    // Fallback: se bloqueado, copia link e redireciona
+    if (!win || win.closed) {
+      copyTextToClipboard(url).then((ok) => {
+        if (ok) {
+          toast.info('Link copiado! Cole no navegador para abrir o WhatsApp.', { duration: 5000 });
+        }
+      });
+      // Fallback final: navegação direta
+      window.location.href = url;
+    }
   };
 
   const registerWhatsappReferral = async (card: KanbanCard, vendedora: { nome: string }) => {
