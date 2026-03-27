@@ -1214,14 +1214,11 @@ export default function FilaMestre() {
     const statusCfg = STATUS_PEDIDO_CONFIG[r.status_atual] || {};
     const isPcpOp = r.origem_op === 'PCP';
 
-    const isSelected = selectedCards.has(r.id);
-
     return (
       <div
         key={r.id}
         className={`rounded-lg border cursor-pointer hover:shadow-md transition-shadow ${
           isPcpOp ? 'bg-orange-50 dark:bg-orange-950/20 border-l-4 border-l-orange-500' :
-          isSelected ? 'ring-2 ring-orange-400 border-l-4 border-l-orange-400 bg-orange-50/30 dark:bg-orange-950/10' :
           r.prioridade === 'URGENTE' ? 'border-l-4 border-l-destructive bg-card' :
           r.prioridade === 'ATENCAO' ? 'border-l-4 border-l-warning bg-card' :
           'border-l-4 border-l-[hsl(var(--success))] bg-card'
@@ -1230,31 +1227,22 @@ export default function FilaMestre() {
       >
         <div className="px-4 py-2.5 space-y-1.5">
           {/* Linha 1 — Identificação */}
-          <div className="grid grid-cols-[auto_auto_1fr_auto_auto_auto] items-center gap-0 border-b border-border pb-1.5">
-            {/* Checkbox for selection */}
-            {canEdit && (
-              <div className="pr-2 flex items-center" onClick={(e) => e.stopPropagation()}>
-                <Checkbox
-                  checked={isSelected}
-                  onCheckedChange={(checked) => {
-                    setSelectedCards(prev => {
-                      const next = new Set(prev);
-                      if (checked) next.add(r.id); else next.delete(r.id);
-                      return next;
-                    });
-                  }}
-                  className="h-4 w-4"
-                />
-              </div>
-            )}
+          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-0 border-b border-border pb-1.5">
             <div className="px-2 py-0.5 border-r border-border">
-              <span className="text-[11px] text-muted-foreground">Nº Venda</span>
+              <span className="text-[11px] text-muted-foreground">{isPcpOp ? 'Nº OP' : 'Nº Venda'}</span>
               <p className="text-xs font-bold tabular-nums text-foreground">#{r.api_venda_id || r.numero_pedido}</p>
             </div>
-            <div className="px-2 py-0.5 border-r border-border min-w-0">
-              <span className="text-[11px] text-muted-foreground">Cliente</span>
-              <p className="text-[14px] font-bold text-foreground truncate leading-tight">{r.cliente_nome}</p>
-            </div>
+            {!isPcpOp ? (
+              <div className="px-2 py-0.5 border-r border-border min-w-0">
+                <span className="text-[11px] text-muted-foreground">Cliente</span>
+                <p className="text-[14px] font-bold text-foreground truncate leading-tight">{r.cliente_nome}</p>
+              </div>
+            ) : (
+              <div className="px-2 py-0.5 border-r border-border min-w-0">
+                <span className="text-[11px] text-muted-foreground">Produto</span>
+                <p className="text-[14px] font-bold text-foreground truncate leading-tight">{r.produtos_descricao || 'Produção PCP'}</p>
+              </div>
+            )}
             <div className="px-2 py-0.5 border-r border-border text-right">
               <span className="text-[11px] text-muted-foreground">Valor</span>
               <p className="text-xs font-bold tabular-nums text-foreground whitespace-nowrap">{fmt(r.valor_liquido)}</p>
@@ -1532,9 +1520,8 @@ export default function FilaMestre() {
               size="sm"
               className="text-xs h-7 px-2 gap-1 border-orange-400/50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:hover:bg-orange-950/20"
               onClick={openGerarOpDialog}
-              disabled={selectedCards.size === 0}
             >
-              <Plus className="h-3 w-3" /> Gerar OP PCP {selectedCards.size > 0 && `(${selectedCards.size})`}
+              <Plus className="h-3 w-3" /> Gerar OP PCP
             </Button>
           )}
           <Popover>
@@ -2059,38 +2046,56 @@ export default function FilaMestre() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Tipo de Produto</Label>
+              <Label className="text-sm font-medium">Tipo de Produto *</Label>
               <Select value={gerarOpTipo} onValueChange={setGerarOpTipo}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SINTETICO">Cinto Sintético</SelectItem>
                   <SelectItem value="TECIDO">Cinto Tecido</SelectItem>
-                  <SelectItem value="FIVELA_COBERTA">Fivela Coberta</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {gerarOpItens.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Itens para produção</Label>
-                <div className="rounded-lg border border-border/60 divide-y divide-border/40 max-h-48 overflow-y-auto">
-                  {gerarOpItens.map((item: any) => (
-                    <label key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/40 cursor-pointer text-sm">
-                      <Checkbox
-                        checked={gerarOpItensSelecionados.has(item.id)}
-                        onCheckedChange={(checked) => {
-                          const next = new Set(gerarOpItensSelecionados);
-                          if (checked) next.add(item.id); else next.delete(item.id);
-                          setGerarOpItensSelecionados(next);
-                        }}
-                      />
-                      <span className="flex-1 truncate">{item.descricao_produto}</span>
-                      <span className="text-muted-foreground text-xs">{item.quantidade}un</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Produto a produzir *</Label>
+              <Input
+                placeholder="Ex: Cinto Sintético 2,0 cm Preto"
+                value={gerarOpProduto}
+                onChange={(e) => setGerarOpProduto(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Quantidade *</Label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="Ex: 300"
+                value={gerarOpQuantidade}
+                onChange={(e) => setGerarOpQuantidade(parseInt(e.target.value) || 0)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Data de Entrega *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal h-10">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {gerarOpDataEntrega ? format(gerarOpDataEntrega, 'dd/MM/yyyy') : 'Selecionar data'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarPicker
+                    mode="single"
+                    selected={gerarOpDataEntrega}
+                    onSelect={setGerarOpDataEntrega}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
 
             <div className="space-y-2">
               <Label className="text-sm font-medium">Observação (opcional)</Label>
@@ -2106,7 +2111,7 @@ export default function FilaMestre() {
             <Button variant="outline" onClick={() => setGerarOpDialogOpen(false)}>Cancelar</Button>
             <Button
               onClick={handleGerarOpPcp}
-              disabled={gerarOpLoading || gerarOpItensSelecionados.size === 0}
+              disabled={gerarOpLoading || !gerarOpProduto.trim() || !gerarOpDataEntrega || gerarOpQuantidade < 1}
               className="bg-orange-600 hover:bg-orange-700 text-white"
             >
               {gerarOpLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
