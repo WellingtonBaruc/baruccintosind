@@ -3,7 +3,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { STATUS_PRAZO_CONFIG, TIPO_PRODUTO_LABELS, TIPO_PRODUTO_BADGE } from '@/lib/pcp';
 import { STATUS_PEDIDO_CONFIG } from '@/lib/producao';
-import { PcpCalendarData, calcularPrazoPcp } from '@/lib/pcpCalendario';
+import { PcpCalendarData, calcularPrazoPcp, isDiaUtil } from '@/lib/pcpCalendario';
+import { hojeBrasilia } from '@/lib/dateUtils';
 import ConfigurarPcpDialog from '@/components/pcp/ConfigurarPcpDialog';
 import PcpIntelligenceBar from '@/components/pcp/PcpIntelligenceBar';
 import { Badge } from '@/components/ui/badge';
@@ -112,6 +113,7 @@ export default function FilaMestre() {
   const [exportDateFrom, setExportDateFrom] = useState<Date | undefined>();
   const [exportDateTo, setExportDateTo] = useState<Date | undefined>();
   const [viewMode, setViewMode] = useState<ViewMode>('compact');
+  const [selectedPlanDay, setSelectedPlanDay] = useState<string | null>(null);
 
   const [calendarData, setCalendarData] = useState<PcpCalendarData>({ sabadoAtivo: false, domingoAtivo: false, feriados: [], pausas: [] });
   const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
@@ -366,6 +368,7 @@ export default function FilaMestre() {
     if (prazoFilter === 'ATRASADO' && r.status_prazo !== 'ATRASADO') return false;
     if (prazoFilter === 'HOJE' && r.dataEntregaEfetiva !== new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })) return false;
     if (prazoFilter === 'FUTURO' && (r.status_prazo === 'ATRASADO' || r.dataEntregaEfetiva === new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }))) return false;
+    if (selectedPlanDay && r.dataEntregaEfetiva !== selectedPlanDay) return false;
     return true;
   });
 
@@ -1139,7 +1142,86 @@ export default function FilaMestre() {
         </div>
       </div>
 
-      
+      {/* 5-Day Planning Grid */}
+      {(() => {
+        const todayStr = hojeBrasilia();
+        const today = new Date(todayStr + 'T00:00:00');
+        const next5: string[] = [];
+        const cursor = new Date(today);
+        // Include today if it's a business day
+        if (isDiaUtil(cursor, calendarData)) next5.push(todayStr);
+        while (next5.length < 5) {
+          cursor.setDate(cursor.getDate() + 1);
+          if (isDiaUtil(cursor, calendarData)) {
+            const y = cursor.getFullYear();
+            const m = String(cursor.getMonth() + 1).padStart(2, '0');
+            const dd = String(cursor.getDate()).padStart(2, '0');
+            next5.push(`${y}-${m}-${dd}`);
+          }
+        }
+        return (
+          <div className="grid grid-cols-5 gap-2">
+            {next5.map((dayStr) => {
+              const isToday = dayStr === todayStr;
+              const isSelected = selectedPlanDay === dayStr;
+              const dayDate = new Date(dayStr + 'T00:00:00');
+              const dayLabel = `${String(dayDate.getDate()).padStart(2, '0')}/${String(dayDate.getMonth() + 1).padStart(2, '0')}`;
+
+              const dayRows = rows.filter(r => r.dataEntregaEfetiva === dayStr);
+              const sinteticoPecas = dayRows.filter(r => r.tipo_produto === 'SINTETICO').reduce((s, r) => s + r.quantidade_itens, 0);
+              const tecidoPecas = dayRows.filter(r => r.tipo_produto === 'TECIDO').reduce((s, r) => s + r.quantidade_itens, 0);
+              const concluidoPecas = dayRows.filter(r => {
+                if (!r.data_fim_pcp) return false;
+                const fimDate = new Date(r.data_fim_pcp).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+                return fimDate === dayStr;
+              }).reduce((s, r) => s + r.quantidade_itens, 0);
+
+              return (
+                <button
+                  key={dayStr}
+                  onClick={() => setSelectedPlanDay(isSelected ? null : dayStr)}
+                  className={cn(
+                    "rounded-lg border p-3 text-left transition-all hover:shadow-md",
+                    isSelected ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border/60 bg-card",
+                    isToday && !isSelected && "border-primary/50 bg-primary/5"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={cn("text-sm font-bold tabular-nums", isToday ? "text-primary" : "text-foreground")}>{dayLabel}</span>
+                    {isToday && <Badge className="text-[10px] bg-primary/15 text-primary border-primary/30 px-1.5 py-0">HOJE</Badge>}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-blue-500 text-xs">🔵</span>
+                      <span className="text-xs text-muted-foreground">Sint</span>
+                      <span className="text-sm font-bold tabular-nums text-blue-600 ml-auto">{sinteticoPecas}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-amber-500 text-xs">🟠</span>
+                      <span className="text-xs text-muted-foreground">Tec</span>
+                      <span className="text-sm font-bold tabular-nums text-amber-600 ml-auto">{tecidoPecas}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-emerald-500 text-xs">✔</span>
+                      <span className="text-xs text-muted-foreground">Concl.</span>
+                      <span className="text-sm font-bold tabular-nums text-emerald-600 ml-auto">{concluidoPecas}</span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {selectedPlanDay && (
+        <div className="flex items-center gap-2">
+          <Badge className="bg-primary/10 text-primary border-primary/30">
+            Filtrando: {(() => { const d = new Date(selectedPlanDay + 'T00:00:00'); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`; })()}
+          </Badge>
+          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setSelectedPlanDay(null)}>Limpar filtro</Button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap items-center">
