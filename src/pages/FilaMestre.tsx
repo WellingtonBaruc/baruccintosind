@@ -820,15 +820,17 @@ export default function FilaMestre() {
         onClick={() => openDetail(r.id)}
       >
         <div className="px-3 py-1.5 space-y-0.5">
+          {/* Line 1: Venda + Cliente + Tipo + Valor */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="font-bold text-xs tabular-nums">{r.api_venda_id || r.numero_pedido}</span>
-              <span className={`text-[10px] font-semibold px-1.5 py-0 rounded border ${tipoBadge}`}>{tipoLabel}</span>
-              {r.is_piloto && <span className="text-[10px] px-1 rounded bg-purple-500/15 text-purple-600 border border-purple-500/30 font-semibold">P</span>}
+              <span className="text-[11px] tabular-nums text-muted-foreground font-medium">#{r.api_venda_id || r.numero_pedido}</span>
+              <span className="text-muted-foreground text-[10px]">•</span>
+              <span className="text-sm font-bold text-foreground truncate">{r.cliente_nome}</span>
+              <span className={`text-[10px] font-semibold px-1.5 py-0 rounded border shrink-0 ${tipoBadge}`}>{tipoLabel}</span>
+              {r.is_piloto && <span className="text-[10px] px-1 rounded bg-purple-500/15 text-purple-600 border border-purple-500/30 font-semibold shrink-0">P</span>}
             </div>
             <span className="text-xs font-bold tabular-nums text-foreground whitespace-nowrap">{fmt(r.valor_liquido)}</span>
           </div>
-          <p className="text-sm font-bold text-foreground truncate leading-tight">{r.cliente_nome}</p>
           <div className="flex items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
             <span title="Entrega">🚚 {fmtDate(r.dataEntregaEfetiva)}</span>
             <span className={`font-bold ${r.atrasoDias < 0 ? 'text-destructive' : r.atrasoDias <= 2 ? 'text-warning' : 'text-muted-foreground'}`} title="Atraso">⚠ {r.atrasoDias}d</span>
