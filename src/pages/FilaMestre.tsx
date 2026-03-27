@@ -1067,7 +1067,6 @@ export default function FilaMestre() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Fila Mestre</h1>
         <div className="flex gap-2 items-center">
-        <div className="flex gap-2 items-center flex-1 justify-end">
           {canEdit && (
             <Button variant="outline" size="sm" className="text-xs h-7 px-2" onClick={() => setConfigOpen(true)}>
               <Settings className="h-3 w-3 mr-1" /> PCP
