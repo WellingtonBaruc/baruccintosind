@@ -139,6 +139,8 @@ export default function FilaMestre() {
   const [gerarOpDialogOpen, setGerarOpDialogOpen] = useState(false);
   const [gerarOpTipo, setGerarOpTipo] = useState<string>('SINTETICO');
   const [gerarOpDataEntrega, setGerarOpDataEntrega] = useState<Date | undefined>();
+  const [gerarOpDataOp, setGerarOpDataOp] = useState<Date | undefined>(new Date());
+  const [gerarOpInicioIdeal, setGerarOpInicioIdeal] = useState<Date | undefined>();
   const [gerarOpObs, setGerarOpObs] = useState('');
   const [gerarOpLoading, setGerarOpLoading] = useState(false);
 
@@ -698,7 +700,9 @@ export default function FilaMestre() {
     setOpProdutos([]);
     setShowProdutoForm(false);
     setEditingProdutoIdx(null);
+    setGerarOpDataOp(new Date());
     setGerarOpDataEntrega(undefined);
+    setGerarOpInicioIdeal(undefined);
     setGerarOpObs('');
     setGerarOpDialogOpen(true);
   };
@@ -741,7 +745,10 @@ export default function FilaMestre() {
   const handleGerarOpPcp = async () => {
     if (!profile) return;
     if (opProdutos.length === 0) { toast.error('Adicione pelo menos um produto'); return; }
+    if (!gerarOpDataOp) { toast.error('Informe a data da OP'); return; }
     if (!gerarOpDataEntrega) { toast.error('Informe a data de entrega'); return; }
+    if (!gerarOpInicioIdeal) { toast.error('Informe o início ideal'); return; }
+    if (gerarOpInicioIdeal > gerarOpDataEntrega) { toast.error('Início ideal não pode ser posterior à data de entrega'); return; }
     setGerarOpLoading(true);
     try {
       const pipelineMap: Record<string, string> = {
@@ -764,6 +771,8 @@ export default function FilaMestre() {
       }
       const numeroPedido = `OP-PCP-${String(nextNum).padStart(4, '0')}`;
       const dataEntregaStr = format(gerarOpDataEntrega, 'yyyy-MM-dd');
+      const dataOpStr = format(gerarOpDataOp, 'yyyy-MM-dd');
+      const inicioIdealStr = format(gerarOpInicioIdeal, 'yyyy-MM-dd');
 
       const produtosDescList = opProdutos.map(p => `${buildProdutoDesc(p)} (${p.quantidade}un)`);
       const produtosDescStr = produtosDescList.join(' | ');
@@ -776,6 +785,8 @@ export default function FilaMestre() {
           status_atual: 'EM_PRODUCAO',
           tipo_fluxo: 'PCP_INTERNO',
           data_previsao_entrega: dataEntregaStr,
+          data_venda_api: dataOpStr,
+          data_inicio_producao_necessaria: inicioIdealStr,
           valor_liquido: 0,
           valor_bruto: 0,
           valor_desconto: 0,
@@ -2451,20 +2462,53 @@ export default function FilaMestre() {
               </div>
             )}
 
-            {/* Data entrega */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Data de Entrega *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal h-10">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {gerarOpDataEntrega ? format(gerarOpDataEntrega, 'dd/MM/yyyy') : 'Selecionar data'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarPicker mode="single" selected={gerarOpDataEntrega} onSelect={setGerarOpDataEntrega} initialFocus className={cn("p-3 pointer-events-auto")} />
-                </PopoverContent>
-              </Popover>
+            {/* Datas agrupadas */}
+            <div className="grid grid-cols-3 gap-3">
+              {/* Data da OP */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Data da OP *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal h-10">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {gerarOpDataOp ? format(gerarOpDataOp, 'dd/MM/yyyy') : 'Selecionar'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarPicker mode="single" selected={gerarOpDataOp} onSelect={setGerarOpDataOp} initialFocus className={cn("p-3 pointer-events-auto")} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              {/* Data de Entrega */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Data de Entrega *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal h-10">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {gerarOpDataEntrega ? format(gerarOpDataEntrega, 'dd/MM/yyyy') : 'Selecionar'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarPicker mode="single" selected={gerarOpDataEntrega} onSelect={setGerarOpDataEntrega} initialFocus className={cn("p-3 pointer-events-auto")} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              {/* Início Ideal */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Início Ideal *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal h-10">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {gerarOpInicioIdeal ? format(gerarOpInicioIdeal, 'dd/MM/yyyy') : 'Selecionar'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarPicker mode="single" selected={gerarOpInicioIdeal} onSelect={setGerarOpInicioIdeal} initialFocus className={cn("p-3 pointer-events-auto")} />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
 
             {/* Observação */}
