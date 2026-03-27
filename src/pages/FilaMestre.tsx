@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import * as XLSX from 'xlsx';
@@ -80,6 +80,7 @@ interface PedidoDetail {
 }
 
 type AgrupamentoType = 'data_entrega' | 'tipo' | 'status';
+type ViewMode = 'compact' | 'detailed';
 
 interface GrupoInfo {
   key: string;
@@ -110,6 +111,7 @@ export default function FilaMestre() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [exportDateFrom, setExportDateFrom] = useState<Date | undefined>();
   const [exportDateTo, setExportDateTo] = useState<Date | undefined>();
+  const [viewMode, setViewMode] = useState<ViewMode>('compact');
 
   const [calendarData, setCalendarData] = useState<PcpCalendarData>({ sabadoAtivo: false, domingoAtivo: false, feriados: [], pausas: [] });
   const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
@@ -803,6 +805,77 @@ export default function FilaMestre() {
     );
   };
 
+  const renderCompactCard = (r: VendaRow) => {
+    const tipoBadge = TIPO_PRODUTO_BADGE[r.tipo_produto || ''] || 'bg-muted text-muted-foreground border-border';
+    const tipoLabel = r.tipo_produto === 'SINTETICO' ? 'Sint' : r.tipo_produto === 'TECIDO' ? 'Tec' : r.tipo_produto === 'FIVELA_COBERTA' ? 'Fiv' : '—';
+    const etapas = r.etapas || [];
+    return (
+      <div
+        key={r.id}
+        className={`rounded-md border bg-card cursor-pointer hover:shadow-md transition-shadow ${
+          r.prioridade === 'URGENTE' ? 'border-l-[3px] border-l-destructive' :
+          r.prioridade === 'ATENCAO' ? 'border-l-[3px] border-l-warning' :
+          'border-l-[3px] border-l-[hsl(var(--success))]'
+        }`}
+        onClick={() => openDetail(r.id)}
+      >
+        <div className="px-3 py-1.5 space-y-0.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-bold text-xs tabular-nums">{r.api_venda_id || r.numero_pedido}</span>
+              <span className={`text-[10px] font-semibold px-1.5 py-0 rounded border ${tipoBadge}`}>{tipoLabel}</span>
+              {r.is_piloto && <span className="text-[10px] px-1 rounded bg-purple-500/15 text-purple-600 border border-purple-500/30 font-semibold">P</span>}
+            </div>
+            <span className="text-xs font-bold tabular-nums text-foreground whitespace-nowrap">{fmt(r.valor_liquido)}</span>
+          </div>
+          <p className="text-sm font-bold text-foreground truncate leading-tight">{r.cliente_nome}</p>
+          <div className="flex items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
+            <span title="Entrega">🚚 {fmtDate(r.dataEntregaEfetiva)}</span>
+            <span className={`font-bold ${r.atrasoDias < 0 ? 'text-destructive' : r.atrasoDias <= 2 ? 'text-warning' : 'text-muted-foreground'}`} title="Atraso">⚠ {r.atrasoDias}d</span>
+            <span title="Início ideal">⏱ {fmtDate(r.dataInicioIdeal)}</span>
+            <span title="Início PCP">🕒 {r.data_inicio_pcp ? fmtDateTime(r.data_inicio_pcp).split(' ')[0] : '—'}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase">ETAPA:</span>
+            <span className="text-[11px] font-bold text-primary">{r.etapa_atual}</span>
+          </div>
+          {etapas.length > 0 && (
+            <TooltipProvider delayDuration={200}>
+              <div className="flex items-center gap-0.5 pt-0.5">
+                {etapas.map((etapa) => {
+                  const isConcluida = etapa.status === 'CONCLUIDA';
+                  const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
+                  const shortName = etapa.nome_etapa.length > 4 ? etapa.nome_etapa.substring(0, 4) : etapa.nome_etapa;
+                  return (
+                    <Tooltip key={etapa.id}>
+                      <TooltipTrigger asChild>
+                        <button
+                          className={`px-1 py-0 rounded text-[9px] font-semibold transition-all ${isAdmin ? 'cursor-pointer hover:ring-1 hover:ring-primary/40' : 'cursor-default'} ${isConcluida ? 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]' : isEmAndamento ? 'bg-primary/20 text-primary ring-1 ring-primary/30' : 'bg-muted/60 text-muted-foreground'}`}
+                          onClick={(e) => { e.stopPropagation(); if (isAdmin) handleMoveToEtapa(r, etapa); }}
+                        >{shortName}</button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs"><p>{etapa.nome_etapa} — {isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}</p></TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className={`px-1 py-0 rounded text-[9px] font-semibold ${isAdmin ? 'cursor-pointer hover:ring-1 hover:ring-primary/40' : 'cursor-default'} ${r.ordem_status === 'CONCLUIDA' ? 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]' : 'bg-muted/60 text-muted-foreground'}`}
+                      onClick={(e) => { e.stopPropagation(); if (isAdmin) handleMoveToConcluido(r); }}
+                    >Fim</button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">Concluído</TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -868,6 +941,27 @@ export default function FilaMestre() {
             </SelectContent>
           </Select>
         </div>
+
+        <div className="h-6 w-px bg-border mx-1" />
+
+        <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+          <Button
+            variant={viewMode === 'compact' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 text-xs gap-1 px-2"
+            onClick={() => setViewMode('compact')}
+          >
+            <LayoutList className="h-3.5 w-3.5" /> Compacto
+          </Button>
+          <Button
+            variant={viewMode === 'detailed' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 text-xs gap-1 px-2"
+            onClick={() => setViewMode('detailed')}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" /> Detalhado
+          </Button>
+        </div>
       </div>
 
       {/* Summary + Global Export */}
@@ -931,79 +1025,100 @@ export default function FilaMestre() {
       ) : sorted.length === 0 ? (
         <p className="text-center py-12 text-muted-foreground text-sm">Nenhum pedido encontrado.</p>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className={`flex flex-col ${viewMode === 'compact' ? 'gap-3' : 'gap-5'}`}>
           {groups.map(group => {
             const isCollapsed = collapsedGroups.has(group.key);
             const hasUrgent = group.urgentes > 0;
+            const compactDateLabel = agrupamento === 'data_entrega' && group.key !== 'SEM_DATA'
+              ? (() => { try { return format(new Date(group.key + 'T00:00:00'), 'dd/MM'); } catch { return group.label; } })()
+              : group.label;
 
             return (
-              <div key={group.key} className="space-y-2">
+              <div key={group.key} className={viewMode === 'compact' ? 'space-y-1' : 'space-y-2'}>
                 {/* Group header */}
-                <button
-                  onClick={() => toggleGroup(group.key)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors text-left ${
-                    hasUrgent
-                      ? 'bg-destructive/5 border-destructive/30 hover:bg-destructive/10'
-                      : 'bg-muted/50 border-border/60 hover:bg-muted/80'
-                  }`}
-                >
-                  {isCollapsed ? <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" /> : <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />}
-                  <div className="flex-1 min-w-0">
-                    <span className="text-base font-bold capitalize">{group.label}</span>
-                  </div>
-                   <div className="flex items-center gap-3 text-sm text-muted-foreground shrink-0 flex-wrap">
-                    <span className="font-semibold text-foreground">{group.pedidos.length} pedido{group.pedidos.length !== 1 ? 's' : ''}</span>
-                    <span>·</span>
-                    <span>{group.totalPecas} pç</span>
-                    {group.sinteticoCount > 0 && (
-                      <span className="text-[11px] bg-blue-500/15 text-blue-600 border border-blue-500/30 rounded px-1.5 py-0.5 font-semibold">
-                        Sint: {group.sinteticoCount}v · {group.sinteticoPecas}pç
-                      </span>
-                    )}
-                    {group.tecidoCount > 0 && (
-                      <span className="text-[11px] bg-amber-500/15 text-amber-600 border border-amber-500/30 rounded px-1.5 py-0.5 font-semibold">
-                        Tec: {group.tecidoCount}v · {group.tecidoPecas}pç
-                      </span>
-                    )}
-                    {group.outrosCount > 0 && (
-                      <span className="text-[11px] bg-muted text-muted-foreground border border-border rounded px-1.5 py-0.5 font-semibold">
-                        Outros: {group.outrosCount}v · {group.outrosPecas}pç
-                      </span>
-                    )}
-                    <span>·</span>
+                {viewMode === 'compact' ? (
+                  <button
+                    onClick={() => toggleGroup(group.key)}
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md border transition-colors text-left text-sm ${
+                      hasUrgent ? 'bg-destructive/5 border-destructive/30 hover:bg-destructive/10' : 'bg-muted/50 border-border/60 hover:bg-muted/80'
+                    }`}
+                  >
+                    {isCollapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
+                    <span className="font-bold">📅 {compactDateLabel}</span>
+                    <span className="text-muted-foreground">|</span>
+                    <span className="font-semibold text-foreground">{group.pedidos.length} pedidos</span>
+                    <span className="text-muted-foreground">|</span>
+                    <span className="text-muted-foreground">{group.totalPecas} pç</span>
+                    <span className="text-muted-foreground">|</span>
                     <span className="font-semibold text-foreground tabular-nums">{fmt(group.totalValor)}</span>
                     {group.urgentes > 0 && (
                       <>
-                        <span>·</span>
-                        <span className="text-destructive font-bold">{group.urgentes} urgente{group.urgentes !== 1 ? 's' : ''}</span>
+                        <span className="text-muted-foreground">|</span>
+                        <span className="text-destructive font-bold">{group.urgentes} urg</span>
                       </>
                     )}
-                    <span className="ml-1" />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      title="Baixar Excel"
-                      onClick={(e) => { e.stopPropagation(); exportGroupToExcel(group); }}
-                    >
-                      <FileSpreadsheet className="h-4 w-4 text-[hsl(var(--success))]" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      title="Baixar PDF"
-                      onClick={(e) => { e.stopPropagation(); exportGroupToPdf(group); }}
-                    >
-                      <FileText className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </button>
+                    <span className="ml-auto flex items-center gap-0.5">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Excel" onClick={(e) => { e.stopPropagation(); exportGroupToExcel(group); }}>
+                        <FileSpreadsheet className="h-3.5 w-3.5 text-[hsl(var(--success))]" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="PDF" onClick={(e) => { e.stopPropagation(); exportGroupToPdf(group); }}>
+                        <FileText className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => toggleGroup(group.key)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors text-left ${
+                      hasUrgent ? 'bg-destructive/5 border-destructive/30 hover:bg-destructive/10' : 'bg-muted/50 border-border/60 hover:bg-muted/80'
+                    }`}
+                  >
+                    {isCollapsed ? <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" /> : <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-base font-bold capitalize">{group.label}</span>
+                    </div>
+                     <div className="flex items-center gap-3 text-sm text-muted-foreground shrink-0 flex-wrap">
+                      <span className="font-semibold text-foreground">{group.pedidos.length} pedido{group.pedidos.length !== 1 ? 's' : ''}</span>
+                      <span>·</span>
+                      <span>{group.totalPecas} pç</span>
+                      {group.sinteticoCount > 0 && (
+                        <span className="text-[11px] bg-blue-500/15 text-blue-600 border border-blue-500/30 rounded px-1.5 py-0.5 font-semibold">
+                          Sint: {group.sinteticoCount}v · {group.sinteticoPecas}pç
+                        </span>
+                      )}
+                      {group.tecidoCount > 0 && (
+                        <span className="text-[11px] bg-amber-500/15 text-amber-600 border border-amber-500/30 rounded px-1.5 py-0.5 font-semibold">
+                          Tec: {group.tecidoCount}v · {group.tecidoPecas}pç
+                        </span>
+                      )}
+                      {group.outrosCount > 0 && (
+                        <span className="text-[11px] bg-muted text-muted-foreground border border-border rounded px-1.5 py-0.5 font-semibold">
+                          Outros: {group.outrosCount}v · {group.outrosPecas}pç
+                        </span>
+                      )}
+                      <span>·</span>
+                      <span className="font-semibold text-foreground tabular-nums">{fmt(group.totalValor)}</span>
+                      {group.urgentes > 0 && (
+                        <>
+                          <span>·</span>
+                          <span className="text-destructive font-bold">{group.urgentes} urgente{group.urgentes !== 1 ? 's' : ''}</span>
+                        </>
+                      )}
+                      <span className="ml-1" />
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Baixar Excel" onClick={(e) => { e.stopPropagation(); exportGroupToExcel(group); }}>
+                        <FileSpreadsheet className="h-4 w-4 text-[hsl(var(--success))]" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Baixar PDF" onClick={(e) => { e.stopPropagation(); exportGroupToPdf(group); }}>
+                        <FileText className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </button>
+                )}
 
                 {/* Group items */}
                 {!isCollapsed && (
-                  <div className="flex flex-col gap-3 pl-2">
-                    {group.pedidos.map(renderCard)}
+                  <div className={`flex flex-col ${viewMode === 'compact' ? 'gap-1 pl-1' : 'gap-3 pl-2'}`}>
+                    {group.pedidos.map(viewMode === 'compact' ? renderCompactCard : renderCard)}
                   </div>
                 )}
               </div>
