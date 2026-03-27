@@ -1984,6 +1984,74 @@ export default function FilaMestre() {
       </Sheet>
 
       <ConfigurarPcpDialog open={configOpen} onOpenChange={setConfigOpen} onSaved={fetchAll} />
+
+      {/* Dialog: Gerar OP PCP */}
+      <Dialog open={gerarOpDialogOpen} onOpenChange={setGerarOpDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-orange-600" />
+              Gerar OP de Produção (PCP)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Tipo de Produto</Label>
+              <Select value={gerarOpTipo} onValueChange={setGerarOpTipo}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SINTETICO">Cinto Sintético</SelectItem>
+                  <SelectItem value="TECIDO">Cinto Tecido</SelectItem>
+                  <SelectItem value="FIVELA_COBERTA">Fivela Coberta</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {gerarOpItens.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Itens para produção</Label>
+                <div className="rounded-lg border border-border/60 divide-y divide-border/40 max-h-48 overflow-y-auto">
+                  {gerarOpItens.map((item: any) => (
+                    <label key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/40 cursor-pointer text-sm">
+                      <Checkbox
+                        checked={gerarOpItensSelecionados.has(item.id)}
+                        onCheckedChange={(checked) => {
+                          const next = new Set(gerarOpItensSelecionados);
+                          if (checked) next.add(item.id); else next.delete(item.id);
+                          setGerarOpItensSelecionados(next);
+                        }}
+                      />
+                      <span className="flex-1 truncate">{item.descricao_produto}</span>
+                      <span className="text-muted-foreground text-xs">{item.quantidade}un</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Observação (opcional)</Label>
+              <Textarea
+                placeholder="Motivo ou detalhes da OP..."
+                value={gerarOpObs}
+                onChange={(e) => setGerarOpObs(e.target.value)}
+                className="text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGerarOpDialogOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={handleGerarOpPcp}
+              disabled={gerarOpLoading || gerarOpItensSelecionados.size === 0}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {gerarOpLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+              Gerar OP PCP
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
