@@ -371,6 +371,12 @@ export default function FilaMestre() {
     if (prazoFilter === 'HOJE' && r.dataEntregaEfetiva !== new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })) return false;
     if (prazoFilter === 'FUTURO' && (r.status_prazo === 'ATRASADO' || r.dataEntregaEfetiva === new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }))) return false;
     if (selectedPlanDay && r.dataEntregaEfetiva !== selectedPlanDay) return false;
+    if (selectedWeekFilter && r.dataEntregaEfetiva) {
+      const d = new Date(r.dataEntregaEfetiva + 'T00:00:00');
+      const weekNum = Math.ceil(d.getDate() / 7);
+      const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+      if (selectedWeekFilter !== `${monthKey}-${weekNum}`) return false;
+    }
     return true;
   });
 
@@ -1161,8 +1167,42 @@ export default function FilaMestre() {
             next5.push(`${y}-${m}-${dd}`);
           }
         }
+        const todayDate = new Date(todayStr + 'T00:00:00');
+        const currentMonth = todayDate.getMonth();
+        const currentYear = todayDate.getFullYear();
+        const monthNames = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+        const monthName = monthNames[currentMonth];
+
+        // Calculate week ranges for current month
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const weeks: { num: number; start: number; end: number }[] = [];
+        for (let w = 1; w <= 5; w++) {
+          const start = (w - 1) * 7 + 1;
+          const end = Math.min(w * 7, daysInMonth);
+          if (start <= daysInMonth) weeks.push({ num: w, start, end });
+        }
+
+        // Get rows for selected week
+        const weekKey = `${currentYear}-${currentMonth}-${selectedWeek}`;
+        const weekRows = rows.filter(r => {
+          if (!r.dataEntregaEfetiva) return false;
+          const d = new Date(r.dataEntregaEfetiva + 'T00:00:00');
+          if (d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) return false;
+          const wn = Math.ceil(d.getDate() / 7);
+          return wn === selectedWeek;
+        });
+        const wSint = weekRows.filter(r => r.tipo_produto === 'SINTETICO').reduce((s, r) => s + r.quantidade_itens, 0);
+        const wTec = weekRows.filter(r => r.tipo_produto === 'TECIDO').reduce((s, r) => s + r.quantidade_itens, 0);
+        const wTotal = wSint + wTec;
+        const wConcl = weekRows.filter(r => {
+          if (!r.data_fim_pcp) return false;
+          const fd = new Date(r.data_fim_pcp);
+          return fd.getMonth() === currentMonth && fd.getFullYear() === currentYear && Math.ceil(fd.getDate() / 7) === selectedWeek;
+        }).reduce((s, r) => s + r.quantidade_itens, 0);
+        const isWeekSelected = selectedWeekFilter === weekKey;
+
         return (
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-6 gap-2">
             {next5.map((dayStr) => {
               const isToday = dayStr === todayStr;
               const isSelected = selectedPlanDay === dayStr;
@@ -1182,7 +1222,7 @@ export default function FilaMestre() {
               return (
                 <button
                   key={dayStr}
-                  onClick={() => setSelectedPlanDay(isSelected ? null : dayStr)}
+                  onClick={() => { setSelectedPlanDay(isSelected ? null : dayStr); setSelectedWeekFilter(null); }}
                   className={cn(
                     "rounded-lg border p-3 text-left transition-all hover:shadow-md",
                     isSelected ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border/60 bg-card",
@@ -1214,16 +1254,66 @@ export default function FilaMestre() {
                 </button>
               );
             })}
+
+            {/* Card 6 - Weekly Summary */}
+            <button
+              onClick={() => { setSelectedWeekFilter(isWeekSelected ? null : weekKey); setSelectedPlanDay(null); }}
+              className={cn(
+                "rounded-lg border p-3 text-left transition-all hover:shadow-md border-dashed",
+                isWeekSelected ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border bg-muted/30"
+              )}
+            >
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="text-sm font-bold text-foreground">{monthName}</span>
+                <span className="text-sm font-bold tabular-nums text-foreground ml-auto">{wTotal}</span>
+              </div>
+              <div className="mb-2">
+                <Select value={String(selectedWeek)} onValueChange={(v) => { setSelectedWeek(Number(v)); setSelectedWeekFilter(null); }}>
+                  <SelectTrigger className="h-7 text-xs w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {weeks.map(w => (
+                      <SelectItem key={w.num} value={String(w.num)}>Semana {w.num}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs">🔵</span>
+                  <span className="text-xs text-muted-foreground">Sint</span>
+                  <span className="text-sm font-bold tabular-nums text-blue-600 ml-auto">{wSint}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs">🟠</span>
+                  <span className="text-xs text-muted-foreground">Tec</span>
+                  <span className="text-sm font-bold tabular-nums text-amber-600 ml-auto">{wTec}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs">✔</span>
+                  <span className="text-xs text-muted-foreground">Concl.</span>
+                  <span className="text-sm font-bold tabular-nums text-emerald-600 ml-auto">{wConcl}</span>
+                </div>
+              </div>
+            </button>
           </div>
         );
       })()}
 
-      {selectedPlanDay && (
+      {(selectedPlanDay || selectedWeekFilter) && (
         <div className="flex items-center gap-2">
-          <Badge className="bg-primary/10 text-primary border-primary/30">
-            Filtrando: {(() => { const d = new Date(selectedPlanDay + 'T00:00:00'); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`; })()}
-          </Badge>
-          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setSelectedPlanDay(null)}>Limpar filtro</Button>
+          {selectedPlanDay && (
+            <Badge className="bg-primary/10 text-primary border-primary/30">
+              Filtrando: {(() => { const d = new Date(selectedPlanDay + 'T00:00:00'); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`; })()}
+            </Badge>
+          )}
+          {selectedWeekFilter && (
+            <Badge className="bg-primary/10 text-primary border-primary/30">
+              Filtrando: Semana {selectedWeek}
+            </Badge>
+          )}
+          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => { setSelectedPlanDay(null); setSelectedWeekFilter(null); }}>Limpar filtro</Button>
         </div>
       )}
 
