@@ -625,8 +625,99 @@ export default function FilaMestre() {
     toast.success(value ? `Entrega ajustada para ${format(date!, 'dd/MM/yy')}` : 'Entrega ajustada removida');
     fetchAll();
   };
+  // Open Gerar OP PCP dialog
+  const openGerarOpDialog = async (pedidoId: string) => {
+    setGerarOpPedidoId(pedidoId);
+    setGerarOpTipo('SINTETICO');
+    setGerarOpObs('');
+    setGerarOpItensSelecionados(new Set());
+    // Fetch items for this pedido
+    const { data: itens } = await supabase.from('pedido_itens').select('*').eq('pedido_id', pedidoId);
+    setGerarOpItens(itens || []);
+    setGerarOpItensSelecionados(new Set((itens || []).map((i: any) => i.id)));
+    setGerarOpDialogOpen(true);
+  };
 
-  // Filters
+  const handleGerarOpPcp = async () => {
+    if (!profile || !gerarOpPedidoId) return;
+    setGerarOpLoading(true);
+    try {
+      // Determine pipeline based on tipo
+      const pipelineMap: Record<string, string> = {
+        'SINTETICO': '00000000-0000-0000-0000-000000000001',
+        'TECIDO': '00000000-0000-0000-0000-000000000002',
+        'FIVELA_COBERTA': '00000000-0000-0000-0000-000000000003',
+      };
+      const pipelineId = pipelineMap[gerarOpTipo] || pipelineMap['SINTETICO'];
+
+      // Get max sequencia for this pedido
+      const { data: existingOrdens } = await supabase
+        .from('ordens_producao')
+        .select('sequencia')
+        .eq('pedido_id', gerarOpPedidoId)
+        .order('sequencia', { ascending: false })
+        .limit(1);
+      const nextSeq = (existingOrdens && existingOrdens[0] ? existingOrdens[0].sequencia : 0) + 1;
+
+      // Build product description
+      const selectedItens = gerarOpItens.filter(i => gerarOpItensSelecionados.has(i.id));
+      const prodDesc = selectedItens.map((i: any) => `${i.descricao_produto} (${i.quantidade}un)`).join(', ');
+
+      // Create OP
+      const { data: novaOrdem, error: ordemErr } = await supabase
+        .from('ordens_producao')
+        .insert({
+          pedido_id: gerarOpPedidoId,
+          pipeline_id: pipelineId,
+          sequencia: nextSeq,
+          status: 'AGUARDANDO',
+          tipo_produto: gerarOpTipo,
+          observacao: gerarOpObs || null,
+          origem_op: 'PCP',
+          criado_por_id: profile.id,
+          produtos_descricao: prodDesc || null,
+        } as any)
+        .select()
+        .single();
+      if (ordemErr) throw ordemErr;
+
+      // Create etapas
+      const { data: etapas } = await supabase
+        .from('pipeline_etapas')
+        .select('*')
+        .eq('pipeline_id', pipelineId)
+        .order('ordem');
+
+      if (etapas && etapas.length > 0 && novaOrdem) {
+        const opEtapas = etapas.map((e: any) => ({
+          ordem_id: novaOrdem.id,
+          pipeline_etapa_id: e.id,
+          nome_etapa: e.nome,
+          ordem_sequencia: e.ordem,
+          status: 'PENDENTE',
+        }));
+        await supabase.from('op_etapas').insert(opEtapas as any);
+      }
+
+      // Register history
+      await supabase.from('pedido_historico').insert({
+        pedido_id: gerarOpPedidoId,
+        usuario_id: profile.id,
+        tipo_acao: 'TRANSICAO',
+        observacao: `OP de Produção gerada pelo PCP. Tipo: ${gerarOpTipo}. ${gerarOpObs ? 'Obs: ' + gerarOpObs : ''}`,
+      });
+
+      toast.success('OP PCP gerada com sucesso!');
+      setGerarOpDialogOpen(false);
+      fetchAll();
+    } catch (err: any) {
+      toast.error('Erro ao gerar OP: ' + (err.message || err));
+    } finally {
+      setGerarOpLoading(false);
+    }
+  };
+
+
   const filtered = rows.filter(r => {
     if (search && !r.cliente_nome.toLowerCase().includes(search.toLowerCase()) && !r.numero_pedido.toLowerCase().includes(search.toLowerCase()) && !(r.api_venda_id || '').toLowerCase().includes(search.toLowerCase())) return false;
     if (tipoFilter !== 'all' && r.tipo_produto !== tipoFilter) return false;
