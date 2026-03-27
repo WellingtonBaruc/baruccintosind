@@ -939,7 +939,7 @@ export default function FilaMestre() {
               {/* Progresso — apenas etapas do Kanban */}
               {etapas.length > 0 && (
             <TooltipProvider delayDuration={200}>
-              <div className="flex items-center gap-1 flex-wrap">
+              <div className="flex items-center gap-1">
                 {etapas.filter(etapa => {
                   // Mostrar apenas etapas do Kanban de produção (excluir pós-produção)
                   const nome = etapa.nome_etapa?.toLowerCase() || '';
@@ -952,7 +952,7 @@ export default function FilaMestre() {
                     <Tooltip key={etapa.id}>
                       <TooltipTrigger asChild>
                         <button
-                          className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all ${
+                          className={`flex-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-all text-center ${
                             isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
                           } ${
                             isConcluida ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]' :
@@ -972,7 +972,7 @@ export default function FilaMestre() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                      className={`flex-1 px-2 py-1 rounded-md text-[11px] font-semibold text-center ${
                         isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
                       } ${
                         r.ordem_status === 'CONCLUIDA' ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] font-bold' : 'bg-muted/60 text-muted-foreground'
