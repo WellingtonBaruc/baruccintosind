@@ -1166,14 +1166,16 @@ export default function FilaMestre() {
     const tipoLabel = TIPO_PRODUTO_LABELS[r.tipo_produto || ''] || 'A classificar';
     const etapas = r.etapas || [];
     const statusCfg = STATUS_PEDIDO_CONFIG[r.status_atual] || {};
+    const isPcpOp = r.origem_op === 'PCP';
 
     return (
       <div
         key={r.id}
-        className={`rounded-lg border bg-card cursor-pointer hover:shadow-md transition-shadow ${
-          r.prioridade === 'URGENTE' ? 'border-l-4 border-l-destructive' :
-          r.prioridade === 'ATENCAO' ? 'border-l-4 border-l-warning' :
-          'border-l-4 border-l-[hsl(var(--success))]'
+        className={`rounded-lg border cursor-pointer hover:shadow-md transition-shadow ${
+          isPcpOp ? 'bg-orange-50 dark:bg-orange-950/20 border-l-4 border-l-orange-500' :
+          r.prioridade === 'URGENTE' ? 'border-l-4 border-l-destructive bg-card' :
+          r.prioridade === 'ATENCAO' ? 'border-l-4 border-l-warning bg-card' :
+          'border-l-4 border-l-[hsl(var(--success))] bg-card'
         }`}
         onClick={() => openDetail(r.id)}
       >
