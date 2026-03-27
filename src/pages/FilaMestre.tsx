@@ -1080,17 +1080,17 @@ export default function FilaMestre() {
         </div>
         <div className="flex gap-2 items-center flex-1 justify-end">
           {canEdit && (
-            <Button variant="outline" size="lg" className="flex-1 text-sm" onClick={() => setConfigOpen(true)}>
-              <Settings className="h-5 w-5 mr-2" /> Configurar PCP
+            <Button variant="outline" size="sm" className="text-xs h-7 px-2" onClick={() => setConfigOpen(true)}>
+              <Settings className="h-3 w-3 mr-1" /> PCP
             </Button>
           )}
-          <Button variant="outline" size="lg" className="flex-1 text-sm" onClick={() => navigate('/painel-dia')}>
-            <Calendar className="h-5 w-5 mr-2" /> Painel do Dia
+          <Button variant="outline" size="sm" className="text-xs h-7 px-2" onClick={() => navigate('/painel-dia')}>
+            <Calendar className="h-3 w-3 mr-1" /> Painel
           </Button>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="lg" className="flex-1 text-sm gap-2">
-                <Download className="h-5 w-5" /> Exportar <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+              <Button variant="outline" size="sm" className="text-xs h-7 px-2 gap-1">
+                <Download className="h-3 w-3" /> Exportar <ChevronDown className="h-2.5 w-2.5 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-3" align="end">
