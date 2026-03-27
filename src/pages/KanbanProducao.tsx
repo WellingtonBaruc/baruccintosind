@@ -1052,10 +1052,6 @@ export default function KanbanProducao() {
     const encodedMessage = encodeURIComponent(message);
     const url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 
-    console.log('CLICK BOTÃO WhatsApp');
-    console.log('URL GERADA:', url);
-    console.log('MÉTODO: createElement("a") + click()');
-
     const link = document.createElement('a');
     link.href = url;
     link.target = '_blank';
@@ -1063,8 +1059,6 @@ export default function KanbanProducao() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
-    console.log('LINK CLICADO - aguardando abertura externa');
   };
 
   const registerWhatsappReferral = async (card: KanbanCard, vendedora: { nome: string }) => {
