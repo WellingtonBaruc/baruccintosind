@@ -273,6 +273,7 @@ export default function FilaMestre() {
       .from('pedidos')
       .select('id')
       .eq('is_deleted', false)
+      .not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA")')
       .gte('data_entrega_ajustada_pcp', dateFrom)
       .lte('data_entrega_ajustada_pcp', dateTo);
 
@@ -281,6 +282,7 @@ export default function FilaMestre() {
       .from('pedidos')
       .select('id')
       .eq('is_deleted', false)
+      .not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA")')
       .is('data_entrega_ajustada_pcp', null)
       .gte('data_previsao_entrega', dateFrom)
       .lte('data_previsao_entrega', dateTo);
