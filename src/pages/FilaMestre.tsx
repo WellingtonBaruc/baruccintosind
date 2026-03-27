@@ -1949,29 +1949,65 @@ export default function FilaMestre() {
                       isToday && !isSelected && "border-primary/50 bg-primary/5"
                     )}
                   >
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={cn("text-sm font-bold tabular-nums", isToday ? "text-primary" : "text-foreground")}>{dayLabel}</span>
-                    {isToday && <Badge className="text-[10px] bg-primary/15 text-primary border-primary/30 px-1.5 py-0">HOJE</Badge>}
-                    <span className="text-sm font-bold tabular-nums text-foreground ml-auto">{totalPecas}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs">🔵</span>
-                      <span className="text-xs text-muted-foreground">Sint</span>
-                      <span className="text-sm font-bold tabular-nums text-blue-600 ml-auto">{sinteticoPecas}</span>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={cn("text-sm font-bold tabular-nums", isToday ? "text-primary" : "text-foreground")}>{dayLabel}</span>
+                      {isToday && <Badge className="text-[10px] bg-primary/15 text-primary border-primary/30 px-1.5 py-0">HOJE</Badge>}
+                      <span className="text-sm font-bold tabular-nums text-foreground ml-auto">{totalPecas}</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs">🟠</span>
-                      <span className="text-xs text-muted-foreground">Tec</span>
-                      <span className="text-sm font-bold tabular-nums text-amber-600 ml-auto">{tecidoPecas}</span>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs">🔵</span>
+                        <span className="text-xs text-muted-foreground">Sint</span>
+                        <span className="text-sm font-bold tabular-nums text-blue-600 ml-auto">{sinteticoPecas}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs">🟠</span>
+                        <span className="text-xs text-muted-foreground">Tec</span>
+                        <span className="text-sm font-bold tabular-nums text-amber-600 ml-auto">{tecidoPecas}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs">✔</span>
+                        <span className="text-xs text-muted-foreground">Concl.</span>
+                        <span className="text-sm font-bold tabular-nums text-emerald-600 ml-auto">{concluidoPecas}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs">✔</span>
-                      <span className="text-xs text-muted-foreground">Concl.</span>
-                      <span className="text-sm font-bold tabular-nums text-emerald-600 ml-auto">{concluidoPecas}</span>
+                    {/* Expand toggle */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setExpandedDayCard(isExpanded ? null : dayStr); }}
+                      className="mt-2 flex items-center gap-1 text-xs text-primary hover:underline font-medium w-full justify-center"
+                    >
+                      {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                      {isExpanded ? 'Fechar' : 'Produtos'}
+                    </button>
+                  </button>
+                  {/* Expanded product details */}
+                  {isExpanded && (
+                    <div className="rounded-b-lg border border-t-0 border-border/60 bg-muted/30 p-3 space-y-3 text-left">
+                      <p className="text-xs font-bold text-foreground">▼ PRODUTOS DO DIA</p>
+                      {(dailyProducts[dayStr]?.sintetico?.length || 0) > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-blue-600 flex items-center gap-1">🔵 Sintético</p>
+                          <ProductList items={dailyProducts[dayStr]?.sintetico || []} />
+                        </div>
+                      )}
+                      {(dailyProducts[dayStr]?.tecido?.length || 0) > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-amber-600 flex items-center gap-1">🟠 Tecido</p>
+                          <ProductList items={dailyProducts[dayStr]?.tecido || []} />
+                        </div>
+                      )}
+                      {(dailyProducts[dayStr]?.concluido?.length || 0) > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-emerald-600 flex items-center gap-1">✔ Concluídos</p>
+                          <ProductList items={dailyProducts[dayStr]?.concluido || []} />
+                        </div>
+                      )}
+                      {!(dailyProducts[dayStr]?.sintetico?.length || dailyProducts[dayStr]?.tecido?.length || dailyProducts[dayStr]?.concluido?.length) && (
+                        <p className="text-xs text-muted-foreground italic">Nenhum produto neste dia</p>
+                      )}
                     </div>
-                  </div>
-                </button>
+                  )}
+                </div>
               );
             })}
 
