@@ -905,17 +905,19 @@ export default function FilaMestre() {
                       const inicio = new Date(r.data_inicio_pcp);
                       const fim = new Date(r.data_fim_pcp);
                       const diffMs = fim.getTime() - inicio.getTime();
-                      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                      const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                      if (diffHours >= 24) {
-                        const days = Math.floor(diffHours / 24);
-                        const hrs = diffHours % 24;
-                        return `${days}d ${hrs}h`;
-                      }
-                      return `${diffHours}h ${diffMins}min`;
+                      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                      const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                      const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
+                      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
                     }
                     if (r.data_inicio_pcp) {
-                      return 'Em andamento';
+                      const inicio = new Date(r.data_inicio_pcp);
+                      const agora = new Date();
+                      const diffMs = agora.getTime() - inicio.getTime();
+                      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                      const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                      const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
+                      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} ⏱`;
                     }
                     return '—';
                   })()}
