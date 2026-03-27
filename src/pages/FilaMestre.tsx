@@ -316,26 +316,36 @@ export default function FilaMestre() {
       qtdByPedido.set(item.pedido_id, (qtdByPedido.get(item.pedido_id) || 0) + (item.quantidade || 0));
     }
 
+    // Classify items per-item by description, not by OP type
+    let totalSint = 0, totalTec = 0, totalConcl = 0;
+    const fromDay = parseInt(dateFrom.split('-')[2]);
+    const toDay = parseInt(dateTo.split('-')[2]);
+
+    // Build concluded pedido set
+    const concludedPedidoIds = new Set<string>();
     const ordensByPedido = new Map<string, any[]>();
     for (const o of allOrdens) {
       if (!ordensByPedido.has(o.pedido_id)) ordensByPedido.set(o.pedido_id, []);
       ordensByPedido.get(o.pedido_id)!.push(o);
     }
-
-    let totalSint = 0, totalTec = 0, totalConcl = 0;
-    const fromDay = parseInt(dateFrom.split('-')[2]);
-    const toDay = parseInt(dateTo.split('-')[2]);
-
     for (const [pedidoId, ordens] of ordensByPedido) {
-      const pecas = qtdByPedido.get(pedidoId) || 0;
-      const mainOrdem = ordens.find((o: any) => o.tipo_produto === 'SINTETICO') || ordens.find((o: any) => o.tipo_produto === 'TECIDO');
-      if (!mainOrdem) continue;
-      if (mainOrdem.tipo_produto === 'SINTETICO') totalSint += pecas;
-      else if (mainOrdem.tipo_produto === 'TECIDO') totalTec += pecas;
-
       const concluded = ordens.some((o: any) => {
         if (o.status !== 'CONCLUIDA' || !o.data_fim_pcp) return false;
         const fimDate = new Date(o.data_fim_pcp);
+        return fimDate.getFullYear() === currentYear && fimDate.getMonth() === month && fimDate.getDate() >= fromDay && fimDate.getDate() <= toDay;
+      });
+      if (concluded) concludedPedidoIds.add(pedidoId);
+    }
+
+    for (const item of allItens) {
+      if (!pedidoIdsWithOrdens.has(item.pedido_id)) continue;
+      const tipo = getItemTipo(item.descricao_produto);
+      if (!tipo) continue;
+      const qtd = item.quantidade || 0;
+      if (tipo === 'SINTETICO') totalSint += qtd;
+      else totalTec += qtd;
+      if (concludedPedidoIds.has(item.pedido_id)) totalConcl += qtd;
+    }
         return fimDate.getFullYear() === currentYear && fimDate.getMonth() === month && fimDate.getDate() >= fromDay && fimDate.getDate() <= toDay;
       });
       if (concluded) totalConcl += pecas;
