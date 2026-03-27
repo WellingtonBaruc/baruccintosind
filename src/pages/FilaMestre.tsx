@@ -861,13 +861,16 @@ export default function FilaMestre() {
                 </div>
                 <div className="flex-1">
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Início Ideal</span>
-                  <p className={`font-bold ${r.data_venda_api && r.dataEntregaEfetiva && r.data_venda_api === r.dataEntregaEfetiva ? 'text-destructive' : 'text-foreground'}`}>
+                  <p className={`font-bold px-1.5 py-0.5 rounded text-[11px] inline-block mt-0.5 ${
+                    r.data_venda_api && r.dataEntregaEfetiva && r.data_venda_api === r.dataEntregaEfetiva
+                      ? 'bg-destructive/15 text-destructive'
+                      : 'bg-warning/20 text-foreground'
+                  }`}>
                     {(() => {
                       if (r.data_venda_api && r.dataEntregaEfetiva && r.data_venda_api === r.dataEntregaEfetiva) {
                         return 'ENT IMEDIATA';
                       }
                       if (r.data_venda_api) {
-                        // Início ideal = data da venda + 1 dia útil
                         const vendaDate = new Date(r.data_venda_api + 'T00:00:00');
                         const nextDay = new Date(vendaDate);
                         nextDay.setDate(nextDay.getDate() + 1);
