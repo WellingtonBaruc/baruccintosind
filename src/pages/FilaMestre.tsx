@@ -944,62 +944,69 @@ export default function FilaMestre() {
             <div className="px-5 pb-4 pt-1">
               <TooltipProvider delayDuration={200}>
                 <div className="flex items-center gap-1 flex-wrap">
-                  {etapas.filter((etapa) => {
-                    const nomeNorm = etapa.nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                    return !['concluido', 'producao finalizada'].includes(nomeNorm);
-                  }).map((etapa) => {
-                    const isConcluida = etapa.status === 'CONCLUIDA';
-                    const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
+                  {(() => {
+                    const lastEtapaNorm = etapas.length > 0 ? etapas[etapas.length - 1].nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+                    const lastEtapaIsConcluido = ['concluido', 'producao finalizada'].includes(lastEtapaNorm);
                     return (
-                      <Tooltip key={etapa.id}>
-                        <TooltipTrigger asChild>
-                          <button
-                            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all ${
-                              isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
-                            } ${
-                              isConcluida ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]' :
-                              isEmAndamento ? 'bg-primary/15 text-primary font-bold ring-1 ring-primary/40' :
-                              'bg-muted/60 text-muted-foreground'
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isAdmin) handleMoveToEtapa(r, etapa);
-                            }}
-                          >
-                            {isConcluida && <CheckCircle2 className="h-3 w-3" />}
-                            <span className="truncate max-w-[80px]">{etapa.nome_etapa}</span>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs">
-                          <p className="font-medium">{etapa.nome_etapa}</p>
-                          <p className="text-muted-foreground">{isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}</p>
-                          {isAdmin && <p className="text-primary mt-0.5">Clique para mover</p>}
-                        </TooltipContent>
-                      </Tooltip>
+                      <>
+                        {etapas.map((etapa) => {
+                          const isConcluida = etapa.status === 'CONCLUIDA';
+                          const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
+                          return (
+                            <Tooltip key={etapa.id}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all ${
+                                    isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+                                  } ${
+                                    isConcluida ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]' :
+                                    isEmAndamento ? 'bg-primary/15 text-primary font-bold ring-1 ring-primary/40' :
+                                    'bg-muted/60 text-muted-foreground'
+                                  }`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isAdmin) handleMoveToEtapa(r, etapa);
+                                  }}
+                                >
+                                  {isConcluida && <CheckCircle2 className="h-3 w-3" />}
+                                  <span className="truncate max-w-[80px]">{etapa.nome_etapa}</span>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                <p className="font-medium">{etapa.nome_etapa}</p>
+                                <p className="text-muted-foreground">{isConcluida ? 'Concluída' : isEmAndamento ? 'Em Andamento' : 'Pendente'}</p>
+                                {isAdmin && <p className="text-primary mt-0.5">Clique para mover</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                        {!lastEtapaIsConcluido && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all ${
+                                  isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+                                } ${
+                                  r.ordem_status === 'CONCLUIDA' ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] font-bold' : 'bg-muted/60 text-muted-foreground'
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isAdmin) handleMoveToConcluido(r);
+                                }}
+                              >
+                                {r.ordem_status === 'CONCLUIDA' && <CheckCircle2 className="h-3 w-3" />}
+                                <span>Concluído</span>
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              <p className="font-medium">Concluído</p>
+                              {isAdmin && <p className="text-primary mt-0.5">Clique para concluir</p>}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </>
                     );
-                  })}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all ${
-                          isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
-                        } ${
-                          r.ordem_status === 'CONCLUIDA' ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] font-bold' : 'bg-muted/60 text-muted-foreground'
-                        }`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isAdmin) handleMoveToConcluido(r);
-                        }}
-                      >
-                        {r.ordem_status === 'CONCLUIDA' && <CheckCircle2 className="h-3 w-3" />}
-                        <span>Concluído</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">
-                      <p className="font-medium">Concluído</p>
-                      {isAdmin && <p className="text-primary mt-0.5">Clique para concluir</p>}
-                    </TooltipContent>
-                  </Tooltip>
+                  })()}
                 </div>
               </TooltipProvider>
             </div>
