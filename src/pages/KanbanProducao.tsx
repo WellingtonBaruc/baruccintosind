@@ -1013,13 +1013,15 @@ export default function KanbanProducao() {
     setWhatsappLoading(false);
   };
 
-  const handleSelectVendedora = async (vendedora: { nome: string; whatsapp: string }) => {
-    const card = whatsappModal.card;
-    if (!card || !profile || !whatsappPedidoData) { 
-      console.error('handleSelectVendedora: missing data', { card: !!card, profile: !!profile, whatsappPedidoData: !!whatsappPedidoData });
-      return; 
+  const closeWhatsappModal = () => {
+    setWhatsappModal({ open: false, card: null });
+    setWhatsappPedidoData(null);
+  };
+
+  const registerWhatsappReferral = async (card: KanbanCard, vendedora: { nome: string; whatsapp: string }) => {
+    if (!profile) {
+      return;
     }
-    const p = whatsappPedidoData;
 
     try {
       const { error: histError } = await supabase.from('pedido_historico').insert({
@@ -1034,12 +1036,9 @@ export default function KanbanProducao() {
         toast.error('Erro ao registrar encaminhamento');
       }
     } catch (err) {
-      console.error('handleSelectVendedora catch:', err);
+      console.error('registerWhatsappReferral catch:', err);
       toast.error('Erro ao registrar encaminhamento');
     }
-
-    setWhatsappModal({ open: false, card: null });
-    setWhatsappPedidoData(null);
   };
 
   const buildWhatsappMessage = (pedidoData: any) => {
@@ -1061,6 +1060,52 @@ export default function KanbanProducao() {
     const cleanPhone = phone.replace(/\D/g, '');
     const encodedMessage = encodeURIComponent(message);
     return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+  };
+
+  const openWhatsappExternally = (phone: string, message: string) => {
+    const url = buildWhatsappUrl(phone, message);
+
+    const popup = window.open(url, '_blank', 'noopener,noreferrer');
+    if (popup) {
+      return true;
+    }
+
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.info('Se o navegador bloquear a nova aba, libere pop-ups e tente novamente.');
+      return true;
+    } catch (error) {
+      console.error('openWhatsappExternally error:', error);
+      toast.error('Não foi possível abrir o WhatsApp. Libere pop-ups e tente novamente.');
+      return false;
+    }
+  };
+
+  const handleWhatsappButtonClick = (vendedora: { id: string; nome: string; whatsapp: string }) => {
+    const card = whatsappModal.card;
+
+    if (!card || !whatsappPedidoData) {
+      console.error('handleWhatsappButtonClick: missing data', { card: !!card, whatsappPedidoData: !!whatsappPedidoData });
+      toast.error('Dados da venda indisponíveis para abrir o WhatsApp.');
+      return;
+    }
+
+    const message = buildWhatsappMessage(whatsappPedidoData);
+    const opened = openWhatsappExternally(vendedora.whatsapp, message);
+
+    if (!opened) {
+      return;
+    }
+
+    closeWhatsappModal();
+    void registerWhatsappReferral(card, vendedora);
   };
 
   const formatWhatsappDisplay = (phone: string) => {
@@ -1763,7 +1808,7 @@ export default function KanbanProducao() {
       </Sheet>
 
       {/* WhatsApp Vendedora Modal */}
-      <Dialog open={whatsappModal.open} onOpenChange={(open) => { if (!open) { setWhatsappModal({ open: false, card: null }); setWhatsappPedidoData(null); } }}>
+      <Dialog open={whatsappModal.open} onOpenChange={(open) => { if (!open) closeWhatsappModal(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
@@ -1788,33 +1833,21 @@ export default function KanbanProducao() {
               <p className="text-center text-sm text-muted-foreground py-4">Nenhuma vendedora cadastrada. Cadastre em Usuários.</p>
             )}
             {vendedorasDb.map((v) => {
-              const message = whatsappPedidoData ? buildWhatsappMessage(whatsappPedidoData) : '';
-              const whatsappUrl = buildWhatsappUrl(v.whatsapp, message);
-
               return (
                 <Button
                   key={v.id}
-                  asChild
                   variant="outline"
                   className="h-14 justify-start gap-3 text-left hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all group"
+                  onClick={() => handleWhatsappButtonClick(v)}
                 >
-                  <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => {
-                      void handleSelectVendedora(v);
-                    }}
-                  >
-                    <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm shrink-0 group-hover:bg-emerald-200 transition-colors">
-                      {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{v.nome}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{formatWhatsappDisplay(v.whatsapp)}</p>
-                    </div>
-                    <MessageCircle className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </a>
+                  <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm shrink-0 group-hover:bg-emerald-200 transition-colors">
+                    {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{v.nome}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{formatWhatsappDisplay(v.whatsapp)}</p>
+                  </div>
+                  <MessageCircle className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Button>
               );
             })}
