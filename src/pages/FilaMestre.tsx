@@ -124,6 +124,8 @@ export default function FilaMestre() {
   const [selectedWeekFilter, setSelectedWeekFilter] = useState<string | null>(null);
   const [weekSummary, setWeekSummary] = useState<{ sintetico: number; tecido: number; concluido: number }>({ sintetico: 0, tecido: 0, concluido: 0 });
   const [dailySummary, setDailySummary] = useState<Record<string, { sintetico: number; tecido: number; concluido: number }>>({});
+  const [dailyProducts, setDailyProducts] = useState<Record<string, { sintetico: { desc: string; qtd: number }[]; tecido: { desc: string; qtd: number }[]; concluido: { desc: string; qtd: number }[] }>>({});
+  const [expandedDayCard, setExpandedDayCard] = useState<string | null>(null);
 
   const [calendarData, setCalendarData] = useState<PcpCalendarData>({ sabadoAtivo: false, domingoAtivo: false, feriados: [], pausas: [] });
   const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
@@ -338,7 +340,7 @@ export default function FilaMestre() {
     for (const p of (prevRes.data || [])) pedidoDateMap.set(p.id, p.data_previsao_entrega);
 
     const pedidoIds = [...pedidoDateMap.keys()];
-    if (pedidoIds.length === 0) { setDailySummary({}); return; }
+    if (pedidoIds.length === 0) { setDailySummary({}); setDailyProducts({}); return; }
 
     const batchSize = 200;
     const allOrdens: any[] = [];
@@ -347,7 +349,7 @@ export default function FilaMestre() {
       const batch = pedidoIds.slice(i, i + batchSize);
       const [oRes, iRes] = await Promise.all([
         supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status, data_fim_pcp').in('pedido_id', batch).in('tipo_produto', ['SINTETICO', 'TECIDO']),
-        supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', batch),
+        supabase.from('pedido_itens').select('pedido_id, quantidade, descricao_produto').in('pedido_id', batch),
       ]);
       allOrdens.push(...(oRes.data || []));
       allItens.push(...(iRes.data || []));
@@ -355,9 +357,12 @@ export default function FilaMestre() {
 
     const pedidoIdsWithOrdens = new Set(allOrdens.map(o => o.pedido_id));
     const qtdByPedido = new Map<string, number>();
+    const itensByPedido = new Map<string, { desc: string; qtd: number }[]>();
     for (const item of allItens) {
       if (!pedidoIdsWithOrdens.has(item.pedido_id)) continue;
       qtdByPedido.set(item.pedido_id, (qtdByPedido.get(item.pedido_id) || 0) + (item.quantidade || 0));
+      if (!itensByPedido.has(item.pedido_id)) itensByPedido.set(item.pedido_id, []);
+      itensByPedido.get(item.pedido_id)!.push({ desc: item.descricao_produto || 'Sem descrição', qtd: item.quantidade || 0 });
     }
     const ordensByPedido = new Map<string, any[]>();
     for (const o of allOrdens) {
@@ -366,25 +371,39 @@ export default function FilaMestre() {
     }
 
     const result: Record<string, { sintetico: number; tecido: number; concluido: number }> = {};
-    for (const day of days) result[day] = { sintetico: 0, tecido: 0, concluido: 0 };
+    const prodResult: Record<string, { sintetico: { desc: string; qtd: number }[]; tecido: { desc: string; qtd: number }[]; concluido: { desc: string; qtd: number }[] }> = {};
+    for (const day of days) {
+      result[day] = { sintetico: 0, tecido: 0, concluido: 0 };
+      prodResult[day] = { sintetico: [], tecido: [], concluido: [] };
+    }
 
     for (const [pedidoId, ordens] of ordensByPedido) {
       const deliveryDate = pedidoDateMap.get(pedidoId);
       if (!deliveryDate || !result[deliveryDate]) continue;
       const pecas = qtdByPedido.get(pedidoId) || 0;
+      const pedidoItens = itensByPedido.get(pedidoId) || [{ desc: 'Produto', qtd: pecas }];
       const mainOrdem = ordens.find((o: any) => o.tipo_produto === 'SINTETICO') || ordens.find((o: any) => o.tipo_produto === 'TECIDO');
       if (!mainOrdem) continue;
-      if (mainOrdem.tipo_produto === 'SINTETICO') result[deliveryDate].sintetico += pecas;
-      else result[deliveryDate].tecido += pecas;
+      if (mainOrdem.tipo_produto === 'SINTETICO') {
+        result[deliveryDate].sintetico += pecas;
+        prodResult[deliveryDate].sintetico.push(...pedidoItens);
+      } else {
+        result[deliveryDate].tecido += pecas;
+        prodResult[deliveryDate].tecido.push(...pedidoItens);
+      }
 
       const concluded = ordens.some((o: any) => {
         if (o.status !== 'CONCLUIDA' || !o.data_fim_pcp) return false;
         const fimStr = new Date(o.data_fim_pcp).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
         return fimStr === deliveryDate;
       });
-      if (concluded) result[deliveryDate].concluido += pecas;
+      if (concluded) {
+        result[deliveryDate].concluido += pecas;
+        prodResult[deliveryDate].concluido.push(...pedidoItens);
+      }
     }
     setDailySummary(result);
+    setDailyProducts(prodResult);
   }, []);
 
   useEffect(() => {
@@ -1883,11 +1902,34 @@ export default function FilaMestre() {
         const wConcl = weekSummary.concluido;
         const isWeekSelected = selectedWeekFilter === weekKey;
 
+        const ProductList = ({ items, limit = 5 }: { items: { desc: string; qtd: number }[]; limit?: number }) => {
+          const [showAll, setShowAll] = React.useState(false);
+          const displayed = showAll ? items : items.slice(0, limit);
+          if (items.length === 0) return <span className="text-xs text-muted-foreground italic">Nenhum item</span>;
+          return (
+            <div className="space-y-0.5">
+              {displayed.map((item, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-foreground truncate">{item.desc}</span>
+                  <span className="font-bold tabular-nums text-foreground shrink-0">{item.qtd}</span>
+                </div>
+              ))}
+              {items.length > limit && !showAll && (
+                <button onClick={(e) => { e.stopPropagation(); setShowAll(true); }} className="text-xs text-primary hover:underline font-medium">
+                  Ver todos ({items.length})
+                </button>
+              )}
+            </div>
+          );
+        };
+
         return (
+          <div className="space-y-2">
           <div className="grid grid-cols-6 gap-2">
             {next5.map((dayStr) => {
               const isToday = dayStr === todayStr;
               const isSelected = selectedPlanDay === dayStr;
+              const isExpanded = expandedDayCard === dayStr;
               const dayDate = new Date(dayStr + 'T00:00:00');
               const dayLabel = `${String(dayDate.getDate()).padStart(2, '0')}/${String(dayDate.getMonth() + 1).padStart(2, '0')}`;
 
@@ -1898,38 +1940,74 @@ export default function FilaMestre() {
               const concluidoPecas = daySummaryData.concluido;
 
               return (
-                <button
-                  key={dayStr}
-                  onClick={() => { setSelectedPlanDay(isSelected ? null : dayStr); setSelectedWeekFilter(null); }}
-                  className={cn(
-                    "rounded-lg border p-3 text-left transition-all hover:shadow-md",
-                    isSelected ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border/60 bg-card",
-                    isToday && !isSelected && "border-primary/50 bg-primary/5"
+                <div key={dayStr} className="flex flex-col">
+                  <button
+                    onClick={() => { setSelectedPlanDay(isSelected ? null : dayStr); setSelectedWeekFilter(null); }}
+                    className={cn(
+                      "rounded-lg border p-3 text-left transition-all hover:shadow-md",
+                      isSelected ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border/60 bg-card",
+                      isToday && !isSelected && "border-primary/50 bg-primary/5"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={cn("text-sm font-bold tabular-nums", isToday ? "text-primary" : "text-foreground")}>{dayLabel}</span>
+                      {isToday && <Badge className="text-[10px] bg-primary/15 text-primary border-primary/30 px-1.5 py-0">HOJE</Badge>}
+                      <span className="text-sm font-bold tabular-nums text-foreground ml-auto">{totalPecas}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs">🔵</span>
+                        <span className="text-xs text-muted-foreground">Sint</span>
+                        <span className="text-sm font-bold tabular-nums text-blue-600 ml-auto">{sinteticoPecas}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs">🟠</span>
+                        <span className="text-xs text-muted-foreground">Tec</span>
+                        <span className="text-sm font-bold tabular-nums text-amber-600 ml-auto">{tecidoPecas}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs">✔</span>
+                        <span className="text-xs text-muted-foreground">Concl.</span>
+                        <span className="text-sm font-bold tabular-nums text-emerald-600 ml-auto">{concluidoPecas}</span>
+                      </div>
+                    </div>
+                    {/* Expand toggle */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setExpandedDayCard(isExpanded ? null : dayStr); }}
+                      className="mt-2 flex items-center gap-1 text-xs text-primary hover:underline font-medium w-full justify-center"
+                    >
+                      {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                      {isExpanded ? 'Fechar' : 'Produtos'}
+                    </button>
+                  </button>
+                  {/* Expanded product details */}
+                  {isExpanded && (
+                    <div className="rounded-b-lg border border-t-0 border-border/60 bg-muted/30 p-3 space-y-3 text-left">
+                      <p className="text-xs font-bold text-foreground">▼ PRODUTOS DO DIA</p>
+                      {(dailyProducts[dayStr]?.sintetico?.length || 0) > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-blue-600 flex items-center gap-1">🔵 Sintético</p>
+                          <ProductList items={dailyProducts[dayStr]?.sintetico || []} />
+                        </div>
+                      )}
+                      {(dailyProducts[dayStr]?.tecido?.length || 0) > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-amber-600 flex items-center gap-1">🟠 Tecido</p>
+                          <ProductList items={dailyProducts[dayStr]?.tecido || []} />
+                        </div>
+                      )}
+                      {(dailyProducts[dayStr]?.concluido?.length || 0) > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-emerald-600 flex items-center gap-1">✔ Concluídos</p>
+                          <ProductList items={dailyProducts[dayStr]?.concluido || []} />
+                        </div>
+                      )}
+                      {!(dailyProducts[dayStr]?.sintetico?.length || dailyProducts[dayStr]?.tecido?.length || dailyProducts[dayStr]?.concluido?.length) && (
+                        <p className="text-xs text-muted-foreground italic">Nenhum produto neste dia</p>
+                      )}
+                    </div>
                   )}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={cn("text-sm font-bold tabular-nums", isToday ? "text-primary" : "text-foreground")}>{dayLabel}</span>
-                    {isToday && <Badge className="text-[10px] bg-primary/15 text-primary border-primary/30 px-1.5 py-0">HOJE</Badge>}
-                    <span className="text-sm font-bold tabular-nums text-foreground ml-auto">{totalPecas}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs">🔵</span>
-                      <span className="text-xs text-muted-foreground">Sint</span>
-                      <span className="text-sm font-bold tabular-nums text-blue-600 ml-auto">{sinteticoPecas}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs">🟠</span>
-                      <span className="text-xs text-muted-foreground">Tec</span>
-                      <span className="text-sm font-bold tabular-nums text-amber-600 ml-auto">{tecidoPecas}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs">✔</span>
-                      <span className="text-xs text-muted-foreground">Concl.</span>
-                      <span className="text-sm font-bold tabular-nums text-emerald-600 ml-auto">{concluidoPecas}</span>
-                    </div>
-                  </div>
-                </button>
+                </div>
               );
             })}
 
@@ -1988,6 +2066,7 @@ export default function FilaMestre() {
                 </div>
               </div>
             </div>
+          </div>
           </div>
         );
       })()}
