@@ -495,6 +495,17 @@ export default function FilaMestre() {
       .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
       .order('criado_em', { ascending: false });
 
+    // Also fetch "Nova Venda" (manual sales, tipo_fluxo PRODUCAO without status_api from Simplifica)
+    const { data: pedidosNovaVenda } = await supabase
+      .from('pedidos')
+      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
+      .eq('tipo_fluxo', 'PRODUCAO')
+      .eq('is_deleted', false)
+      .eq('sincronizacao_bloqueada', true)
+      .is('api_venda_id', null)
+      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
+      .order('criado_em', { ascending: false });
+
     const { data: todasOrdens } = await supabase
       .from('ordens_producao')
       .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp, sequencia')
