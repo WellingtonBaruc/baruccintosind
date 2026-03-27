@@ -2067,6 +2067,7 @@ export default function FilaMestre() {
               </div>
             </div>
           </div>
+          </div>
         );
       })()}
 
