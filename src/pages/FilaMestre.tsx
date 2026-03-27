@@ -1902,11 +1902,34 @@ export default function FilaMestre() {
         const wConcl = weekSummary.concluido;
         const isWeekSelected = selectedWeekFilter === weekKey;
 
+        const ProductList = ({ items, limit = 5 }: { items: { desc: string; qtd: number }[]; limit?: number }) => {
+          const [showAll, setShowAll] = React.useState(false);
+          const displayed = showAll ? items : items.slice(0, limit);
+          if (items.length === 0) return <span className="text-xs text-muted-foreground italic">Nenhum item</span>;
+          return (
+            <div className="space-y-0.5">
+              {displayed.map((item, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-foreground truncate">{item.desc}</span>
+                  <span className="font-bold tabular-nums text-foreground shrink-0">{item.qtd}</span>
+                </div>
+              ))}
+              {items.length > limit && !showAll && (
+                <button onClick={(e) => { e.stopPropagation(); setShowAll(true); }} className="text-xs text-primary hover:underline font-medium">
+                  Ver todos ({items.length})
+                </button>
+              )}
+            </div>
+          );
+        };
+
         return (
+          <div className="space-y-2">
           <div className="grid grid-cols-6 gap-2">
             {next5.map((dayStr) => {
               const isToday = dayStr === todayStr;
               const isSelected = selectedPlanDay === dayStr;
+              const isExpanded = expandedDayCard === dayStr;
               const dayDate = new Date(dayStr + 'T00:00:00');
               const dayLabel = `${String(dayDate.getDate()).padStart(2, '0')}/${String(dayDate.getMonth() + 1).padStart(2, '0')}`;
 
@@ -1917,15 +1940,15 @@ export default function FilaMestre() {
               const concluidoPecas = daySummaryData.concluido;
 
               return (
-                <button
-                  key={dayStr}
-                  onClick={() => { setSelectedPlanDay(isSelected ? null : dayStr); setSelectedWeekFilter(null); }}
-                  className={cn(
-                    "rounded-lg border p-3 text-left transition-all hover:shadow-md",
-                    isSelected ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border/60 bg-card",
-                    isToday && !isSelected && "border-primary/50 bg-primary/5"
-                  )}
-                >
+                <div key={dayStr} className="flex flex-col">
+                  <button
+                    onClick={() => { setSelectedPlanDay(isSelected ? null : dayStr); setSelectedWeekFilter(null); }}
+                    className={cn(
+                      "rounded-lg border p-3 text-left transition-all hover:shadow-md",
+                      isSelected ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border/60 bg-card",
+                      isToday && !isSelected && "border-primary/50 bg-primary/5"
+                    )}
+                  >
                   <div className="flex items-center gap-2 mb-2">
                     <span className={cn("text-sm font-bold tabular-nums", isToday ? "text-primary" : "text-foreground")}>{dayLabel}</span>
                     {isToday && <Badge className="text-[10px] bg-primary/15 text-primary border-primary/30 px-1.5 py-0">HOJE</Badge>}
