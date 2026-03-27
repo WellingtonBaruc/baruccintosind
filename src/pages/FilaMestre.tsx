@@ -128,6 +128,7 @@ export default function FilaMestre() {
   const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<PedidoDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
