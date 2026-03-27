@@ -1249,21 +1249,21 @@ export default function FilaMestre() {
           }
         }
         const todayDate = new Date(todayStr + 'T00:00:00');
-        const currentMonth = todayDate.getMonth();
         const currentYear = todayDate.getFullYear();
         const monthNames = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
-        const monthName = monthNames[currentMonth];
+        const monthNamesFull = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+        const selectedMonthName = monthNames[selectedMonth];
 
-        // Calculate week ranges for current month
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        // Calculate week ranges for selected month
+        const daysInSelectedMonth = new Date(currentYear, selectedMonth + 1, 0).getDate();
         const weeks: { num: number; start: number; end: number }[] = [];
         for (let w = 1; w <= 5; w++) {
           const start = (w - 1) * 7 + 1;
-          const end = Math.min(w * 7, daysInMonth);
-          if (start <= daysInMonth) weeks.push({ num: w, start, end });
+          const end = Math.min(w * 7, daysInSelectedMonth);
+          if (start <= daysInSelectedMonth) weeks.push({ num: w, start, end });
         }
 
-        const weekKey = `${currentYear}-${currentMonth}-${selectedWeek}`;
+        const weekKey = `${currentYear}-${selectedMonth}-${selectedWeek}`;
         const wSint = weekSummary.sintetico;
         const wTec = weekSummary.tecido;
         const wTotal = wSint + wTec;
