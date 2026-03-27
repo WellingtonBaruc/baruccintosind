@@ -1128,26 +1128,6 @@ export default function FilaMestre() {
           </Select>
         </div>
 
-        <div className="h-6 w-px bg-border mx-1" />
-
-        <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
-          <Button
-            variant={viewMode === 'compact' ? 'default' : 'ghost'}
-            size="sm"
-            className="h-7 text-xs gap-1 px-2"
-            onClick={() => setViewMode('compact')}
-          >
-            <LayoutList className="h-3.5 w-3.5" /> Compacto
-          </Button>
-          <Button
-            variant={viewMode === 'detailed' ? 'default' : 'ghost'}
-            size="sm"
-            className="h-7 text-xs gap-1 px-2"
-            onClick={() => setViewMode('detailed')}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" /> Detalhado
-          </Button>
-        </div>
       </div>
 
       {/* Summary + Global Export */}
@@ -1211,7 +1191,7 @@ export default function FilaMestre() {
       ) : sorted.length === 0 ? (
         <p className="text-center py-12 text-muted-foreground text-sm">Nenhum pedido encontrado.</p>
       ) : (
-        <div className={`flex flex-col ${viewMode === 'compact' ? 'gap-3' : 'gap-5'}`}>
+        <div className="flex flex-col gap-3">
           {groups.map(group => {
             const isCollapsed = collapsedGroups.has(group.key);
             const hasUrgent = group.urgentes > 0;
@@ -1220,9 +1200,9 @@ export default function FilaMestre() {
               : group.label;
 
             return (
-              <div key={group.key} className={viewMode === 'compact' ? 'space-y-1' : 'space-y-2'}>
+              <div key={group.key} className="space-y-1">
                 {/* Group header */}
-                {viewMode === 'compact' ? (
+                {/* Compact group header */}
                   <button
                     onClick={() => toggleGroup(group.key)}
                     className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md border transition-colors text-left text-sm ${
@@ -1252,59 +1232,11 @@ export default function FilaMestre() {
                       </Button>
                     </span>
                   </button>
-                ) : (
-                  <button
-                    onClick={() => toggleGroup(group.key)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors text-left ${
-                      hasUrgent ? 'bg-destructive/5 border-destructive/30 hover:bg-destructive/10' : 'bg-muted/50 border-border/60 hover:bg-muted/80'
-                    }`}
-                  >
-                    {isCollapsed ? <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" /> : <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />}
-                    <div className="flex-1 min-w-0">
-                      <span className="text-base font-bold capitalize">{group.label}</span>
-                    </div>
-                     <div className="flex items-center gap-3 text-sm text-muted-foreground shrink-0 flex-wrap">
-                      <span className="font-semibold text-foreground">{group.pedidos.length} pedido{group.pedidos.length !== 1 ? 's' : ''}</span>
-                      <span>·</span>
-                      <span>{group.totalPecas} pç</span>
-                      {group.sinteticoCount > 0 && (
-                        <span className="text-[11px] bg-blue-500/15 text-blue-600 border border-blue-500/30 rounded px-1.5 py-0.5 font-semibold">
-                          Sint: {group.sinteticoCount}v · {group.sinteticoPecas}pç
-                        </span>
-                      )}
-                      {group.tecidoCount > 0 && (
-                        <span className="text-[11px] bg-amber-500/15 text-amber-600 border border-amber-500/30 rounded px-1.5 py-0.5 font-semibold">
-                          Tec: {group.tecidoCount}v · {group.tecidoPecas}pç
-                        </span>
-                      )}
-                      {group.outrosCount > 0 && (
-                        <span className="text-[11px] bg-muted text-muted-foreground border border-border rounded px-1.5 py-0.5 font-semibold">
-                          Outros: {group.outrosCount}v · {group.outrosPecas}pç
-                        </span>
-                      )}
-                      <span>·</span>
-                      <span className="font-semibold text-foreground tabular-nums">{fmt(group.totalValor)}</span>
-                      {group.urgentes > 0 && (
-                        <>
-                          <span>·</span>
-                          <span className="text-destructive font-bold">{group.urgentes} urgente{group.urgentes !== 1 ? 's' : ''}</span>
-                        </>
-                      )}
-                      <span className="ml-1" />
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Baixar Excel" onClick={(e) => { e.stopPropagation(); exportGroupToExcel(group); }}>
-                        <FileSpreadsheet className="h-4 w-4 text-[hsl(var(--success))]" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Baixar PDF" onClick={(e) => { e.stopPropagation(); exportGroupToPdf(group); }}>
-                        <FileText className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </button>
-                )}
 
                 {/* Group items */}
                 {!isCollapsed && (
-                  <div className={`flex flex-col ${viewMode === 'compact' ? 'gap-1 pl-1' : 'gap-3 pl-2'}`}>
-                    {group.pedidos.map(viewMode === 'compact' ? renderCompactCard : renderCard)}
+                  <div className="flex flex-col gap-1 pl-1">
+                    {group.pedidos.map(renderCompactCard)}
                   </div>
                 )}
               </div>
