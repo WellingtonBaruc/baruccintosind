@@ -162,13 +162,13 @@ export default function KanbanProducao() {
   const [whatsappPedidoData, setWhatsappPedidoData] = useState<any>(null);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
 
-  const VENDEDORAS = [
-    { nome: 'Vendedora 1', whatsapp: '5500000000001' },
-    { nome: 'Vendedora 2', whatsapp: '5500000000002' },
-    { nome: 'Vendedora 3', whatsapp: '5500000000003' },
-    { nome: 'Vendedora 4', whatsapp: '5500000000004' },
-    { nome: 'Vendedora 5', whatsapp: '5500000000005' },
-  ];
+  const [vendedorasDb, setVendedorasDb] = useState<{ id: string; nome: string; whatsapp: string }[]>([]);
+
+  useEffect(() => {
+    supabase.from('vendedoras').select('id, nome, whatsapp').eq('ativa', true).order('nome').then(({ data }) => {
+      setVendedorasDb(data || []);
+    });
+  }, []);
 
   const openDetailSheet = async (card: KanbanCard) => {
     setDetailSheet({ open: true, card, items: [], loading: true, pedido: null });
@@ -1758,9 +1758,12 @@ export default function KanbanProducao() {
             </div>
           )}
           <div className="grid gap-2">
-            {VENDEDORAS.map((v, i) => (
+            {vendedorasDb.length === 0 && (
+              <p className="text-center text-sm text-muted-foreground py-4">Nenhuma vendedora cadastrada. Cadastre em Usuários.</p>
+            )}
+            {vendedorasDb.map((v) => (
               <Button
-                key={i}
+                key={v.id}
                 variant="outline"
                 className="h-14 justify-start gap-3 text-left hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all group"
                 onClick={() => handleSelectVendedora(v)}
