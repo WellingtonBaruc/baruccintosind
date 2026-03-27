@@ -1037,27 +1037,10 @@ export default function KanbanProducao() {
     const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     console.log('WhatsApp URL:', url);
 
-    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    const popup = window.open(url, '_blank', 'noopener,noreferrer');
 
-    if (popup) {
-      popup.opener = null;
-      popup.location.href = url;
-    } else {
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.info('Se o WhatsApp não abrir, o link foi copiado.');
-      } catch {
-        toast.info('Se o WhatsApp não abrir, permita pop-ups no navegador.');
-      }
+    if (!popup) {
+      toast.info('Não foi possível abrir o WhatsApp. Verifique se o navegador bloqueou pop-ups.');
     }
 
     // Log to history
