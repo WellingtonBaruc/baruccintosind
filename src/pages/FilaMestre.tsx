@@ -401,29 +401,38 @@ export default function FilaMestre() {
       prodResult[day] = { sintetico: [], tecido: [], concluido: [] };
     }
 
+    // Build concluded pedido set
+    const concludedPedidoIds = new Set<string>();
     for (const [pedidoId, ordens] of ordensByPedido) {
       const deliveryDate = pedidoDateMap.get(pedidoId);
-      if (!deliveryDate || !result[deliveryDate]) continue;
-      const pecas = qtdByPedido.get(pedidoId) || 0;
-      const pedidoItens = itensByPedido.get(pedidoId) || [{ desc: 'Produto', qtd: pecas }];
-      const mainOrdem = ordens.find((o: any) => o.tipo_produto === 'SINTETICO') || ordens.find((o: any) => o.tipo_produto === 'TECIDO');
-      if (!mainOrdem) continue;
-      if (mainOrdem.tipo_produto === 'SINTETICO') {
-        result[deliveryDate].sintetico += pecas;
-        prodResult[deliveryDate].sintetico.push(...pedidoItens);
-      } else {
-        result[deliveryDate].tecido += pecas;
-        prodResult[deliveryDate].tecido.push(...pedidoItens);
-      }
-
+      if (!deliveryDate) continue;
       const concluded = ordens.some((o: any) => {
         if (o.status !== 'CONCLUIDA' || !o.data_fim_pcp) return false;
         const fimStr = new Date(o.data_fim_pcp).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
         return fimStr === deliveryDate;
       });
-      if (concluded) {
-        result[deliveryDate].concluido += pecas;
-        prodResult[deliveryDate].concluido.push(...pedidoItens);
+      if (concluded) concludedPedidoIds.add(pedidoId);
+    }
+
+    // Classify each item individually by its description
+    for (const item of allItens) {
+      if (!pedidoIdsWithOrdens.has(item.pedido_id)) continue;
+      const deliveryDate = pedidoDateMap.get(item.pedido_id);
+      if (!deliveryDate || !result[deliveryDate]) continue;
+      const tipo = getItemTipo(item.descricao_produto);
+      if (!tipo) continue;
+      const qtd = item.quantidade || 0;
+      const desc = item.descricao_produto || 'Sem descrição';
+      if (tipo === 'SINTETICO') {
+        result[deliveryDate].sintetico += qtd;
+        prodResult[deliveryDate].sintetico.push({ desc, qtd });
+      } else {
+        result[deliveryDate].tecido += qtd;
+        prodResult[deliveryDate].tecido.push({ desc, qtd });
+      }
+      if (concludedPedidoIds.has(item.pedido_id)) {
+        result[deliveryDate].concluido += qtd;
+        prodResult[deliveryDate].concluido.push({ desc, qtd });
       }
     }
     setDailySummary(result);
