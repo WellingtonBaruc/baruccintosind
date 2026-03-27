@@ -1361,15 +1361,11 @@ export default function FilaMestre() {
               const dayDate = new Date(dayStr + 'T00:00:00');
               const dayLabel = `${String(dayDate.getDate()).padStart(2, '0')}/${String(dayDate.getMonth() + 1).padStart(2, '0')}`;
 
-              const dayRows = rows.filter(r => r.dataEntregaEfetiva === dayStr);
-              const sinteticoPecas = dayRows.filter(r => r.tipo_produto === 'SINTETICO').reduce((s, r) => s + r.quantidade_itens, 0);
-              const tecidoPecas = dayRows.filter(r => r.tipo_produto === 'TECIDO').reduce((s, r) => s + r.quantidade_itens, 0);
+              const daySummaryData = dailySummary[dayStr] || { sintetico: 0, tecido: 0, concluido: 0 };
+              const sinteticoPecas = daySummaryData.sintetico;
+              const tecidoPecas = daySummaryData.tecido;
               const totalPecas = sinteticoPecas + tecidoPecas;
-              const concluidoPecas = dayRows.filter(r => {
-                if (!r.data_fim_pcp) return false;
-                const fimDate = new Date(r.data_fim_pcp).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-                return fimDate === dayStr;
-              }).reduce((s, r) => s + r.quantidade_itens, 0);
+              const concluidoPecas = daySummaryData.concluido;
 
               return (
                 <button
