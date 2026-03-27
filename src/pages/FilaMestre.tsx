@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid, Clock, Plus, Store, Wrench, Trash2, Pencil } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid, Clock, Plus, Store, Wrench, Trash2, Pencil, Ban } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -193,6 +193,12 @@ export default function FilaMestre() {
   const [deleteOpDialogOpen, setDeleteOpDialogOpen] = useState(false);
   const [deleteOpTarget, setDeleteOpTarget] = useState<VendaRow | null>(null);
   const [deleteOpLoading, setDeleteOpLoading] = useState(false);
+
+  // Cancelar Venda state
+  const [cancelVendaDialogOpen, setCancelVendaDialogOpen] = useState(false);
+  const [cancelVendaTarget, setCancelVendaTarget] = useState<VendaRow | null>(null);
+  const [cancelVendaLoading, setCancelVendaLoading] = useState(false);
+  const [cancelVendaObs, setCancelVendaObs] = useState('');
 
   // Editar OP PCP state
   const [editOpDialogOpen, setEditOpDialogOpen] = useState(false);
@@ -948,6 +954,51 @@ export default function FilaMestre() {
       toast.error('Erro ao excluir OP: ' + (err.message || err));
     } finally {
       setDeleteOpLoading(false);
+    }
+  };
+
+  // Cancelar Venda
+  const handleCancelVenda = async () => {
+    if (!cancelVendaTarget || !profile) return;
+    setCancelVendaLoading(true);
+    try {
+      const { error } = await supabase
+        .from('pedidos')
+        .update({
+          status_atual: 'CANCELADO',
+          status_api: 'Cancelado',
+          sincronizacao_bloqueada: true,
+        } as any)
+        .eq('id', cancelVendaTarget.id);
+      if (error) throw error;
+
+      // Cancel all associated ordens
+      await supabase
+        .from('ordens_producao')
+        .update({ status: 'CANCELADA' } as any)
+        .eq('pedido_id', cancelVendaTarget.id);
+
+      // Log action
+      await supabase.from('pedido_historico').insert({
+        pedido_id: cancelVendaTarget.id,
+        usuario_id: profile.id,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: cancelVendaTarget.status_atual,
+        status_novo: 'CANCELADO',
+        observacao: cancelVendaObs
+          ? `Cancelado manualmente por ${profile.nome}. Motivo: ${cancelVendaObs}`
+          : `Cancelado manualmente por ${profile.nome} — venda cancelada no Simplifica.`,
+      });
+
+      toast.success('Venda cancelada com sucesso');
+      setCancelVendaDialogOpen(false);
+      setCancelVendaTarget(null);
+      setCancelVendaObs('');
+      fetchAll();
+    } catch (err: any) {
+      toast.error('Erro ao cancelar venda: ' + (err.message || err));
+    } finally {
+      setCancelVendaLoading(false);
     }
   };
 
