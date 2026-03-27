@@ -2221,7 +2221,6 @@ export default function FilaMestre() {
                   <div className="flex gap-4 text-xs text-muted-foreground">
                     <span>Fivela: {p.fivela}</span>
                     <span>Banho: {p.banhoFivela}</span>
-                    <span>Abertura: {p.aberturaFivela || '—'}</span>
                     <span>Material: {p.material}</span>
                   </div>
                   <p className="text-sm font-bold text-orange-700">Qtd: {p.quantidade}</p>
