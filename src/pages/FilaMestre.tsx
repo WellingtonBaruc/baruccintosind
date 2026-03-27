@@ -174,7 +174,6 @@ export default function FilaMestre() {
 
     let dateFrom: string, dateTo: string;
     if (weekNum === 0) {
-      // All weeks — full month
       dateFrom = `${currentYear}-${String(month + 1).padStart(2, '0')}-01`;
       dateTo = `${currentYear}-${String(month + 1).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
     } else {
@@ -184,34 +183,54 @@ export default function FilaMestre() {
       dateTo = `${currentYear}-${String(month + 1).padStart(2, '0')}-${String(weekEnd).padStart(2, '0')}`;
     }
 
-    // Fetch pedidos with delivery dates in range (using both previsao and ajustada)
-    const { data: pedidosInRange } = await supabase
+    // Fetch pedidos with adjusted delivery in range
+    const { data: pedidosAjustados } = await supabase
       .from('pedidos')
       .select('id')
-      .or(`and(data_entrega_ajustada_pcp.gte.${dateFrom},data_entrega_ajustada_pcp.lte.${dateTo}),and(data_entrega_ajustada_pcp.is.null,data_previsao_entrega.gte.${dateFrom},data_previsao_entrega.lte.${dateTo})`);
+      .gte('data_entrega_ajustada_pcp', dateFrom)
+      .lte('data_entrega_ajustada_pcp', dateTo);
 
-    const pedidoIds = (pedidosInRange || []).map(p => p.id);
+    // Fetch pedidos without adjusted date, using previsao
+    const { data: pedidosPrevisao } = await supabase
+      .from('pedidos')
+      .select('id')
+      .is('data_entrega_ajustada_pcp', null)
+      .gte('data_previsao_entrega', dateFrom)
+      .lte('data_previsao_entrega', dateTo);
+
+    const pedidoIds = [...new Set([
+      ...(pedidosAjustados || []).map(p => p.id),
+      ...(pedidosPrevisao || []).map(p => p.id),
+    ])];
+
     if (pedidoIds.length === 0) {
       setWeekSummary({ sintetico: 0, tecido: 0, concluido: 0 });
       return;
     }
 
-    // Fetch orders and items in batches
+    // Fetch orders (only SINTETICO/TECIDO - exclude OUTROS) and items in batches
     const batchSize = 200;
     const allOrdens: any[] = [];
     const allItens: any[] = [];
     for (let i = 0; i < pedidoIds.length; i += batchSize) {
       const batch = pedidoIds.slice(i, i + batchSize);
       const [ordensRes, itensRes] = await Promise.all([
-        supabase.from('ordens_producao').select('id, pedido_id, tipo_produto, status, data_fim_pcp').in('pedido_id', batch),
+        supabase.from('ordens_producao')
+          .select('id, pedido_id, tipo_produto, status, data_fim_pcp')
+          .in('pedido_id', batch)
+          .in('tipo_produto', ['SINTETICO', 'TECIDO']),
         supabase.from('pedido_itens').select('pedido_id, quantidade').in('pedido_id', batch),
       ]);
       allOrdens.push(...(ordensRes.data || []));
       allItens.push(...(itensRes.data || []));
     }
 
+    // Only count pedidos that have valid production orders
+    const pedidoIdsWithOrdens = new Set(allOrdens.map(o => o.pedido_id));
+
     const qtdByPedido = new Map<string, number>();
     for (const item of allItens) {
+      if (!pedidoIdsWithOrdens.has(item.pedido_id)) continue;
       qtdByPedido.set(item.pedido_id, (qtdByPedido.get(item.pedido_id) || 0) + (item.quantidade || 0));
     }
 
@@ -222,20 +241,20 @@ export default function FilaMestre() {
     }
 
     let totalSint = 0, totalTec = 0, totalConcl = 0;
-    for (const pedidoId of pedidoIds) {
-      const pecas = qtdByPedido.get(pedidoId) || 0;
-      const ordens = ordensByPedido.get(pedidoId) || [];
-      const mainOrdem = ordens.find(o => o.tipo_produto === 'SINTETICO') || ordens.find(o => o.tipo_produto === 'TECIDO') || ordens[0];
-      if (mainOrdem?.tipo_produto === 'SINTETICO') totalSint += pecas;
-      else if (mainOrdem?.tipo_produto === 'TECIDO') totalTec += pecas;
+    const fromDay = parseInt(dateFrom.split('-')[2]);
+    const toDay = parseInt(dateTo.split('-')[2]);
 
-      const concluded = ordens.some(o => {
+    for (const [pedidoId, ordens] of ordensByPedido) {
+      const pecas = qtdByPedido.get(pedidoId) || 0;
+      const mainOrdem = ordens.find((o: any) => o.tipo_produto === 'SINTETICO') || ordens.find((o: any) => o.tipo_produto === 'TECIDO');
+      if (!mainOrdem) continue;
+      if (mainOrdem.tipo_produto === 'SINTETICO') totalSint += pecas;
+      else if (mainOrdem.tipo_produto === 'TECIDO') totalTec += pecas;
+
+      const concluded = ordens.some((o: any) => {
         if (o.status !== 'CONCLUIDA' || !o.data_fim_pcp) return false;
         const fimDate = new Date(o.data_fim_pcp);
-        const fimDay = fimDate.getDate();
-        const fromDay = parseInt(dateFrom.split('-')[2]);
-        const toDay = parseInt(dateTo.split('-')[2]);
-        return fimDate.getFullYear() === currentYear && fimDate.getMonth() === month && fimDay >= fromDay && fimDay <= toDay;
+        return fimDate.getFullYear() === currentYear && fimDate.getMonth() === month && fimDate.getDate() >= fromDay && fimDate.getDate() <= toDay;
       });
       if (concluded) totalConcl += pecas;
     }
