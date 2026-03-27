@@ -933,11 +933,16 @@ export default function FilaMestre() {
                 <span className="text-muted-foreground">Etapa: <span className="font-bold text-primary">{r.etapa_atual}</span></span>
               </div>
 
-              {/* Progresso */}
+              {/* Progresso — apenas etapas do Kanban */}
               {etapas.length > 0 && (
             <TooltipProvider delayDuration={200}>
               <div className="flex items-center gap-1 flex-wrap">
-                {etapas.map((etapa) => {
+                {etapas.filter(etapa => {
+                  // Mostrar apenas etapas do Kanban de produção (excluir pós-produção)
+                  const nome = etapa.nome_etapa?.toLowerCase() || '';
+                  const excluidas = ['produção finalizada', 'producao finalizada'];
+                  return !excluidas.some(ex => nome.includes(ex));
+                }).map((etapa) => {
                   const isConcluida = etapa.status === 'CONCLUIDA';
                   const isEmAndamento = etapa.status === 'EM_ANDAMENTO';
                   return (
@@ -970,7 +975,7 @@ export default function FilaMestre() {
                         r.ordem_status === 'CONCLUIDA' ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] font-bold' : 'bg-muted/60 text-muted-foreground'
                       }`}
                       onClick={(e) => { e.stopPropagation(); if (isAdmin) handleMoveToConcluido(r); }}
-                    >Fim</button>
+                    >Concluído</button>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="text-xs">
                     <p>Concluído</p>
