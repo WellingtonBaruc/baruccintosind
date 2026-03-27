@@ -1196,9 +1196,11 @@ export default function FilaMestre() {
             </div>
             <div className="px-2 py-0.5 border-r border-border text-center">
               <span className="text-[11px] text-muted-foreground">Tipo</span>
-              <div className="mt-0.5">
+              <div className="mt-0.5 flex items-center gap-1 flex-wrap">
                 <Badge className={`text-[10px] font-semibold ${tipoBadge}`}>{tipoLabel}</Badge>
-                {r.is_piloto && <Badge className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30 ml-1">Piloto</Badge>}
+                {r.is_piloto && <Badge className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30">Piloto</Badge>}
+                {isPcpOp && <Badge className="text-[10px] bg-orange-500/15 text-orange-600 border-orange-500/30 font-bold">OP PCP</Badge>}
+                {r.origem_op === 'LOJA' && <Badge className="text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30 font-bold">OP Loja</Badge>}
               </div>
             </div>
             <div className="px-2 py-0.5 text-right">
