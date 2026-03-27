@@ -124,6 +124,8 @@ export default function FilaMestre() {
   const [selectedWeekFilter, setSelectedWeekFilter] = useState<string | null>(null);
   const [weekSummary, setWeekSummary] = useState<{ sintetico: number; tecido: number; concluido: number }>({ sintetico: 0, tecido: 0, concluido: 0 });
   const [dailySummary, setDailySummary] = useState<Record<string, { sintetico: number; tecido: number; concluido: number }>>({});
+  const [dailyProducts, setDailyProducts] = useState<Record<string, { sintetico: { desc: string; qtd: number }[]; tecido: { desc: string; qtd: number }[]; concluido: { desc: string; qtd: number }[] }>>({});
+  const [expandedDayCard, setExpandedDayCard] = useState<string | null>(null);
 
   const [calendarData, setCalendarData] = useState<PcpCalendarData>({ sabadoAtivo: false, domingoAtivo: false, feriados: [], pausas: [] });
   const [leadTimes, setLeadTimes] = useState<Record<string, number>>({});
