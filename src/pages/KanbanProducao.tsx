@@ -61,6 +61,13 @@ interface KanbanCard {
   corte_ok: boolean;
   corte_total: number;
   corte_concluidos: number;
+  // WhatsApp pre-loaded fields
+  numero_pedido: string;
+  cliente_telefone: string | null;
+  cliente_endereco: string | null;
+  canal_venda: string | null;
+  valor_liquido: number;
+  observacao_comercial: string | null;
 }
 
 // Unified columns
@@ -189,7 +196,7 @@ export default function KanbanProducao() {
           usuarios(nome),
           ordens_producao!inner(
             id, pedido_id, tipo_produto, status, fivelas_recebidas, sequencia, observacao, tem_fivela_coberta, fivela_coberta_status, programado_inicio_data, programado_conclusao_data,
-            pedidos!inner(api_venda_id, cliente_nome, vendedor_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas, observacao_api)
+            pedidos!inner(api_venda_id, numero_pedido, cliente_nome, cliente_telefone, cliente_endereco, canal_venda, valor_liquido, observacao_comercial, vendedor_nome, status_prazo, data_previsao_entrega, status_api, status_atual, is_piloto, status_piloto, fivelas_separadas, observacao_api)
           )
         `)
         .in('status', ['EM_ANDAMENTO', 'CONCLUIDA', 'PENDENTE']),
@@ -346,6 +353,12 @@ export default function KanbanProducao() {
         programado_inicio_data: (e.ordens_producao as any).programado_inicio_data || null,
         programado_conclusao_data: (e.ordens_producao as any).programado_conclusao_data || null,
         observacao_api: e.ordens_producao.pedidos.observacao_api || null,
+        numero_pedido: e.ordens_producao.pedidos.numero_pedido || e.ordens_producao.pedidos.api_venda_id || '—',
+        cliente_telefone: e.ordens_producao.pedidos.cliente_telefone || null,
+        cliente_endereco: e.ordens_producao.pedidos.cliente_endereco || null,
+        canal_venda: e.ordens_producao.pedidos.canal_venda || null,
+        valor_liquido: Number(e.ordens_producao.pedidos.valor_liquido || 0),
+        observacao_comercial: e.ordens_producao.pedidos.observacao_comercial || null,
         corte_ok: (() => {
           const items = pedidoTipoItems.get(`${pedidoId}|${tipoProduto}`) || [];
           if (items.length === 0) return false;
