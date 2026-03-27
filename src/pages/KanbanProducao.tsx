@@ -1015,7 +1015,7 @@ export default function KanbanProducao() {
       `✅ *SEU PEDIDO FOI FINALIZADO!*`,
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `📋 *Pedido:* #${card.numero_pedido}`,
+      `📋 *Venda:* #${card.api_venda_id}`,
       `👤 *Cliente:* ${card.cliente_nome || '—'}`,
       `📞 *Telefone:* ${card.cliente_telefone || '—'}`,
       `📍 *Endereço:* ${card.cliente_endereco || '—'}`,
