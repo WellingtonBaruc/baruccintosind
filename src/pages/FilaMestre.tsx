@@ -941,6 +941,27 @@ export default function FilaMestre() {
             </SelectContent>
           </Select>
         </div>
+
+        <div className="h-6 w-px bg-border mx-1" />
+
+        <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+          <Button
+            variant={viewMode === 'compact' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 text-xs gap-1 px-2"
+            onClick={() => setViewMode('compact')}
+          >
+            <LayoutList className="h-3.5 w-3.5" /> Compacto
+          </Button>
+          <Button
+            variant={viewMode === 'detailed' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 text-xs gap-1 px-2"
+            onClick={() => setViewMode('detailed')}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" /> Detalhado
+          </Button>
+        </div>
       </div>
 
       {/* Summary + Global Export */}
