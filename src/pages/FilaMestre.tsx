@@ -885,6 +885,115 @@ export default function FilaMestre() {
     }
   };
 
+  // Editar OP PCP
+  const openEditOpDialog = async (r: VendaRow) => {
+    setEditOpTarget(r);
+    // Determine tipo from the existing OP
+    setEditOpTipo(r.tipo_produto || 'SINTETICO');
+    setEditOpDataEntrega(r.dataEntregaEfetiva ? new Date(r.dataEntregaEfetiva + 'T00:00:00') : undefined);
+    // Load existing items
+    const { data: itens } = await supabase.from('pedido_itens').select('*').eq('pedido_id', r.id);
+    const produtos: OpProdutoItem[] = (itens || []).map((item: any) => {
+      // Parse observacao_producao to extract fields
+      const obs = item.observacao_producao || '';
+      const extract = (key: string) => {
+        const m = obs.match(new RegExp(`${key}:\\s*([^|]+)`));
+        return m ? m[1].trim() : '';
+      };
+      return {
+        id: item.id,
+        fivela: extract('Fivela'),
+        banhoFivela: extract('Banho'),
+        tamanho: extract('Tamanho') || 'Slim',
+        material: extract('Material') || 'Perugia 2,5',
+        cor: extract('Cor') || 'Preto',
+        quantidade: item.quantidade || 1,
+      };
+    });
+    setEditOpProdutos(produtos);
+    // Load obs from pedido
+    const { data: pedido } = await supabase.from('pedidos').select('observacao_comercial').eq('id', r.id).single();
+    setEditOpObs(pedido?.observacao_comercial || '');
+    setEditShowProdutoForm(false);
+    setEditingEditProdutoIdx(null);
+    setEditOpDialogOpen(true);
+  };
+
+  const handleEditAddProduto = () => {
+    if (!editFormProduto.fivela.trim()) { toast.error('Informe a fivela'); return; }
+    if (!editFormProduto.banhoFivela) { toast.error('Selecione o banho da fivela'); return; }
+    if (editFormProduto.quantidade < 1) { toast.error('Quantidade inválida'); return; }
+    if (editingEditProdutoIdx !== null) {
+      setEditOpProdutos(prev => prev.map((p, i) => i === editingEditProdutoIdx ? { ...editFormProduto, id: p.id } : p));
+      setEditingEditProdutoIdx(null);
+    } else {
+      setEditOpProdutos(prev => [...prev, { ...editFormProduto, id: crypto.randomUUID() }]);
+    }
+    setEditFormProduto({ id: '', fivela: '', banhoFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1 });
+    setEditShowProdutoForm(false);
+  };
+
+  const handleSaveEditOp = async () => {
+    if (!editOpTarget || !profile) return;
+    if (editOpProdutos.length === 0) { toast.error('Adicione pelo menos um produto'); return; }
+    if (!editOpDataEntrega) { toast.error('Informe a data de entrega'); return; }
+    setEditOpLoading(true);
+    try {
+      const dataEntregaStr = format(editOpDataEntrega, 'yyyy-MM-dd');
+      const totalQtd = editOpProdutos.reduce((s, p) => s + p.quantidade, 0);
+      const produtosDescList = editOpProdutos.map(p => `${buildProdutoDesc(p, editOpTipo)} (${p.quantidade}un)`);
+      const produtosDescStr = produtosDescList.join(' | ');
+
+      // Update pedido
+      await supabase.from('pedidos').update({
+        data_previsao_entrega: dataEntregaStr,
+        observacao_comercial: editOpObs || null,
+      } as any).eq('id', editOpTarget.id);
+
+      // Delete old items, insert new
+      await supabase.from('pedido_itens').delete().eq('pedido_id', editOpTarget.id);
+      const itensToInsert = editOpProdutos.map(p => ({
+        pedido_id: editOpTarget.id,
+        descricao_produto: buildProdutoDesc(p, editOpTipo),
+        quantidade: p.quantidade,
+        valor_unitario: 0,
+        valor_total: 0,
+        observacao_producao: `Fivela: ${p.fivela} | Banho: ${p.banhoFivela} | Tamanho: ${p.tamanho} | Material: ${p.material} | Cor: ${p.cor}`,
+      }));
+      await supabase.from('pedido_itens').insert(itensToInsert as any);
+
+      // Update ordem
+      const pipelineMap: Record<string, string> = {
+        'SINTETICO': '00000000-0000-0000-0000-000000000001',
+        'TECIDO': '00000000-0000-0000-0000-000000000002',
+        'FIVELA_COBERTA': '00000000-0000-0000-0000-000000000003',
+      };
+      await supabase.from('ordens_producao').update({
+        tipo_produto: editOpTipo,
+        pipeline_id: pipelineMap[editOpTipo] || pipelineMap['SINTETICO'],
+        produtos_descricao: produtosDescStr,
+        observacao: editOpObs || null,
+      } as any).eq('pedido_id', editOpTarget.id);
+
+      // Log
+      await supabase.from('pedido_historico').insert({
+        pedido_id: editOpTarget.id,
+        usuario_id: profile.id,
+        tipo_acao: 'EDICAO',
+        observacao: `OP PCP editada. ${editOpProdutos.length} produto(s). Total: ${totalQtd}un.`,
+      });
+
+      toast.success('OP PCP atualizada com sucesso!');
+      setEditOpDialogOpen(false);
+      setEditOpTarget(null);
+      fetchAll();
+    } catch (err: any) {
+      toast.error('Erro ao editar OP: ' + (err.message || err));
+    } finally {
+      setEditOpLoading(false);
+    }
+  };
+
 
   const filtered = rows.filter(r => {
     if (search && !r.cliente_nome.toLowerCase().includes(search.toLowerCase()) && !r.numero_pedido.toLowerCase().includes(search.toLowerCase()) && !(r.api_venda_id || '').toLowerCase().includes(search.toLowerCase())) return false;
