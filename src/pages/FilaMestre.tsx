@@ -138,11 +138,37 @@ export default function FilaMestre() {
   // Gerar OP PCP dialog state
   const [gerarOpDialogOpen, setGerarOpDialogOpen] = useState(false);
   const [gerarOpTipo, setGerarOpTipo] = useState<string>('SINTETICO');
-  const [gerarOpProduto, setGerarOpProduto] = useState('');
-  const [gerarOpQuantidade, setGerarOpQuantidade] = useState<number>(1);
   const [gerarOpDataEntrega, setGerarOpDataEntrega] = useState<Date | undefined>();
   const [gerarOpObs, setGerarOpObs] = useState('');
   const [gerarOpLoading, setGerarOpLoading] = useState(false);
+
+  // Multi-product state
+  interface OpProdutoItem {
+    id: string;
+    fivela: string;
+    banhoFivela: string;
+    aberturaFivela: string;
+    tamanho: string;
+    material: string;
+    cor: string;
+    quantidade: number;
+  }
+  const [opProdutos, setOpProdutos] = useState<OpProdutoItem[]>([]);
+  const [editingProdutoIdx, setEditingProdutoIdx] = useState<number | null>(null);
+  const [formProduto, setFormProduto] = useState<OpProdutoItem>({
+    id: '', fivela: '', banhoFivela: '', aberturaFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1,
+  });
+  const [customBanhos, setCustomBanhos] = useState<string[]>([]);
+  const [customCores, setCustomCores] = useState<string[]>([]);
+  const [addingBanho, setAddingBanho] = useState(false);
+  const [newBanho, setNewBanho] = useState('');
+  const [addingCor, setAddingCor] = useState(false);
+  const [newCor, setNewCor] = useState('');
+  const [showProdutoForm, setShowProdutoForm] = useState(false);
+
+  const BANHO_OPTIONS = ['LAT', 'NIQ', 'OV', 'GRAFITE', 'LAT MET', 'LATNIQ', ...customBanhos];
+  const COR_OPTIONS = ['Preto', 'Caramelo', 'Bege', 'Marfim', 'Mostarda', ...customCores];
+  const totalOpQuantidade = opProdutos.reduce((s, p) => s + p.quantidade, 0);
 
   // Excluir OP PCP state
   const [deleteOpDialogOpen, setDeleteOpDialogOpen] = useState(false);
