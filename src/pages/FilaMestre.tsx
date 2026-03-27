@@ -1786,6 +1786,40 @@ export default function FilaMestre() {
                     {isAdmin && <p className="text-primary mt-0.5">Clique para concluir</p>}
                   </TooltipContent>
                 </Tooltip>
+                {/* Post-production stages (Kanban Venda) — shown after production concludes */}
+                {r.ordem_status === 'CONCLUIDA' && (() => {
+                  const POST_PROD_STAGES = [
+                    { key: 'comercial', label: 'Comercial', statuses: ['PRODUCAO_CONCLUIDA', 'AGUARDANDO_COMERCIAL', 'LOJA_OK', 'LOJA_PENDENTE_FINALIZACAO'] },
+                    { key: 'financeiro', label: 'Financeiro', statuses: ['VALIDADO_COMERCIAL', 'AGUARDANDO_FINANCEIRO'] },
+                    { key: 'logistica', label: 'Logística', statuses: ['VALIDADO_FINANCEIRO', 'LIBERADO_LOGISTICA', 'EM_SEPARACAO'] },
+                    { key: 'entregue', label: 'Entregue', statuses: ['ENVIADO', 'ENTREGUE', 'AGUARDANDO_CIENCIA_COMERCIAL'] },
+                  ];
+                  // Determine which stage is current/done
+                  const currentIdx = POST_PROD_STAGES.findIndex(s => s.statuses.includes(r.status_atual));
+                  return (
+                    <>
+                      <div className="w-px h-4 bg-border mx-1" />
+                      {POST_PROD_STAGES.map((stage, idx) => {
+                        const isDone = currentIdx >= 0 && idx < currentIdx;
+                        const isCurrent = idx === currentIdx;
+                        return (
+                          <Tooltip key={stage.key}>
+                            <TooltipTrigger asChild>
+                              <div className={`flex-1 px-2 py-1 rounded-md text-[11px] font-semibold text-center cursor-default ${
+                                isDone ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]' :
+                                isCurrent ? 'bg-amber-500/15 text-amber-700 font-bold ring-1 ring-amber-400/40' :
+                                'bg-muted/60 text-muted-foreground'
+                              }`}>{stage.label}</div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              <p>{stage.label} — {isDone ? 'Concluído' : isCurrent ? 'Em andamento' : 'Pendente'}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
               </div>
               {/* Countdown to delivery date (15h cutoff) */}
               {(() => {
