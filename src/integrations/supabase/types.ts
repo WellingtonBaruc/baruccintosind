@@ -1389,6 +1389,30 @@ export type Database = {
         }
         Relationships: []
       }
+      vendedoras: {
+        Row: {
+          ativa: boolean
+          criado_em: string
+          id: string
+          nome: string
+          whatsapp: string
+        }
+        Insert: {
+          ativa?: boolean
+          criado_em?: string
+          id?: string
+          nome: string
+          whatsapp: string
+        }
+        Update: {
+          ativa?: boolean
+          criado_em?: string
+          id?: string
+          nome?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
