@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid, Clock, Plus, Store, Wrench, Trash2 } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid, Clock, Plus, Store, Wrench, Trash2, Pencil } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -147,7 +147,6 @@ export default function FilaMestre() {
     id: string;
     fivela: string;
     banhoFivela: string;
-    aberturaFivela: string;
     tamanho: string;
     material: string;
     cor: string;
@@ -156,7 +155,7 @@ export default function FilaMestre() {
   const [opProdutos, setOpProdutos] = useState<OpProdutoItem[]>([]);
   const [editingProdutoIdx, setEditingProdutoIdx] = useState<number | null>(null);
   const [formProduto, setFormProduto] = useState<OpProdutoItem>({
-    id: '', fivela: '', banhoFivela: '', aberturaFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1,
+    id: '', fivela: '', banhoFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1,
   });
   const [customBanhos, setCustomBanhos] = useState<string[]>([]);
   const [customCores, setCustomCores] = useState<string[]>([]);
@@ -174,6 +173,20 @@ export default function FilaMestre() {
   const [deleteOpDialogOpen, setDeleteOpDialogOpen] = useState(false);
   const [deleteOpTarget, setDeleteOpTarget] = useState<VendaRow | null>(null);
   const [deleteOpLoading, setDeleteOpLoading] = useState(false);
+
+  // Editar OP PCP state
+  const [editOpDialogOpen, setEditOpDialogOpen] = useState(false);
+  const [editOpTarget, setEditOpTarget] = useState<VendaRow | null>(null);
+  const [editOpTipo, setEditOpTipo] = useState<string>('SINTETICO');
+  const [editOpProdutos, setEditOpProdutos] = useState<OpProdutoItem[]>([]);
+  const [editOpDataEntrega, setEditOpDataEntrega] = useState<Date | undefined>();
+  const [editOpObs, setEditOpObs] = useState('');
+  const [editOpLoading, setEditOpLoading] = useState(false);
+  const [editShowProdutoForm, setEditShowProdutoForm] = useState(false);
+  const [editingEditProdutoIdx, setEditingEditProdutoIdx] = useState<number | null>(null);
+  const [editFormProduto, setEditFormProduto] = useState<OpProdutoItem>({
+    id: '', fivela: '', banhoFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1,
+  });
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedFetchAll = useCallback(() => {
@@ -689,7 +702,7 @@ export default function FilaMestre() {
   };
 
   const resetFormProduto = () => {
-    setFormProduto({ id: '', fivela: '', banhoFivela: '', aberturaFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1 });
+    setFormProduto({ id: '', fivela: '', banhoFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1 });
   };
 
   const handleAddProduto = () => {
@@ -716,9 +729,11 @@ export default function FilaMestre() {
     setOpProdutos(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const buildProdutoDesc = (p: OpProdutoItem) => {
-    const parts = [gerarOpTipo === 'SINTETICO' ? 'Cinto Sintético' : 'Cinto Tecido', p.tamanho, p.cor, p.banhoFivela].filter(Boolean);
-    return parts.join(' • ');
+  const buildProdutoDesc = (p: OpProdutoItem, tipo?: string) => {
+    const tipoStr = (tipo || gerarOpTipo) === 'SINTETICO' ? 'CINTO SINTETICO' : 'CINTO TECIDO';
+    // Order: tipo, fivela, banho, mm (from fivela), tamanho, material, cor
+    const parts = [tipoStr, p.fivela, p.banhoFivela, p.tamanho, p.material, p.cor].filter(Boolean);
+    return parts.join(' ');
   };
 
   const handleGerarOpPcp = async () => {
@@ -774,7 +789,7 @@ export default function FilaMestre() {
         quantidade: p.quantidade,
         valor_unitario: 0,
         valor_total: 0,
-        observacao_producao: `Fivela: ${p.fivela} | Banho: ${p.banhoFivela} | Abertura: ${p.aberturaFivela} | Tamanho: ${p.tamanho} | Material: ${p.material} | Cor: ${p.cor}`,
+        observacao_producao: `Fivela: ${p.fivela} | Banho: ${p.banhoFivela} | Tamanho: ${p.tamanho} | Material: ${p.material} | Cor: ${p.cor}`,
       }));
       await supabase.from('pedido_itens').insert(itensToInsert as any);
 
@@ -867,6 +882,115 @@ export default function FilaMestre() {
       toast.error('Erro ao excluir OP: ' + (err.message || err));
     } finally {
       setDeleteOpLoading(false);
+    }
+  };
+
+  // Editar OP PCP
+  const openEditOpDialog = async (r: VendaRow) => {
+    setEditOpTarget(r);
+    // Determine tipo from the existing OP
+    setEditOpTipo(r.tipo_produto || 'SINTETICO');
+    setEditOpDataEntrega(r.dataEntregaEfetiva ? new Date(r.dataEntregaEfetiva + 'T00:00:00') : undefined);
+    // Load existing items
+    const { data: itens } = await supabase.from('pedido_itens').select('*').eq('pedido_id', r.id);
+    const produtos: OpProdutoItem[] = (itens || []).map((item: any) => {
+      // Parse observacao_producao to extract fields
+      const obs = item.observacao_producao || '';
+      const extract = (key: string) => {
+        const m = obs.match(new RegExp(`${key}:\\s*([^|]+)`));
+        return m ? m[1].trim() : '';
+      };
+      return {
+        id: item.id,
+        fivela: extract('Fivela'),
+        banhoFivela: extract('Banho'),
+        tamanho: extract('Tamanho') || 'Slim',
+        material: extract('Material') || 'Perugia 2,5',
+        cor: extract('Cor') || 'Preto',
+        quantidade: item.quantidade || 1,
+      };
+    });
+    setEditOpProdutos(produtos);
+    // Load obs from pedido
+    const { data: pedido } = await supabase.from('pedidos').select('observacao_comercial').eq('id', r.id).single();
+    setEditOpObs(pedido?.observacao_comercial || '');
+    setEditShowProdutoForm(false);
+    setEditingEditProdutoIdx(null);
+    setEditOpDialogOpen(true);
+  };
+
+  const handleEditAddProduto = () => {
+    if (!editFormProduto.fivela.trim()) { toast.error('Informe a fivela'); return; }
+    if (!editFormProduto.banhoFivela) { toast.error('Selecione o banho da fivela'); return; }
+    if (editFormProduto.quantidade < 1) { toast.error('Quantidade inválida'); return; }
+    if (editingEditProdutoIdx !== null) {
+      setEditOpProdutos(prev => prev.map((p, i) => i === editingEditProdutoIdx ? { ...editFormProduto, id: p.id } : p));
+      setEditingEditProdutoIdx(null);
+    } else {
+      setEditOpProdutos(prev => [...prev, { ...editFormProduto, id: crypto.randomUUID() }]);
+    }
+    setEditFormProduto({ id: '', fivela: '', banhoFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1 });
+    setEditShowProdutoForm(false);
+  };
+
+  const handleSaveEditOp = async () => {
+    if (!editOpTarget || !profile) return;
+    if (editOpProdutos.length === 0) { toast.error('Adicione pelo menos um produto'); return; }
+    if (!editOpDataEntrega) { toast.error('Informe a data de entrega'); return; }
+    setEditOpLoading(true);
+    try {
+      const dataEntregaStr = format(editOpDataEntrega, 'yyyy-MM-dd');
+      const totalQtd = editOpProdutos.reduce((s, p) => s + p.quantidade, 0);
+      const produtosDescList = editOpProdutos.map(p => `${buildProdutoDesc(p, editOpTipo)} (${p.quantidade}un)`);
+      const produtosDescStr = produtosDescList.join(' | ');
+
+      // Update pedido
+      await supabase.from('pedidos').update({
+        data_previsao_entrega: dataEntregaStr,
+        observacao_comercial: editOpObs || null,
+      } as any).eq('id', editOpTarget.id);
+
+      // Delete old items, insert new
+      await supabase.from('pedido_itens').delete().eq('pedido_id', editOpTarget.id);
+      const itensToInsert = editOpProdutos.map(p => ({
+        pedido_id: editOpTarget.id,
+        descricao_produto: buildProdutoDesc(p, editOpTipo),
+        quantidade: p.quantidade,
+        valor_unitario: 0,
+        valor_total: 0,
+        observacao_producao: `Fivela: ${p.fivela} | Banho: ${p.banhoFivela} | Tamanho: ${p.tamanho} | Material: ${p.material} | Cor: ${p.cor}`,
+      }));
+      await supabase.from('pedido_itens').insert(itensToInsert as any);
+
+      // Update ordem
+      const pipelineMap: Record<string, string> = {
+        'SINTETICO': '00000000-0000-0000-0000-000000000001',
+        'TECIDO': '00000000-0000-0000-0000-000000000002',
+        'FIVELA_COBERTA': '00000000-0000-0000-0000-000000000003',
+      };
+      await supabase.from('ordens_producao').update({
+        tipo_produto: editOpTipo,
+        pipeline_id: pipelineMap[editOpTipo] || pipelineMap['SINTETICO'],
+        produtos_descricao: produtosDescStr,
+        observacao: editOpObs || null,
+      } as any).eq('pedido_id', editOpTarget.id);
+
+      // Log
+      await supabase.from('pedido_historico').insert({
+        pedido_id: editOpTarget.id,
+        usuario_id: profile.id,
+        tipo_acao: 'EDICAO',
+        observacao: `OP PCP editada. ${editOpProdutos.length} produto(s). Total: ${totalQtd}un.`,
+      });
+
+      toast.success('OP PCP atualizada com sucesso!');
+      setEditOpDialogOpen(false);
+      setEditOpTarget(null);
+      fetchAll();
+    } catch (err: any) {
+      toast.error('Erro ao editar OP: ' + (err.message || err));
+    } finally {
+      setEditOpLoading(false);
     }
   };
 
@@ -1581,15 +1705,26 @@ export default function FilaMestre() {
                 </div>
               )}
               {canEdit && r.ordem_status !== 'CONCLUIDA' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
-                  onClick={(e) => { e.stopPropagation(); setDeleteOpTarget(r); setDeleteOpDialogOpen(true); }}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  <span className="text-[11px]">Excluir</span>
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-primary hover:bg-primary/10 shrink-0"
+                    onClick={(e) => { e.stopPropagation(); openEditOpDialog(r); }}
+                  >
+                    <Pencil className="h-3.5 w-3.5 mr-1" />
+                    <span className="text-[11px]">Editar</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
+                    onClick={(e) => { e.stopPropagation(); setDeleteOpTarget(r); setDeleteOpDialogOpen(true); }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    <span className="text-[11px]">Excluir</span>
+                  </Button>
+                </>
               )}
             </div>
           )}
@@ -2206,7 +2341,6 @@ export default function FilaMestre() {
                   <div className="flex gap-4 text-xs text-muted-foreground">
                     <span>Fivela: {p.fivela}</span>
                     <span>Banho: {p.banhoFivela}</span>
-                    <span>Abertura: {p.aberturaFivela || '—'}</span>
                     <span>Material: {p.material}</span>
                   </div>
                   <p className="text-sm font-bold text-orange-700">Qtd: {p.quantidade}</p>
@@ -2248,11 +2382,6 @@ export default function FilaMestre() {
                           </div>
                         )}
                       </div>
-                    </div>
-                    {/* Abertura */}
-                    <div className="space-y-1">
-                      <Label className="text-xs">Abertura da Fivela</Label>
-                      <Input placeholder="Ex: 35mm" value={formProduto.aberturaFivela} onChange={(e) => setFormProduto(prev => ({ ...prev, aberturaFivela: e.target.value }))} className="h-9 text-sm" />
                     </div>
                     {/* Tamanho */}
                     <div className="space-y-1">
@@ -2384,6 +2513,156 @@ export default function FilaMestre() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog: Editar OP PCP */}
+      <Dialog open={editOpDialogOpen} onOpenChange={setEditOpDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" />
+              Editar OP PCP — {editOpTarget?.numero_pedido}
+            </DialogTitle>
+            <DialogDescription>Altere os produtos, quantidades e composição da OP.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Tipo de Produto *</Label>
+              <Select value={editOpTipo} onValueChange={setEditOpTipo}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SINTETICO">Cinto Sintético</SelectItem>
+                  <SelectItem value="TECIDO">Cinto Tecido</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-bold">Produtos da OP ({editOpProdutos.length})</Label>
+                <Button type="button" variant="outline" size="sm"
+                  onClick={() => { setEditFormProduto({ id: '', fivela: '', banhoFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1 }); setEditingEditProdutoIdx(null); setEditShowProdutoForm(true); }}
+                  className="text-orange-600 border-orange-300 hover:bg-orange-50">
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Produto
+                </Button>
+              </div>
+
+              {editOpProdutos.map((p, idx) => (
+                <div key={p.id} className="rounded-lg border border-orange-200 bg-orange-50/50 p-3 space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-bold text-foreground">{buildProdutoDesc(p, editOpTipo)}</p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { setEditFormProduto(editOpProdutos[idx]); setEditingEditProdutoIdx(idx); setEditShowProdutoForm(true); }}>Editar</Button>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive" onClick={() => setEditOpProdutos(prev => prev.filter((_, i) => i !== idx))}>Remover</Button>
+                    </div>
+                  </div>
+                  <div className="flex gap-4 text-xs text-muted-foreground">
+                    <span>Fivela: {p.fivela}</span>
+                    <span>Banho: {p.banhoFivela}</span>
+                    <span>Material: {p.material}</span>
+                  </div>
+                  <p className="text-sm font-bold text-orange-700">Qtd: {p.quantidade}</p>
+                </div>
+              ))}
+
+              {editShowProdutoForm && (
+                <div className="rounded-lg border border-primary/30 bg-muted/30 p-4 space-y-3">
+                  <p className="text-sm font-bold text-foreground">{editingEditProdutoIdx !== null ? 'Editar Produto' : 'Novo Produto'}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Fivela *</Label>
+                      <Input placeholder="Ex: Raquel 10MM" value={editFormProduto.fivela} onChange={(e) => setEditFormProduto(prev => ({ ...prev, fivela: e.target.value }))} className="h-9 text-sm" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Banho da Fivela *</Label>
+                      <div className="flex gap-1">
+                        <Select value={editFormProduto.banhoFivela} onValueChange={(v) => setEditFormProduto(prev => ({ ...prev, banhoFivela: v }))}>
+                          <SelectTrigger className="h-9 text-sm flex-1"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                          <SelectContent>{BANHO_OPTIONS.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tamanho *</Label>
+                      <Select value={editFormProduto.tamanho} onValueChange={(v) => setEditFormProduto(prev => ({ ...prev, tamanho: v }))}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Slim">Slim</SelectItem>
+                          <SelectItem value="Plus">Plus</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Material *</Label>
+                      <Select value={editFormProduto.material} onValueChange={(v) => setEditFormProduto(prev => ({ ...prev, material: v }))}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Perugia 2,5">Perugia 2,5</SelectItem>
+                          <SelectItem value="Mega 2,5">Mega 2,5</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Cor *</Label>
+                      <Select value={editFormProduto.cor} onValueChange={(v) => setEditFormProduto(prev => ({ ...prev, cor: v }))}>
+                        <SelectTrigger className="h-9 text-sm flex-1"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                        <SelectContent>{COR_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Quantidade *</Label>
+                    <Input type="number" min={1} value={editFormProduto.quantidade} onChange={(e) => setEditFormProduto(prev => ({ ...prev, quantidade: parseInt(e.target.value) || 0 }))} className="h-9 text-sm w-32" />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <Button type="button" size="sm" onClick={handleEditAddProduto} className="bg-orange-600 hover:bg-orange-700 text-white">
+                      {editingEditProdutoIdx !== null ? 'Salvar' : 'Adicionar'}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => { setEditShowProdutoForm(false); setEditingEditProdutoIdx(null); }}>Cancelar</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {editOpProdutos.length > 0 && (
+              <div className="rounded-lg border border-orange-300 bg-orange-100/50 p-3 flex items-center justify-between">
+                <span className="text-sm font-bold text-foreground">TOTAL DA OP</span>
+                <span className="text-lg font-bold text-orange-700">{editOpProdutos.reduce((s, p) => s + p.quantidade, 0)} peças</span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Data de Entrega *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal h-10">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {editOpDataEntrega ? format(editOpDataEntrega, 'dd/MM/yyyy') : 'Selecionar data'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarPicker mode="single" selected={editOpDataEntrega} onSelect={setEditOpDataEntrega} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Observação (opcional)</Label>
+              <Textarea placeholder="Motivo ou detalhes..." value={editOpObs} onChange={(e) => setEditOpObs(e.target.value)} className="text-sm" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpDialogOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={handleSaveEditOp}
+              disabled={editOpLoading || editOpProdutos.length === 0 || !editOpDataEntrega}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {editOpLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Pencil className="h-4 w-4 mr-1" />}
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
