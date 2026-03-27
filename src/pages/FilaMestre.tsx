@@ -1324,48 +1324,61 @@ export default function FilaMestre() {
               );
             })}
 
-            {/* Card 6 - Weekly Summary */}
-            <button
+            {/* Card 6 - Consolidated Summary */}
+            <div
               onClick={() => { setSelectedWeekFilter(isWeekSelected ? null : weekKey); setSelectedPlanDay(null); }}
               className={cn(
-                "rounded-lg border p-3 text-left transition-all hover:shadow-md border-dashed",
-                isWeekSelected ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border bg-muted/30"
+                "rounded-lg border p-3 text-left transition-all hover:shadow-md cursor-pointer",
+                isWeekSelected ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border bg-accent/10"
               )}
             >
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <span className="text-sm font-bold text-foreground">{monthName}</span>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-xs font-bold text-foreground">{selectedMonthName}</span>
                 <span className="text-sm font-bold tabular-nums text-foreground ml-auto">{wTotal}</span>
               </div>
-              <div className="mb-2">
-                <Select value={String(selectedWeek)} onValueChange={(v) => { setSelectedWeek(Number(v)); setSelectedWeekFilter(null); }}>
-                  <SelectTrigger className="h-7 text-xs w-full">
+              <div className="mb-1" onClick={e => e.stopPropagation()}>
+                <Select value={String(selectedMonth)} onValueChange={(v) => { setSelectedMonth(Number(v)); setSelectedWeek(0); setSelectedWeekFilter(null); }}>
+                  <SelectTrigger className="h-6 text-[11px] w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    {monthNamesFull.map((name, i) => (
+                      <SelectItem key={i} value={String(i)}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="mb-1.5" onClick={e => e.stopPropagation()}>
+                <Select value={String(selectedWeek)} onValueChange={(v) => { setSelectedWeek(Number(v)); setSelectedWeekFilter(null); }}>
+                  <SelectTrigger className="h-6 text-[11px] w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Todas as semanas</SelectItem>
                     {weeks.map(w => (
                       <SelectItem key={w.num} value={String(w.num)}>Semana {w.num}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs">🔵</span>
-                  <span className="text-xs text-muted-foreground">Sint</span>
+                  <span className="text-[11px] text-muted-foreground">Sint</span>
                   <span className="text-sm font-bold tabular-nums text-blue-600 ml-auto">{wSint}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs">🟠</span>
-                  <span className="text-xs text-muted-foreground">Tec</span>
+                  <span className="text-[11px] text-muted-foreground">Tec</span>
                   <span className="text-sm font-bold tabular-nums text-amber-600 ml-auto">{wTec}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs">✔</span>
-                  <span className="text-xs text-muted-foreground">Concl.</span>
+                  <span className="text-[11px] text-muted-foreground">Concl.</span>
                   <span className="text-sm font-bold tabular-nums text-emerald-600 ml-auto">{wConcl}</span>
                 </div>
               </div>
-            </button>
+            </div>
           </div>
         );
       })()}
