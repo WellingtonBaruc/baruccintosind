@@ -1794,7 +1794,7 @@ export default function KanbanProducao() {
 
       {/* WhatsApp - Modal de seleção de vendedora */}
       <Dialog open={whatsappModal.open} onOpenChange={(open) => { if (!open) setWhatsappModal({ open: false, card: null, vendedora: null }); }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5 text-emerald-600" />
