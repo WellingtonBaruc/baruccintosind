@@ -1513,13 +1513,26 @@ export default function FilaMestre() {
             </div>
           </div>
 
-          {/* PCP OP: Produto a produzir */}
-          {isPcpOp && r.produtos_descricao && (
-            <div className="px-4 pb-2">
-              <div className="rounded-md border border-orange-300/50 bg-orange-100/30 dark:bg-orange-900/10 p-2 text-[11px]">
-                <span className="text-muted-foreground font-medium">Produto a produzir: </span>
-                <span className="font-bold text-foreground">{r.produtos_descricao}</span>
-              </div>
+          {/* PCP OP: Produto a produzir + Excluir */}
+          {isPcpOp && (
+            <div className="px-4 pb-2 flex items-center gap-2">
+              {r.produtos_descricao && (
+                <div className="flex-1 rounded-md border border-orange-300/50 bg-orange-100/30 dark:bg-orange-900/10 p-2 text-[11px]">
+                  <span className="text-muted-foreground font-medium">Produto a produzir: </span>
+                  <span className="font-bold text-foreground">{r.produtos_descricao}</span>
+                </div>
+              )}
+              {canEdit && r.ordem_status !== 'CONCLUIDA' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
+                  onClick={(e) => { e.stopPropagation(); setDeleteOpTarget(r); setDeleteOpDialogOpen(true); }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  <span className="text-[11px]">Excluir</span>
+                </Button>
+              )}
             </div>
           )}
 
@@ -2169,6 +2182,35 @@ export default function FilaMestre() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AlertDialog para excluir OP PCP */}
+      <AlertDialog open={deleteOpDialogOpen} onOpenChange={setDeleteOpDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir OP PCP</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta OP?
+              {deleteOpTarget && (
+                <span className="block mt-2 font-semibold text-foreground">
+                  {deleteOpTarget.numero_pedido} — {deleteOpTarget.produtos_descricao || 'Produção PCP'}
+                </span>
+              )}
+              <span className="block mt-2 text-destructive font-medium">Essa ação não poderá ser desfeita.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteOpLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteOpPcp}
+              disabled={deleteOpLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteOpLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+              Excluir OP
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
