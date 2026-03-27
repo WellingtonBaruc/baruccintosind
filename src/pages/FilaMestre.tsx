@@ -423,17 +423,63 @@ export default function FilaMestre() {
         || ordensDoPedido.find(o => o.status === 'AGUARDANDO')
         || ordensDoPedido[0] || null;
       const allOrdemEtapas = ordem ? (etapas || []).filter(e => e.ordem_id === ordem.id) : [];
-      const etapaAtiva = allOrdemEtapas.find(e => e.status === 'EM_ANDAMENTO') || allOrdemEtapas.find(e => e.status === 'PENDENTE') || null;
+      
+      // Build unified trail for TECIDO: Tecido etapas + Sintético etapas (Preparação→Montagem→Embalagem)
+      let unifiedEtapas: EtapaInfo[] = allOrdemEtapas.map((e: any) => ({ id: e.id, nome_etapa: e.nome_etapa, ordem_sequencia: e.ordem_sequencia, status: e.status }));
+      
+      const tipoProduto = ordem?.tipo_produto || null;
+      
+      if (tipoProduto === 'TECIDO') {
+        // Remove final "Concluído"/"Produção Finalizada" from Tecido trail
+        const concNames = ['concluido', 'producao finalizada'];
+        const tecidoEtapas = unifiedEtapas.filter(e => {
+          const norm = e.nome_etapa.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          return !concNames.includes(norm);
+        });
+        
+        // Find the Sintético OP for this pedido
+        const sinteticoOrdem = ordensDoPedido.find(o => o.tipo_produto === 'SINTETICO');
+        if (sinteticoOrdem) {
+          const sinteticoEtapas = (etapas || [])
+            .filter((e: any) => e.ordem_id === sinteticoOrdem.id)
+            .sort((a: any, b: any) => a.ordem_sequencia - b.ordem_sequencia);
+          
+          // Skip "Corte" (auto-completed) from Sintético, keep Preparação→Montagem→Embalagem→Concluído/Prod.Finalizada
+          const sinteticoTrail = sinteticoEtapas
+            .filter((e: any) => e.nome_etapa !== 'Corte')
+            .map((e: any, idx: number) => ({
+              id: e.id,
+              nome_etapa: e.nome_etapa,
+              ordem_sequencia: 100 + idx, // ensure they sort after Tecido etapas
+              status: e.status as string,
+            }));
+          
+          unifiedEtapas = [...tecidoEtapas, ...sinteticoTrail];
+        } else {
+          unifiedEtapas = tecidoEtapas;
+        }
+      }
+
+      // Find active etapa across unified trail
+      const etapaAtiva = unifiedEtapas.find(e => e.status === 'EM_ANDAMENTO') || unifiedEtapas.find(e => e.status === 'PENDENTE') || null;
 
       let etapaDisplay = '—';
       if (ordem) {
         if (ordem.status === 'AGUARDANDO') etapaDisplay = 'Aguardando Início';
-        else if (ordem.status === 'CONCLUIDA') etapaDisplay = 'Concluída';
+        else if (ordem.status === 'CONCLUIDA') {
+          // For TECIDO, check if Sintético OP is still active
+          const sinteticoOrdem = tipoProduto === 'TECIDO' ? ordensDoPedido.find(o => o.tipo_produto === 'SINTETICO') : null;
+          if (sinteticoOrdem && sinteticoOrdem.status !== 'CONCLUIDA') {
+            const sinEtapaAtiva = (etapas || []).filter((e: any) => e.ordem_id === sinteticoOrdem.id).find((e: any) => e.status === 'EM_ANDAMENTO');
+            etapaDisplay = sinEtapaAtiva ? sinEtapaAtiva.nome_etapa : 'Em Andamento';
+          } else {
+            etapaDisplay = 'Concluída';
+          }
+        }
         else if (etapaAtiva) etapaDisplay = etapaAtiva.nome_etapa;
         else etapaDisplay = ordem.status;
       }
 
-      const tipoProduto = ordem?.tipo_produto || null;
       const lt = lts[tipoProduto || ''] ?? 5;
       const dataEntregaEfetiva = (p as any).data_entrega_ajustada_pcp || p.data_previsao_entrega;
       const pcp = calcularPrazoPcp(dataEntregaEfetiva, lt, cal, new Date(today));
@@ -448,13 +494,22 @@ export default function FilaMestre() {
         else if (diffDias <= ATENCAO_DIAS) statusPrazo = 'ATENCAO';
       }
 
+      // Determine overall ordem_status considering both OPs for TECIDO
+      let overallOrdemStatus = ordem?.status || null;
+      if (tipoProduto === 'TECIDO' && ordem?.status === 'CONCLUIDA') {
+        const sinteticoOrdem = ordensDoPedido.find(o => o.tipo_produto === 'SINTETICO');
+        if (sinteticoOrdem && sinteticoOrdem.status !== 'CONCLUIDA') {
+          overallOrdemStatus = sinteticoOrdem.status;
+        }
+      }
+
       return {
         ...p,
         ordem_id: ordem?.id || null,
-        ordem_status: ordem?.status || null,
+        ordem_status: overallOrdemStatus,
         tipo_produto: tipoProduto,
         etapa_atual: etapaDisplay,
-        operador_atual: (etapaAtiva?.usuarios as any)?.nome || '—',
+        operador_atual: (etapaAtiva as any)?.usuarios?.nome || (allOrdemEtapas.find((e: any) => e.status === 'EM_ANDAMENTO')?.usuarios as any)?.nome || '—',
         data_inicio_pcp: (ordem as any)?.data_inicio_pcp || null,
         data_fim_pcp: (ordem as any)?.data_fim_pcp || null,
         is_piloto: (p as any).is_piloto || false,
@@ -468,7 +523,7 @@ export default function FilaMestre() {
         dataInicioIdeal: pcp.dataInicioIdeal,
         atrasoDias: pcp.atrasoDias,
         prioridade: pcp.prioridade,
-        etapas: allOrdemEtapas.map((e: any) => ({ id: e.id, nome_etapa: e.nome_etapa, ordem_sequencia: e.ordem_sequencia, status: e.status })),
+        etapas: unifiedEtapas,
         dataEntregaEfetiva,
       };
     });
