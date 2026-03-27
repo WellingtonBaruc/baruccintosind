@@ -157,6 +157,19 @@ export default function KanbanProducao() {
   const [obsCorteTexts, setObsCorteTexts] = useState<Map<string, string>>(new Map());
   const [savingObsCorte, setSavingObsCorte] = useState(false);
 
+  // WhatsApp vendedora modal
+  const [whatsappModal, setWhatsappModal] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
+  const [whatsappPedidoData, setWhatsappPedidoData] = useState<any>(null);
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
+
+  const VENDEDORAS = [
+    { nome: 'Vendedora 1', whatsapp: '5500000000001' },
+    { nome: 'Vendedora 2', whatsapp: '5500000000002' },
+    { nome: 'Vendedora 3', whatsapp: '5500000000003' },
+    { nome: 'Vendedora 4', whatsapp: '5500000000004' },
+    { nome: 'Vendedora 5', whatsapp: '5500000000005' },
+  ];
+
   const openDetailSheet = async (card: KanbanCard) => {
     setDetailSheet({ open: true, card, items: [], loading: true, pedido: null });
     const [itemsRes, pedidoRes] = await Promise.all([
