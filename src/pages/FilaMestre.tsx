@@ -680,16 +680,50 @@ export default function FilaMestre() {
   // Open Gerar OP PCP dialog
   const openGerarOpDialog = () => {
     setGerarOpTipo('SINTETICO');
-    setGerarOpProduto('');
-    setGerarOpQuantidade(1);
+    setOpProdutos([]);
+    setShowProdutoForm(false);
+    setEditingProdutoIdx(null);
     setGerarOpDataEntrega(undefined);
     setGerarOpObs('');
     setGerarOpDialogOpen(true);
   };
 
+  const resetFormProduto = () => {
+    setFormProduto({ id: '', fivela: '', banhoFivela: '', aberturaFivela: '', tamanho: 'Slim', material: 'Perugia 2,5', cor: 'Preto', quantidade: 1 });
+  };
+
+  const handleAddProduto = () => {
+    if (!formProduto.fivela.trim()) { toast.error('Informe a fivela'); return; }
+    if (!formProduto.banhoFivela) { toast.error('Selecione o banho da fivela'); return; }
+    if (formProduto.quantidade < 1) { toast.error('Quantidade inválida'); return; }
+    if (editingProdutoIdx !== null) {
+      setOpProdutos(prev => prev.map((p, i) => i === editingProdutoIdx ? { ...formProduto, id: p.id } : p));
+      setEditingProdutoIdx(null);
+    } else {
+      setOpProdutos(prev => [...prev, { ...formProduto, id: crypto.randomUUID() }]);
+    }
+    resetFormProduto();
+    setShowProdutoForm(false);
+  };
+
+  const handleEditProduto = (idx: number) => {
+    setFormProduto(opProdutos[idx]);
+    setEditingProdutoIdx(idx);
+    setShowProdutoForm(true);
+  };
+
+  const handleRemoveProduto = (idx: number) => {
+    setOpProdutos(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const buildProdutoDesc = (p: OpProdutoItem) => {
+    const parts = [gerarOpTipo === 'SINTETICO' ? 'Cinto Sintético' : 'Cinto Tecido', p.tamanho, p.cor, p.banhoFivela].filter(Boolean);
+    return parts.join(' • ');
+  };
+
   const handleGerarOpPcp = async () => {
     if (!profile) return;
-    if (!gerarOpProduto.trim()) { toast.error('Informe o produto'); return; }
+    if (opProdutos.length === 0) { toast.error('Adicione pelo menos um produto'); return; }
     if (!gerarOpDataEntrega) { toast.error('Informe a data de entrega'); return; }
     if (gerarOpQuantidade < 1) { toast.error('Quantidade inválida'); return; }
     setGerarOpLoading(true);
