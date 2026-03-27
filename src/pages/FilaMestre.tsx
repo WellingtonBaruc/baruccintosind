@@ -1754,8 +1754,10 @@ export default function FilaMestre() {
                     r.status_api === 'Pedido Enviado' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-300' :
                     'bg-muted text-muted-foreground border-border'
                   }`}>{r.status_api}</Badge></span>
-                ) : (
+                ) : r.origem_op === 'PCP' ? (
                   <Badge className="text-[11px] font-semibold bg-orange-500/15 text-orange-700 border-orange-300">Venda PCP — Em Produção</Badge>
+                ) : (
+                  <Badge className="text-[11px] font-semibold bg-purple-500/15 text-purple-700 border-purple-300">Nova Venda — {(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual}</Badge>
                 )}
                 <span className="text-muted-foreground">Etapa: <span className="font-bold text-primary">{r.etapa_atual}</span></span>
               </div>
