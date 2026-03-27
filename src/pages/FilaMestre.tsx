@@ -18,10 +18,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid, Clock, Plus, Store, Wrench } from 'lucide-react';
+import { Search, Loader2, Calendar, AlertTriangle, Settings, CheckCircle2, ChevronDown, ChevronRight, Layers, FileSpreadsheet, FileText, Download, CalendarIcon, LayoutList, LayoutGrid, Clock, Plus, Store, Wrench, Trash2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -142,6 +143,11 @@ export default function FilaMestre() {
   const [gerarOpDataEntrega, setGerarOpDataEntrega] = useState<Date | undefined>();
   const [gerarOpObs, setGerarOpObs] = useState('');
   const [gerarOpLoading, setGerarOpLoading] = useState(false);
+
+  // Excluir OP PCP state
+  const [deleteOpDialogOpen, setDeleteOpDialogOpen] = useState(false);
+  const [deleteOpTarget, setDeleteOpTarget] = useState<VendaRow | null>(null);
+  const [deleteOpLoading, setDeleteOpLoading] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedFetchAll = useCallback(() => {
@@ -373,6 +379,7 @@ export default function FilaMestre() {
       .from('pedidos')
       .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
       .eq('status_api', 'Em Produção')
+      .eq('is_deleted', false)
       .order('criado_em', { ascending: false });
 
     // Also fetch PCP-internal pedidos (independent OPs)
@@ -380,6 +387,7 @@ export default function FilaMestre() {
       .from('pedidos')
       .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
       .eq('tipo_fluxo', 'PCP_INTERNO')
+      .eq('is_deleted', false)
       .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
       .order('criado_em', { ascending: false });
 
@@ -760,6 +768,47 @@ export default function FilaMestre() {
       toast.error('Erro ao gerar OP: ' + (err.message || err));
     } finally {
       setGerarOpLoading(false);
+    }
+  };
+
+  // Excluir OP PCP (soft delete)
+  const handleDeleteOpPcp = async () => {
+    if (!deleteOpTarget || !profile) return;
+    setDeleteOpLoading(true);
+    try {
+      // Soft delete the pedido
+      const { error } = await supabase
+        .from('pedidos')
+        .update({ is_deleted: true, deleted_at: new Date().toISOString(), status_atual: 'CANCELADO' } as any)
+        .eq('id', deleteOpTarget.id);
+      if (error) throw error;
+
+      // Cancel associated ordens
+      if (deleteOpTarget.ordem_id) {
+        await supabase
+          .from('ordens_producao')
+          .update({ status: 'CANCELADA' } as any)
+          .eq('pedido_id', deleteOpTarget.id);
+      }
+
+      // Log action
+      await supabase.from('pedido_historico').insert({
+        pedido_id: deleteOpTarget.id,
+        usuario_id: profile.id,
+        tipo_acao: 'TRANSICAO',
+        status_anterior: deleteOpTarget.status_atual,
+        status_novo: 'CANCELADO',
+        observacao: `OP PCP excluída (soft delete) por ${profile.nome}.`,
+      });
+
+      toast.success('OP PCP excluída com sucesso');
+      setDeleteOpDialogOpen(false);
+      setDeleteOpTarget(null);
+      fetchAll();
+    } catch (err: any) {
+      toast.error('Erro ao excluir OP: ' + (err.message || err));
+    } finally {
+      setDeleteOpLoading(false);
     }
   };
 
@@ -1464,13 +1513,26 @@ export default function FilaMestre() {
             </div>
           </div>
 
-          {/* PCP OP: Produto a produzir */}
-          {isPcpOp && r.produtos_descricao && (
-            <div className="px-4 pb-2">
-              <div className="rounded-md border border-orange-300/50 bg-orange-100/30 dark:bg-orange-900/10 p-2 text-[11px]">
-                <span className="text-muted-foreground font-medium">Produto a produzir: </span>
-                <span className="font-bold text-foreground">{r.produtos_descricao}</span>
-              </div>
+          {/* PCP OP: Produto a produzir + Excluir */}
+          {isPcpOp && (
+            <div className="px-4 pb-2 flex items-center gap-2">
+              {r.produtos_descricao && (
+                <div className="flex-1 rounded-md border border-orange-300/50 bg-orange-100/30 dark:bg-orange-900/10 p-2 text-[11px]">
+                  <span className="text-muted-foreground font-medium">Produto a produzir: </span>
+                  <span className="font-bold text-foreground">{r.produtos_descricao}</span>
+                </div>
+              )}
+              {canEdit && r.ordem_status !== 'CONCLUIDA' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
+                  onClick={(e) => { e.stopPropagation(); setDeleteOpTarget(r); setDeleteOpDialogOpen(true); }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  <span className="text-[11px]">Excluir</span>
+                </Button>
+              )}
             </div>
           )}
 
@@ -2120,6 +2182,35 @@ export default function FilaMestre() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AlertDialog para excluir OP PCP */}
+      <AlertDialog open={deleteOpDialogOpen} onOpenChange={setDeleteOpDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir OP PCP</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta OP?
+              {deleteOpTarget && (
+                <span className="block mt-2 font-semibold text-foreground">
+                  {deleteOpTarget.numero_pedido} — {deleteOpTarget.produtos_descricao || 'Produção PCP'}
+                </span>
+              )}
+              <span className="block mt-2 text-destructive font-medium">Essa ação não poderá ser desfeita.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteOpLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteOpPcp}
+              disabled={deleteOpLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteOpLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+              Excluir OP
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

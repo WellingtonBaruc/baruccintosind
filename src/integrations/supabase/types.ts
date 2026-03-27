@@ -1065,11 +1065,13 @@ export type Database = {
           data_pagamento_confirmado: string | null
           data_previsao_entrega: string | null
           data_venda_api: string | null
+          deleted_at: string | null
           fivelas_separadas: boolean | null
           fivelas_separadas_em: string | null
           forma_envio: string | null
           forma_pagamento: string | null
           id: string
+          is_deleted: boolean
           is_piloto: boolean | null
           lead_time_preparacao_dias: number | null
           numero_pedido: string
@@ -1117,11 +1119,13 @@ export type Database = {
           data_pagamento_confirmado?: string | null
           data_previsao_entrega?: string | null
           data_venda_api?: string | null
+          deleted_at?: string | null
           fivelas_separadas?: boolean | null
           fivelas_separadas_em?: string | null
           forma_envio?: string | null
           forma_pagamento?: string | null
           id?: string
+          is_deleted?: boolean
           is_piloto?: boolean | null
           lead_time_preparacao_dias?: number | null
           numero_pedido: string
@@ -1169,11 +1173,13 @@ export type Database = {
           data_pagamento_confirmado?: string | null
           data_previsao_entrega?: string | null
           data_venda_api?: string | null
+          deleted_at?: string | null
           fivelas_separadas?: boolean | null
           fivelas_separadas_em?: string | null
           forma_envio?: string | null
           forma_pagamento?: string | null
           id?: string
+          is_deleted?: boolean
           is_piloto?: boolean | null
           lead_time_preparacao_dias?: number | null
           numero_pedido?: string
