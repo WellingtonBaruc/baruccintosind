@@ -249,7 +249,7 @@ export default function FilaMestre() {
   const fetchAll = async () => {
     const { cal, lts } = await fetchCalendarData();
     await fetchRows(cal, lts);
-    fetchWeeklySummary(selectedWeek);
+    fetchWeeklySummary(selectedMonth, selectedWeek);
   };
 
   const fetchRows = async (cal: PcpCalendarData, lts: Record<string, number>) => {
