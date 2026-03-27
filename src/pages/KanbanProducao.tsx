@@ -1005,16 +1005,32 @@ export default function KanbanProducao() {
   const sanitizeWhatsappPhone = (phone: string) => phone.replace(/\D/g, '');
 
   const buildWhatsappMessage = (card: KanbanCard) => {
+    const dataEntrega = card.data_previsao_entrega
+      ? new Date(card.data_previsao_entrega + 'T12:00:00').toLocaleDateString('pt-BR')
+      : '—';
+    const valor = card.valor_liquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const obs = card.observacao_api || card.observacao_comercial || '';
+
     const lines = [
-      `📋 *Venda #${card.numero_pedido}*`,
-      `👤 Cliente: ${card.cliente_nome || '—'}`,
-      `📞 Telefone: ${card.cliente_telefone || '—'}`,
-      `📍 Cidade/UF: ${card.cliente_endereco || '—'}`,
-      `🏷️ Segmento: ${card.canal_venda || '—'}`,
-      `📅 Data de Entrega: ${card.data_previsao_entrega ? new Date(card.data_previsao_entrega + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}`,
-      `💰 Valor Total: ${card.valor_liquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
-      `📝 Observação: ${card.observacao_api || card.observacao_comercial || '—'}`,
+      `✅ *SEU PEDIDO FOI FINALIZADO!*`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `📋 *Pedido:* #${card.numero_pedido}`,
+      `👤 *Cliente:* ${card.cliente_nome || '—'}`,
+      `📞 *Telefone:* ${card.cliente_telefone || '—'}`,
+      `📍 *Endereço:* ${card.cliente_endereco || '—'}`,
+      `🏷️ *Segmento:* ${card.canal_venda || '—'}`,
+      `📅 *Entrega:* ${dataEntrega}`,
+      `💰 *Valor:* ${valor}`,
+      `━━━━━━━━━━━━━━━━━━━━`,
     ];
+
+    if (obs) {
+      lines.push(`📝 *Obs:* ${obs}`);
+      lines.push(``);
+    }
+
+    lines.push(`Qualquer dúvida, estamos à disposição! 😊`);
 
     return lines.join('\n');
   };
