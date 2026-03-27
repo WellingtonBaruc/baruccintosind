@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -165,8 +166,9 @@ export default function KanbanProducao() {
   const [obsCorteTexts, setObsCorteTexts] = useState<Map<string, string>>(new Map());
   const [savingObsCorte, setSavingObsCorte] = useState(false);
 
-  // WhatsApp inline expansion
-  const [whatsappExpandedCardId, setWhatsappExpandedCardId] = useState<string | null>(null);
+  // WhatsApp modal
+  const [whatsappModal, setWhatsappModal] = useState<{ open: boolean; card: KanbanCard | null }>({ open: false, card: null });
+  const [whatsappConfirm, setWhatsappConfirm] = useState<{ open: boolean; vendedora: { id: string; nome: string; whatsapp: string } | null }>({ open: false, vendedora: null });
 
   const [vendedorasDb, setVendedorasDb] = useState<{ id: string; nome: string; whatsapp: string }[]>([]);
 
@@ -1050,10 +1052,6 @@ export default function KanbanProducao() {
     const encodedMessage = encodeURIComponent(message);
     const url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 
-    console.log('CLICK BOTÃO WhatsApp');
-    console.log('URL GERADA:', url);
-    console.log('MÉTODO: createElement("a") + click()');
-
     const link = document.createElement('a');
     link.href = url;
     link.target = '_blank';
@@ -1061,8 +1059,6 @@ export default function KanbanProducao() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
-    console.log('LINK CLICADO - aguardando abertura externa');
   };
 
   const registerWhatsappReferral = async (card: KanbanCard, vendedora: { nome: string }) => {
@@ -1108,23 +1104,6 @@ export default function KanbanProducao() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">Kanban de Produção</h1>
-          <Button variant="outline" size="sm" className="gap-1.5 border-emerald-500 text-emerald-600"
-            onClick={() => {
-              console.log('TESTE WhatsApp - botão isolado');
-              const testUrl = 'https://wa.me/5500000000000?text=Teste%20Lovable';
-              console.log('URL TESTE:', testUrl);
-              const link = document.createElement('a');
-              link.href = testUrl;
-              link.target = '_blank';
-              link.rel = 'noopener noreferrer';
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              console.log('TESTE - link clicado');
-            }}
-          >
-            <MessageCircle className="h-3.5 w-3.5" /> Teste WhatsApp
-          </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/relatorios/producao')} className="gap-1.5">
             <BarChart3 className="h-3.5 w-3.5" /> Relatórios
           </Button>
@@ -1483,68 +1462,14 @@ export default function KanbanProducao() {
                                   </Button>
                                 )}
                                 {inConcluido && canSendToComercial(card) && (
-                                  <div className="mt-2">
-                                    <Button
-                                      size="sm"
-                                      className="w-full h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                                      onClick={() => setWhatsappExpandedCardId(whatsappExpandedCardId === card.id ? null : card.id)}
-                                    >
-                                      <MessageCircle className="h-3 w-3 mr-1" />
-                                      Enviar para o Comercial
-                                    </Button>
-                                    {whatsappExpandedCardId === card.id && (
-                                      <div className="mt-1 rounded-md border bg-popover p-1 space-y-0.5">
-                                        {vendedorasDb.length === 0 ? (
-                                          <p className="text-xs text-muted-foreground p-2">Nenhuma vendedora cadastrada.</p>
-                                        ) : (
-                                          vendedorasDb.map((v) => {
-                                            const hasValidWhatsapp = sanitizeWhatsappPhone(v.whatsapp).length >= 12;
-
-                                            return (
-                                            <div key={v.id} className="flex w-full items-center gap-2 rounded-sm px-2 py-2">
-                                              <button
-                                                type="button"
-                                                disabled={!hasValidWhatsapp}
-                                                className="flex flex-1 items-center gap-3 text-left transition-colors hover:bg-accent rounded-sm px-1 py-1 disabled:cursor-not-allowed disabled:opacity-60"
-                                                onClick={() => {
-                                                  console.log('CLICK VENDEDORA:', v.nome, v.whatsapp);
-                                                  setWhatsappExpandedCardId(null);
-                                                  openWhatsApp(v.whatsapp, buildWhatsappMessage(card));
-                                                  void registerWhatsappReferral(card, v);
-                                                }}
-                                              >
-                                                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted text-foreground font-bold text-xs shrink-0">
-                                                  {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                  <p className="font-medium text-sm leading-none text-foreground">{v.nome}</p>
-                                                  <p className="text-xs text-muted-foreground font-mono mt-1">
-                                                    {hasValidWhatsapp ? formatWhatsappDisplay(v.whatsapp) : 'WhatsApp inválido'}
-                                                  </p>
-                                                </div>
-                                                <MessageCircle className="h-4 w-4 text-primary shrink-0" />
-                                              </button>
-                                              {hasValidWhatsapp && (
-                                                <button
-                                                  type="button"
-                                                  className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded border border-border hover:bg-accent shrink-0"
-                                                  onClick={async () => {
-                                                    const url = buildWhatsappUrl(v.whatsapp, buildWhatsappMessage(card));
-                                                    const ok = await copyTextToClipboard(url);
-                                                    if (ok) toast.success(`Link copiado para ${v.nome}`);
-                                                    else toast.error('Erro ao copiar');
-                                                  }}
-                                                >
-                                                  Copiar
-                                                </button>
-                                              )}
-                                            </div>
-                                            );
-                                          })
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
+                                  <Button
+                                    size="sm"
+                                    className="w-full mt-2 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    onClick={() => setWhatsappModal({ open: true, card })}
+                                  >
+                                    <MessageCircle className="h-3 w-3 mr-1" />
+                                    Enviar para o Comercial
+                                  </Button>
                                 )}
 
                                 {!inConcluido && col !== 'Aguardando Início' && isSupervisor && (
@@ -1853,6 +1778,110 @@ export default function KanbanProducao() {
           </ScrollArea>
         </SheetContent>
       </Sheet>
+
+      {/* WhatsApp - Modal de seleção de vendedora */}
+      <Dialog open={whatsappModal.open} onOpenChange={(open) => { if (!open) setWhatsappModal({ open: false, card: null }); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-emerald-600" />
+              Enviar para o Comercial
+            </DialogTitle>
+            <DialogDescription>
+              {whatsappModal.card && (
+                <span>
+                  Venda <span className="font-semibold text-foreground">#{whatsappModal.card.numero_pedido}</span> — {whatsappModal.card.cliente_nome}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1 max-h-[320px] overflow-y-auto">
+            {vendedorasDb.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Nenhuma vendedora cadastrada.</p>
+            ) : (
+              vendedorasDb.map((v) => {
+                const hasValid = sanitizeWhatsappPhone(v.whatsapp).length >= 12;
+                return (
+                  <div
+                    key={v.id}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg border p-3 transition-colors",
+                      hasValid ? "hover:bg-accent cursor-pointer" : "opacity-50 cursor-not-allowed"
+                    )}
+                    onClick={() => {
+                      if (!hasValid) return;
+                      setWhatsappConfirm({ open: true, vendedora: v });
+                    }}
+                  >
+                    <div className="flex items-center justify-center h-10 w-10 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm shrink-0">
+                      {v.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-foreground">{v.nome}</p>
+                      <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                        {hasValid ? formatWhatsappDisplay(v.whatsapp) : 'WhatsApp inválido'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {hasValid && (
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const url = buildWhatsappUrl(v.whatsapp, buildWhatsappMessage(whatsappModal.card!));
+                            const ok = await copyTextToClipboard(url);
+                            if (ok) toast.success(`Link copiado para ${v.nome}`);
+                            else toast.error('Erro ao copiar');
+                          }}
+                        >
+                          Copiar
+                        </button>
+                      )}
+                      <MessageCircle className={cn("h-4 w-4", hasValid ? "text-emerald-600" : "text-muted-foreground")} />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp - AlertDialog de confirmação */}
+      <AlertDialog open={whatsappConfirm.open} onOpenChange={(open) => { if (!open) setWhatsappConfirm({ open: false, vendedora: null }); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar envio via WhatsApp</AlertDialogTitle>
+            <AlertDialogDescription>
+              {whatsappConfirm.vendedora && whatsappModal.card && (
+                <>
+                  Enviar a venda <span className="font-semibold text-foreground">#{whatsappModal.card.numero_pedido}</span> para{' '}
+                  <span className="font-semibold text-foreground">{whatsappConfirm.vendedora.nome}</span> via WhatsApp?
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => {
+                if (whatsappConfirm.vendedora && whatsappModal.card) {
+                  openWhatsApp(whatsappConfirm.vendedora.whatsapp, buildWhatsappMessage(whatsappModal.card));
+                  void registerWhatsappReferral(whatsappModal.card, whatsappConfirm.vendedora);
+                }
+                setWhatsappConfirm({ open: false, vendedora: null });
+                setWhatsappModal({ open: false, card: null });
+              }}
+            >
+              <MessageCircle className="h-4 w-4 mr-1" />
+              Enviar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
