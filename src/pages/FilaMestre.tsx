@@ -495,6 +495,17 @@ export default function FilaMestre() {
       .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
       .order('criado_em', { ascending: false });
 
+    // Also fetch "Nova Venda" (manual sales, tipo_fluxo PRODUCAO without status_api from Simplifica)
+    const { data: pedidosNovaVenda } = await supabase
+      .from('pedidos')
+      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
+      .eq('tipo_fluxo', 'PRODUCAO')
+      .eq('is_deleted', false)
+      .eq('sincronizacao_bloqueada', true)
+      .is('api_venda_id', null)
+      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
+      .order('criado_em', { ascending: false });
+
     const { data: todasOrdens } = await supabase
       .from('ordens_producao')
       .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp, sequencia')
@@ -502,7 +513,8 @@ export default function FilaMestre() {
 
     const emProducaoIds = new Set((pedidosEmProducao || []).map(p => p.id));
     const pcpIds = new Set((pedidosPcp || []).map(p => p.id));
-    const allKnownIds = new Set([...emProducaoIds, ...pcpIds]);
+    const novaVendaIds = new Set((pedidosNovaVenda || []).map(p => p.id));
+    const allKnownIds = new Set([...emProducaoIds, ...pcpIds, ...novaVendaIds]);
     const complementaryOpPedidoIds = new Set<string>();
     for (const o of (todasOrdens || [])) {
       if ((o as any).sequencia > 1 && !allKnownIds.has(o.pedido_id)) {
@@ -525,7 +537,7 @@ export default function FilaMestre() {
     // Merge all, deduplicating by id
     const seenIds = new Set<string>();
     const pedidos: any[] = [];
-    for (const p of [...(pedidosEmProducao || []), ...(pedidosPcp || []), ...pedidosComOp]) {
+    for (const p of [...(pedidosEmProducao || []), ...(pedidosPcp || []), ...(pedidosNovaVenda || []), ...pedidosComOp]) {
       if (!seenIds.has(p.id)) {
         seenIds.add(p.id);
         pedidos.push(p);
@@ -1435,9 +1447,13 @@ export default function FilaMestre() {
               }`}>
                 Simplifica: {r.status_api}
               </Badge>
-            ) : (
+            ) : r.origem_op === 'PCP' ? (
               <Badge className="text-[11px] font-semibold bg-orange-500/15 text-orange-700 border-orange-300">
                 Venda PCP — Em Produção
+              </Badge>
+            ) : (
+              <Badge className="text-[11px] font-semibold bg-purple-500/15 text-purple-700 border-purple-300">
+                Nova Venda — {(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual}
               </Badge>
             )}
             {r.operador_atual !== '—' && (
@@ -1738,8 +1754,10 @@ export default function FilaMestre() {
                     r.status_api === 'Pedido Enviado' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-300' :
                     'bg-muted text-muted-foreground border-border'
                   }`}>{r.status_api}</Badge></span>
-                ) : (
+                ) : r.origem_op === 'PCP' ? (
                   <Badge className="text-[11px] font-semibold bg-orange-500/15 text-orange-700 border-orange-300">Venda PCP — Em Produção</Badge>
+                ) : (
+                  <Badge className="text-[11px] font-semibold bg-purple-500/15 text-purple-700 border-purple-300">Nova Venda — {(STATUS_PEDIDO_CONFIG[r.status_atual] || {}).label || r.status_atual}</Badge>
                 )}
                 <span className="text-muted-foreground">Etapa: <span className="font-bold text-primary">{r.etapa_atual}</span></span>
               </div>
