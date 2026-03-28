@@ -1085,7 +1085,7 @@ export default function KanbanProducao() {
           pedido_id: card.pedido_id,
           usuario_id: profile.id,
           tipo_acao: 'TRANSICAO' as any,
-          status_anterior: card.status_pedido,
+          status_anterior: card.pedido_status,
           status_novo: 'AGUARDANDO_COMERCIAL',
           observacao: `Pedido encaminhado para o Comercial via WhatsApp (${vendedora.nome})`,
         },
