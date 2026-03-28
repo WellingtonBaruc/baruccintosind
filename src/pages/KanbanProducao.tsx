@@ -1068,14 +1068,41 @@ export default function KanbanProducao() {
   const registerWhatsappReferral = async (card: KanbanCard, vendedora: VendedoraWhatsapp) => {
     if (!profile) return;
     try {
-      await supabase.from('pedido_historico').insert({
-        pedido_id: card.pedido_id,
-        usuario_id: profile.id,
-        tipo_acao: 'COMENTARIO',
-        observacao: `Encaminhado para ${vendedora.nome} via WhatsApp`,
-      });
+      // 1. Update pedido status to AGUARDANDO_COMERCIAL
+      const { error: updateError } = await supabase.from('pedidos')
+        .update({ status_atual: 'AGUARDANDO_COMERCIAL' as any })
+        .eq('id', card.pedido_id);
+
+      if (updateError) {
+        console.error('Erro ao atualizar status do pedido:', updateError);
+        toast.error('Erro ao mover pedido para o Comercial');
+        return;
+      }
+
+      // 2. Insert TRANSICAO + COMENTARIO in history
+      await supabase.from('pedido_historico').insert([
+        {
+          pedido_id: card.pedido_id,
+          usuario_id: profile.id,
+          tipo_acao: 'TRANSICAO' as any,
+          status_anterior: card.status_pedido,
+          status_novo: 'AGUARDANDO_COMERCIAL',
+          observacao: `Pedido encaminhado para o Comercial via WhatsApp (${vendedora.nome})`,
+        },
+        {
+          pedido_id: card.pedido_id,
+          usuario_id: profile.id,
+          tipo_acao: 'COMENTARIO' as any,
+          observacao: `Encaminhado para ${vendedora.nome} via WhatsApp`,
+        },
+      ]);
+
+      // 3. Refresh kanban to remove card from production
+      fetchCards();
+      toast.success('Pedido enviado para o Kanban Comercial!');
     } catch (err) {
       console.error('registerWhatsappReferral catch:', err);
+      toast.error('Erro ao registrar encaminhamento');
     }
   };
 
