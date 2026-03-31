@@ -503,7 +503,7 @@ export default function FilaMestre() {
       .eq('is_deleted', false)
       .eq('sincronizacao_bloqueada', true)
       .is('api_venda_id', null)
-      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
+      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")')
       .order('criado_em', { ascending: false });
 
     const { data: todasOrdens } = await supabase
