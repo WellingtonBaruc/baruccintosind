@@ -529,7 +529,7 @@ export default function FilaMestre() {
         .from('pedidos')
         .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
         .in('id', backfillIds)
-        .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
+        .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")')
         .neq('status_api', 'Finalizado');
       pedidosComOp = data || [];
     }
