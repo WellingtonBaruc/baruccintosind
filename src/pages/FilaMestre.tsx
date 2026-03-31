@@ -282,7 +282,7 @@ export default function FilaMestre() {
       .from('pedidos')
       .select('id')
       .eq('is_deleted', false)
-      .not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA")')
+      .not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")')
       .is('data_entrega_ajustada_pcp', null)
       .gte('data_previsao_entrega', dateFrom)
       .lte('data_previsao_entrega', dateTo);
