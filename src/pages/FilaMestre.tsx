@@ -273,7 +273,7 @@ export default function FilaMestre() {
       .from('pedidos')
       .select('id')
       .eq('is_deleted', false)
-      .not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA")')
+      .not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")')
       .gte('data_entrega_ajustada_pcp', dateFrom)
       .lte('data_entrega_ajustada_pcp', dateTo);
 
@@ -282,7 +282,7 @@ export default function FilaMestre() {
       .from('pedidos')
       .select('id')
       .eq('is_deleted', false)
-      .not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA")')
+      .not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")')
       .is('data_entrega_ajustada_pcp', null)
       .gte('data_previsao_entrega', dateFrom)
       .lte('data_previsao_entrega', dateTo);
@@ -362,9 +362,10 @@ export default function FilaMestre() {
     const dateFrom = days[0];
     const dateTo = days[days.length - 1];
 
+    const excludeFilter = '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")';
     const [ajRes, prevRes] = await Promise.all([
-      supabase.from('pedidos').select('id, data_entrega_ajustada_pcp').eq('is_deleted', false).not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA")').gte('data_entrega_ajustada_pcp', dateFrom).lte('data_entrega_ajustada_pcp', dateTo),
-      supabase.from('pedidos').select('id, data_previsao_entrega').eq('is_deleted', false).not('status_atual', 'in', '("CANCELADO","HISTORICO","FINALIZADO_SIMPLIFICA")').is('data_entrega_ajustada_pcp', null).gte('data_previsao_entrega', dateFrom).lte('data_previsao_entrega', dateTo),
+      supabase.from('pedidos').select('id, data_entrega_ajustada_pcp').eq('is_deleted', false).not('status_atual', 'in', excludeFilter).gte('data_entrega_ajustada_pcp', dateFrom).lte('data_entrega_ajustada_pcp', dateTo),
+      supabase.from('pedidos').select('id, data_previsao_entrega').eq('is_deleted', false).not('status_atual', 'in', excludeFilter).is('data_entrega_ajustada_pcp', null).gte('data_previsao_entrega', dateFrom).lte('data_previsao_entrega', dateTo),
     ]);
     const pedidoDateMap = new Map<string, string>();
     for (const p of (ajRes.data || [])) pedidoDateMap.set(p.id, p.data_entrega_ajustada_pcp);
@@ -483,7 +484,7 @@ export default function FilaMestre() {
       .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
       .eq('is_deleted', false)
       .eq('status_api', 'Em Produção')
-      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
+      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")')
       .order('criado_em', { ascending: false });
 
     // Also fetch PCP-internal pedidos (independent OPs)
@@ -492,7 +493,7 @@ export default function FilaMestre() {
       .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
       .eq('tipo_fluxo', 'PCP_INTERNO')
       .eq('is_deleted', false)
-      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
+      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")')
       .order('criado_em', { ascending: false });
 
     // Also fetch "Nova Venda" (manual sales, tipo_fluxo PRODUCAO without status_api from Simplifica)
@@ -503,7 +504,7 @@ export default function FilaMestre() {
       .eq('is_deleted', false)
       .eq('sincronizacao_bloqueada', true)
       .is('api_venda_id', null)
-      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
+      .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")')
       .order('criado_em', { ascending: false });
 
     const { data: todasOrdens } = await supabase
@@ -529,7 +530,7 @@ export default function FilaMestre() {
         .from('pedidos')
         .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
         .in('id', backfillIds)
-        .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA")')
+        .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")')
         .neq('status_api', 'Finalizado');
       pedidosComOp = data || [];
     }
