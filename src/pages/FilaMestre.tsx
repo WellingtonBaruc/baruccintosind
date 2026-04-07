@@ -527,12 +527,25 @@ export default function FilaMestre() {
     }
     const backfillIds = [...complementaryOpPedidoIds];
 
+    // Também buscar diretamente pedidos com AGUARDANDO_OP_COMPLEMENTAR
+    // (cobre casos onde OP ainda não foi criada ou tem origem_op nulo)
+    const { data: pedidosAguardandoOp } = await supabase
+      .from('pedidos')
+      .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
+      .eq('status_atual', 'AGUARDANDO_OP_COMPLEMENTAR')
+      .eq('is_deleted', false)
+      .neq('status_api', 'Finalizado');
+
+    // Unir IDs dos dois critérios
+    const aguardandoOpIds = new Set((pedidosAguardandoOp || []).map(p => p.id));
+    const allBackfillIds = [...new Set([...backfillIds, ...aguardandoOpIds])];
+
     let pedidosComOp: any[] = [];
-    if (backfillIds.length > 0) {
+    if (allBackfillIds.length > 0) {
       const { data } = await supabase
         .from('pedidos')
         .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
-        .in('id', backfillIds)
+        .in('id', allBackfillIds)
         .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")')
         .neq('status_api', 'Finalizado');
       pedidosComOp = data || [];
