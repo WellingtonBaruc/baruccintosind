@@ -168,7 +168,7 @@ export default function DashboardGestao() {
     const { data: pedidos } = await supabase
       .from('pedidos')
       .select('id, valor_liquido, criado_em, ordens_producao(tipo_produto), pedido_itens(quantidade, categoria_produto, descricao_produto, referencia_produto)')
-      .eq('tipo_fluxo', 'PRODUCAO')
+      .in('tipo_fluxo', ['PRODUCAO', 'PRONTA_ENTREGA'])
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim);
 
@@ -268,6 +268,7 @@ export default function DashboardGestao() {
               <CardTitle className="text-base flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" /> Pedidos Recebidos do Simplifica
               </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">Em Produção + Pronta Entrega</p>
               {periodoLabel && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Calendar className="h-3 w-3" /> {periodoLabel}
