@@ -47,7 +47,7 @@ interface OpLinha {
 }
 
 interface FluxoEntrada {
-  fluxo: 'PRODUCAO' | 'PRONTA_ENTREGA';
+  fluxo: 'PRODUCAO' | 'PRONTA_ENTREGA' | 'PRONTA_ENTREGA_OP_LOJA';
   label: string;
   pedidos: number;
   itens: number;
@@ -224,6 +224,13 @@ export default function DashboardGestao() {
     };
 
     // Agrupar por fluxo → produto
+    // Buscar quais pedidos PRONTA_ENTREGA têm OP de loja
+    const { data: opsLoja } = await supabase
+      .from('ordens_producao')
+      .select('pedido_id')
+      .eq('origem_op', 'LOJA');
+    const pedidosComOpLoja = new Set((opsLoja || []).map((o: any) => o.pedido_id));
+
     const fluxoMap: Record<string, {
       label: string;
       pedidos: number;
@@ -233,6 +240,7 @@ export default function DashboardGestao() {
     }> = {
       PRODUCAO: { label: 'Produção', pedidos: 0, itens: 0, valor: 0, produtos: {} },
       PRONTA_ENTREGA: { label: 'Pedido Enviado', pedidos: 0, itens: 0, valor: 0, produtos: {} },
+      PRONTA_ENTREGA_OP_LOJA: { label: 'Pronta Entrega c/ OP Loja', pedidos: 0, itens: 0, valor: 0, produtos: {} },
     };
 
     let totalPedidos = 0;
@@ -243,7 +251,12 @@ export default function DashboardGestao() {
     const pedidosComItemReconhecido = new Set<string>();
 
     for (const p of (pedidos || [])) {
-      const fluxo = (p as any).tipo_fluxo === 'PRONTA_ENTREGA' ? 'PRONTA_ENTREGA' : 'PRODUCAO';
+      const tipoFluxoBase = (p as any).tipo_fluxo;
+      const fluxo = tipoFluxoBase === 'PRONTA_ENTREGA' && pedidosComOpLoja.has(p.id)
+        ? 'PRONTA_ENTREGA_OP_LOJA'
+        : tipoFluxoBase === 'PRONTA_ENTREGA'
+        ? 'PRONTA_ENTREGA'
+        : 'PRODUCAO';
       const f = fluxoMap[fluxo];
       const itensArray = (p as any).pedido_itens || [];
 
@@ -286,7 +299,12 @@ export default function DashboardGestao() {
     for (const p of (pedidos || [])) {
       const principal = pedidoProdutoPrincipal.get(p.id);
       if (!principal) continue;
-      const fluxo = (p as any).tipo_fluxo === 'PRONTA_ENTREGA' ? 'PRONTA_ENTREGA' : 'PRODUCAO';
+      const tipoFluxoBase = (p as any).tipo_fluxo;
+      const fluxo = tipoFluxoBase === 'PRONTA_ENTREGA' && pedidosComOpLoja.has(p.id)
+        ? 'PRONTA_ENTREGA_OP_LOJA'
+        : tipoFluxoBase === 'PRONTA_ENTREGA'
+        ? 'PRONTA_ENTREGA'
+        : 'PRODUCAO';
       const f = fluxoMap[fluxo];
       if (f.produtos[principal]) f.produtos[principal].pedidos++;
     }
@@ -296,7 +314,7 @@ export default function DashboardGestao() {
     const fluxos: FluxoEntrada[] = Object.entries(fluxoMap)
       .filter(([, f]) => f.pedidos > 0)
       .map(([fluxo, f]) => ({
-        fluxo: fluxo as 'PRODUCAO' | 'PRONTA_ENTREGA',
+        fluxo: fluxo as 'PRODUCAO' | 'PRONTA_ENTREGA' | 'PRONTA_ENTREGA_OP_LOJA',
         label: f.label,
         pedidos: f.pedidos,
         itens: f.itens,
@@ -481,9 +499,14 @@ export default function DashboardGestao() {
               {entrada.fluxos.length > 0 && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {entrada.fluxos.map(f => (
-                    <div key={f.fluxo} className="rounded-lg border border-border/60 p-4">
+                    <div key={f.fluxo} className={`rounded-lg border p-4 ${f.fluxo === 'PRONTA_ENTREGA_OP_LOJA' ? 'border-purple-500/30 bg-purple-500/5' : 'border-border/60'}`}>
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-sm font-semibold text-foreground">{f.label}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-foreground">{f.label}</span>
+                          {f.fluxo === 'PRONTA_ENTREGA_OP_LOJA' && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 border border-purple-500/20">OP Loja</span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span className="tabular-nums font-medium text-foreground">{f.pedidos} ped.</span>
                           <span className="tabular-nums font-medium text-primary">{f.itens} prod.</span>
