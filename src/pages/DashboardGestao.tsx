@@ -436,7 +436,7 @@ export default function DashboardGestao() {
     const inicio = (d: string) => `${d}T00:00:00-03:00`;
     const fim = (d: string) => `${d}T23:59:59-03:00`;
 
-    const tipoFluxos = fluxo === 'PRODUCAO' ? ['PRODUCAO'] : ['PRONTA_ENTREGA'];
+    const tipoFluxos = fluxo === 'PRODUCAO' ? ['PRODUCAO'] : ['PRONTA_ENTREGA', 'PRONTA_ENTREGA_OP_LOJA'];
 
     const CATEGORIAS_DRILL: Record<string, string[]> = {
       'Cinto Sintético': ['CINTO SINTETICO', 'CINTO SINTÉTICO'],
@@ -449,11 +449,26 @@ export default function DashboardGestao() {
 
     const { data: pedidosRaw } = await supabase
       .from('pedidos')
-      .select('id, numero_pedido, api_venda_id, cliente_nome, valor_liquido, criado_em, ordens_producao(id, tipo_produto, status, origem_op, sequencia), pedido_itens(quantidade, quantidade_faltante, disponivel, descricao_produto)')
+      .select('id, numero_pedido, api_venda_id, cliente_nome, valor_liquido, criado_em, pedido_itens(quantidade, quantidade_faltante, disponivel, descricao_produto)')
       .in('tipo_fluxo', tipoFluxos)
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim)
       .order('criado_em', { ascending: false });
+
+    // Buscar OPs separadamente para garantir que todas são retornadas (join pode ser limitado)
+    const pedidoIds = (pedidosRaw || []).map((p: any) => p.id);
+    const { data: opsMap } = pedidoIds.length > 0
+      ? await supabase
+          .from('ordens_producao')
+          .select('id, pedido_id, tipo_produto, status, origem_op, sequencia')
+          .in('pedido_id', pedidoIds)
+      : { data: [] };
+
+    const opsPorPedido: Record<string, any[]> = {};
+    for (const op of (opsMap || [])) {
+      if (!opsPorPedido[op.pedido_id]) opsPorPedido[op.pedido_id] = [];
+      opsPorPedido[op.pedido_id].push(op);
+    }
 
     const items: DrillItem[] = [];
     for (const p of (pedidosRaw || [])) {
@@ -473,7 +488,8 @@ export default function DashboardGestao() {
       // 2. disponivel=false → quantidade total do item
       // 3. Tem OP de loja mas nenhum item marcado → usa quantidade total dos itens reconhecidos
       // OPs de loja: origem_op='LOJA' (novas) OU sequencia>1 (antigas sem origem_op)
-      const temOpLoja = ((p as any).ordens_producao || []).some((o: any) => o.origem_op === 'LOJA' || (o.sequencia > 1 && !o.origem_op));
+      const pedidoOps = opsPorPedido[p.id] || [];
+      const temOpLoja = pedidoOps.some((o: any) => o.origem_op === 'LOJA' || (o.sequencia > 1 && !o.origem_op));
       const itensFiltrados = itens.filter((i: any) =>
         keywords.some(kw => (i.descricao_produto || '').toUpperCase().includes(kw))
       );
@@ -501,7 +517,7 @@ export default function DashboardGestao() {
         itensOp: itensOpFinal,
         valor: p.valor_liquido || 0,
         dataCriacao: p.criado_em,
-        ops: ((p as any).ordens_producao || []).map((o: any) => ({
+        ops: pedidoOps.map((o: any) => ({
           id: o.id,
           tipoProduto: o.tipo_produto,
           status: o.status,
