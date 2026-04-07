@@ -66,8 +66,10 @@ interface EntradaOPs {
 interface DrillItem {
   pedidoId: string;
   numeroPedido: string;
+  apiVendaId: string | null;
   clienteNome: string;
   unidades: number;
+  itensOp: number;
   valor: number;
   dataCriacao: string;
   ops: { id: string; tipoProduto: string; status: string; origemOp: string | null }[];
@@ -447,7 +449,7 @@ export default function DashboardGestao() {
 
     const { data: pedidosRaw } = await supabase
       .from('pedidos')
-      .select('id, numero_pedido, cliente_nome, valor_liquido, criado_em, ordens_producao(id, tipo_produto, status, origem_op), pedido_itens(quantidade, quantidade_faltante, descricao_produto)')
+      .select('id, numero_pedido, api_venda_id, cliente_nome, valor_liquido, criado_em, ordens_producao(id, tipo_produto, status, origem_op), pedido_itens(quantidade, quantidade_faltante, descricao_produto)')
       .in('tipo_fluxo', tipoFluxos)
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim)
@@ -465,11 +467,18 @@ export default function DashboardGestao() {
         }, 0);
       if (unidades <= 0) continue;
 
+      // Calcular itens que viraram OP (quantidade_faltante dos itens reconhecidos)
+      const itensOp = itens
+        .filter((i: any) => keywords.some(kw => (i.descricao_produto || '').toUpperCase().includes(kw)))
+        .reduce((s: number, i: any) => s + (i.quantidade_faltante || 0), 0);
+
       items.push({
         pedidoId: p.id,
         numeroPedido: p.numero_pedido,
+        apiVendaId: (p as any).api_venda_id || null,
         clienteNome: p.cliente_nome,
         unidades,
+        itensOp,
         valor: p.valor_liquido || 0,
         dataCriacao: p.criado_em,
         ops: ((p as any).ordens_producao || []).map((o: any) => ({
@@ -694,8 +703,10 @@ export default function DashboardGestao() {
                                           <thead>
                                             <tr className="border-b border-border/40">
                                               <th className="text-left px-4 py-2 text-muted-foreground font-medium">Pedido</th>
+                                              <th className="text-left px-4 py-2 text-muted-foreground font-medium">Nº Venda</th>
                                               <th className="text-left px-4 py-2 text-muted-foreground font-medium">Cliente</th>
                                               <th className="text-right px-4 py-2 text-muted-foreground font-medium">Un.</th>
+                                              {f.fluxo !== 'PRODUCAO' && <th className="text-right px-4 py-2 text-muted-foreground font-medium">Un. OP</th>}
                                               <th className="text-right px-4 py-2 text-muted-foreground font-medium">Valor</th>
                                               <th className="text-left px-4 py-2 text-muted-foreground font-medium">Entrada</th>
                                               <th className="text-left px-4 py-2 text-muted-foreground font-medium">OPs</th>
@@ -705,8 +716,17 @@ export default function DashboardGestao() {
                                             {drillItems.map(item => (
                                               <tr key={item.pedidoId} className="border-b border-border/30 hover:bg-muted/40 transition-colors">
                                                 <td className="px-4 py-2 font-medium text-foreground">{item.numeroPedido}</td>
+                                                <td className="px-4 py-2 text-muted-foreground tabular-nums">{item.apiVendaId || '—'}</td>
                                                 <td className="px-4 py-2 text-muted-foreground max-w-[140px] truncate">{item.clienteNome}</td>
                                                 <td className="px-4 py-2 text-right tabular-nums font-medium">{item.unidades}</td>
+                                                {f.fluxo !== 'PRODUCAO' && (
+                                                  <td className="px-4 py-2 text-right tabular-nums">
+                                                    {item.itensOp > 0
+                                                      ? <span className="font-medium text-purple-700">{item.itensOp}</span>
+                                                      : <span className="text-muted-foreground">—</span>
+                                                    }
+                                                  </td>
+                                                )}
                                                 <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{fmt(item.valor)}</td>
                                                 <td className="px-4 py-2 text-muted-foreground">{format(new Date(item.dataCriacao), 'dd/MM/yy', { locale: ptBR })}</td>
                                                 <td className="px-4 py-2">
