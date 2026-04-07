@@ -36,6 +36,15 @@ interface ProdutoLinha {
   valor: number;
 }
 
+interface OpLinha {
+  tipo: string;
+  label: string;
+  total: number;
+  concluidas: number;
+  aguardando: number;
+  emAndamento: number;
+}
+
 interface FluxoEntrada {
   fluxo: 'PRODUCAO' | 'PRONTA_ENTREGA';
   label: string;
@@ -43,6 +52,12 @@ interface FluxoEntrada {
   itens: number;
   valor: number;
   produtos: ProdutoLinha[];
+}
+
+interface EntradaOPs {
+  total: number;
+  concluidas: number;
+  porTipo: OpLinha[];
 }
 
 interface EntradaSimplifica {
@@ -59,6 +74,7 @@ export default function DashboardGestao() {
   const [entradaPeriodo, setEntradaPeriodo] = useState<'hoje' | 'semana' | 'mes' | '7dias' | '30dias' | 'custom'>('hoje');
   const [entrada, setEntrada] = useState<EntradaSimplifica>({ totalPedidos: 0, totalItens: 0, totalValor: 0, fluxos: [] });
   const [loadingEntrada, setLoadingEntrada] = useState(false);
+  const [ops, setOps] = useState<EntradaOPs>({ total: 0, concluidas: 0, porTipo: [] });
   const [dataInicioCustom, setDataInicioCustom] = useState('');
   const [dataFimCustom, setDataFimCustom] = useState('');
   const [periodoLabel, setPeriodoLabel] = useState('');
@@ -296,6 +312,44 @@ export default function DashboardGestao() {
           }),
       }));
 
+    // Buscar OPs geradas no mesmo período
+    const { data: opsData } = await supabase
+      .from('ordens_producao')
+      .select('tipo_produto, status, criado_em')
+      .in('tipo_produto', ['SINTETICO', 'TECIDO', 'FIVELA_COBERTA'])
+      .gte('criado_em', dataInicio)
+      .lte('criado_em', dataFim);
+
+    const OP_LABELS: Record<string, string> = {
+      SINTETICO: 'Sintético', TECIDO: 'Tecido', FIVELA_COBERTA: 'Fivela Coberta',
+    };
+    const OP_ORDEM = ['SINTETICO', 'TECIDO', 'FIVELA_COBERTA'];
+
+    const opMap: Record<string, { total: number; concluidas: number; aguardando: number; emAndamento: number }> = {};
+    for (const op of (opsData || [])) {
+      const t = op.tipo_produto || 'OUTROS';
+      if (!opMap[t]) opMap[t] = { total: 0, concluidas: 0, aguardando: 0, emAndamento: 0 };
+      opMap[t].total++;
+      if (op.status === 'CONCLUIDA') opMap[t].concluidas++;
+      else if (op.status === 'AGUARDANDO') opMap[t].aguardando++;
+      else if (op.status === 'EM_ANDAMENTO') opMap[t].emAndamento++;
+    }
+
+    const opsPorTipo: OpLinha[] = OP_ORDEM
+      .filter(t => opMap[t])
+      .map(t => ({
+        tipo: t,
+        label: OP_LABELS[t] || t,
+        total: opMap[t].total,
+        concluidas: opMap[t].concluidas,
+        aguardando: opMap[t].aguardando,
+        emAndamento: opMap[t].emAndamento,
+      }));
+
+    const totalOps = (opsData || []).length;
+    const concluidasOps = (opsData || []).filter(o => o.status === 'CONCLUIDA').length;
+    setOps({ total: totalOps, concluidas: concluidasOps, porTipo: opsPorTipo });
+
     setEntrada({ totalPedidos, totalItens, totalValor, fluxos });
     setLoadingEntrada(false);
   }, []);
@@ -452,6 +506,40 @@ export default function DashboardGestao() {
 
               {entrada.totalPedidos === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">Nenhum pedido recebido neste período.</p>
+              )}
+
+              {/* OPs geradas no período */}
+              {ops.total > 0 && (
+                <div className="border-t border-border/40 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-semibold text-foreground">OPs geradas no período</p>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="tabular-nums font-medium text-foreground">{ops.total} total</span>
+                      <span className="tabular-nums text-emerald-600 font-medium">{ops.concluidas} concluídas</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {ops.porTipo.map(op => {
+                      const pct = op.total > 0 ? Math.round((op.concluidas / op.total) * 100) : 0;
+                      return (
+                        <div key={op.tipo} className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground w-32 flex-shrink-0">{op.label}</span>
+                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500 rounded-full transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 text-xs tabular-nums text-right">
+                            <span className="text-emerald-600 font-medium">{op.concluidas}</span>
+                            <span className="text-muted-foreground">/ {op.total}</span>
+                            <span className="text-muted-foreground w-8">({pct}%)</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           )}
