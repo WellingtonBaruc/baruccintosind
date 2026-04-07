@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const API_URL = 'https://app.simplificagestao.com.br/simplifica/api/bi/v2/venda_com_item/1MORY0PAW7';
+const API_URL = Deno.env.get('SIMPLIFICA_API_URL') ?? '';
 
 function parseDateBR(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
@@ -40,6 +40,19 @@ Deno.serve(async (req) => {
     paginas_processadas: 0,
     erros: [] as string[],
   };
+
+  if (!API_URL) {
+    await supabase.from('integracao_logs').insert({
+      tipo, status: 'ERRO', total_recebidos: 0, total_inseridos: 0,
+      total_atualizados: 0, total_ignorados: 0, total_erros: 1,
+      paginas_processadas: 0,
+      erro_detalhes: 'SIMPLIFICA_API_URL não configurada nas secrets do Supabase.',
+      duracao_ms: 0,
+    });
+    return new Response(JSON.stringify({ success: false, error: 'SIMPLIFICA_API_URL não configurada.' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
   try {
     const dataInicio = new Date();
@@ -90,9 +103,10 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Generate numero_pedido
-          const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true });
-          const numeroPedido = `PED-${String((count || 0) + 1).padStart(5, '0')}`;
+          // Usar sequence atômica para evitar race condition
+          const { data: seqData, error: seqErr } = await supabase.rpc('next_numero_pedido');
+          if (seqErr) throw new Error(`Falha ao gerar número de pedido: ${seqErr.message}`);
+          const numeroPedido = seqData as string;
 
           const itens = venda.itens2 || venda.itens || [];
 
