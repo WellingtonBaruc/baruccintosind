@@ -1752,7 +1752,9 @@ export default function FilaMestre() {
             <div className="pl-2 space-y-1.5">
               {/* Situação Simplifica + Etapa */}
               <div className="flex items-center gap-5 text-[13px]">
-                {r.status_api ? (
+                {r.origem_op === 'LOJA' ? (
+                  <Badge className="text-[11px] font-semibold bg-purple-500/15 text-purple-700 border-purple-300 border">OP Complementar — Loja</Badge>
+                ) : r.status_api ? (
                   <span className="text-muted-foreground">Simplifica: <Badge className={`text-[11px] font-semibold ml-1 ${
                     r.status_api === 'Em Produção' ? 'bg-blue-500/15 text-blue-700 border-blue-300' :
                     r.status_api === 'Pedido Enviado' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-300' :
