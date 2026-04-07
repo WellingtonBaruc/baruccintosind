@@ -119,53 +119,56 @@ export default function DashboardGestao() {
 
   const fetchEntrada = useCallback(async (periodo: typeof entradaPeriodo, customInicio?: string, customFim?: string) => {
     setLoadingEntrada(true);
-    const now = new Date();
-    const tzOffset = -3 * 60;
-    const localNow = new Date(now.getTime() + (tzOffset - now.getTimezoneOffset()) * 60000);
+
+    // Usar data local BRT diretamente — sem conversão de fuso
+    // format() retorna a data no fuso local do browser, que está em BRT
+    const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    const brtFmt = (d: Date) => d.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+
+    // Sufixo BRT para garantir que o Supabase interprete no fuso correto
+    const inicio = (d: string) => `${d}T00:00:00-03:00`;
+    const fim = (d: string) => `${d}T23:59:59-03:00`;
 
     let dataInicio: string;
-    let dataFim: string = format(localNow, 'yyyy-MM-dd') + 'T23:59:59';
+    let dataFim: string = fim(hoje);
+
     if (periodo === 'custom' && customInicio) {
-      dataInicio = customInicio + 'T00:00:00';
-      dataFim = (customFim || customInicio) + 'T23:59:59';
+      dataInicio = inicio(customInicio);
+      dataFim = fim(customFim || customInicio);
       const ini = format(new Date(customInicio + 'T12:00:00'), 'dd/MM/yyyy');
-      const fim = format(new Date((customFim || customInicio) + 'T12:00:00'), 'dd/MM/yyyy');
-      setPeriodoLabel(customFim && customFim !== customInicio ? `${ini} até ${fim}` : ini);
+      const fimLabel = format(new Date((customFim || customInicio) + 'T12:00:00'), 'dd/MM/yyyy');
+      setPeriodoLabel(customFim && customFim !== customInicio ? `${ini} até ${fimLabel}` : ini);
     } else if (periodo === 'hoje') {
-      dataInicio = format(localNow, 'yyyy-MM-dd') + 'T00:00:00';
-      setPeriodoLabel(format(localNow, "dd/MM/yyyy"));
+      dataInicio = inicio(hoje);
+      setPeriodoLabel(format(new Date(hoje + 'T12:00:00'), 'dd/MM/yyyy'));
     } else if (periodo === 'semana') {
-      const ini = startOfWeek(localNow, { weekStartsOn: 1 });
-      dataInicio = format(ini, 'yyyy-MM-dd') + 'T00:00:00';
-      setPeriodoLabel(`${format(ini, 'dd/MM')} até ${format(localNow, 'dd/MM/yyyy')}`);
+      const now = new Date();
+      const iniDate = startOfWeek(now, { weekStartsOn: 1 });
+      const iniStr = brtFmt(iniDate);
+      dataInicio = inicio(iniStr);
+      setPeriodoLabel(`${format(new Date(iniStr + 'T12:00:00'), 'dd/MM')} até ${format(new Date(hoje + 'T12:00:00'), 'dd/MM/yyyy')}`);
     } else if (periodo === 'mes') {
-      const ini = startOfMonth(localNow);
-      dataInicio = format(ini, 'yyyy-MM-dd') + 'T00:00:00';
-      setPeriodoLabel(`${format(ini, 'dd/MM')} até ${format(localNow, 'dd/MM/yyyy')}`);
+      const now = new Date();
+      const iniStr = brtFmt(startOfMonth(now));
+      dataInicio = inicio(iniStr);
+      setPeriodoLabel(`${format(new Date(iniStr + 'T12:00:00'), 'dd/MM')} até ${format(new Date(hoje + 'T12:00:00'), 'dd/MM/yyyy')}`);
     } else if (periodo === '7dias') {
-      const ini = subDays(localNow, 7);
-      dataInicio = format(ini, 'yyyy-MM-dd') + 'T00:00:00';
-      setPeriodoLabel(`${format(ini, 'dd/MM')} até ${format(localNow, 'dd/MM/yyyy')}`);
+      const iniStr = brtFmt(subDays(new Date(), 7));
+      dataInicio = inicio(iniStr);
+      setPeriodoLabel(`${format(new Date(iniStr + 'T12:00:00'), 'dd/MM')} até ${format(new Date(hoje + 'T12:00:00'), 'dd/MM/yyyy')}`);
     } else {
-      const ini = subDays(localNow, 30);
-      dataInicio = format(ini, 'yyyy-MM-dd') + 'T00:00:00';
-      setPeriodoLabel(`${format(ini, 'dd/MM')} até ${format(localNow, 'dd/MM/yyyy')}`);
+      const iniStr = brtFmt(subDays(new Date(), 30));
+      dataInicio = inicio(iniStr);
+      setPeriodoLabel(`${format(new Date(iniStr + 'T12:00:00'), 'dd/MM')} até ${format(new Date(hoje + 'T12:00:00'), 'dd/MM/yyyy')}`);
     }
 
-    const { data } = await supabase
-      .from('pedidos')
-      .select('valor_liquido, criado_em')
-      .eq('status_api', 'Em Produção')
-      .gte('criado_em', dataInicio)
-      .lte('criado_em', dataFim);
-
-    // Buscar tipos de produto para cada pedido
-
-    // Contar por tipo via ordens_producao
+    // tipo_fluxo = 'PRODUCAO' é salvo no momento da inserção e nunca muda
+    // Garante que pegamos TODOS os pedidos que entraram como Em Produção,
+    // independente do status atual (Finalizado, Enviado, etc.)
     const { data: pedidos } = await supabase
       .from('pedidos')
       .select('id, valor_liquido, criado_em, ordens_producao(tipo_produto), pedido_itens(quantidade, categoria_produto, descricao_produto, referencia_produto)')
-      .eq('status_api', 'Em Produção')
+      .eq('tipo_fluxo', 'PRODUCAO')
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim);
 
