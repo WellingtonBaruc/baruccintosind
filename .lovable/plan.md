@@ -1,40 +1,37 @@
 
 
-## Plano: Corrigir build + Atualizar sync-simplifica + Aplicar migration SQL
+## Plano: Atualizar sync-simplifica com reconciliação de inconsistências e janela de 7 dias
 
-### 1. Corrigir build error em ConfigurarPcpDialog.tsx (linha 167)
+### Mudanças identificadas
 
-**Problema:** `{ [field]: newVal }` gera tipo dinâmico que TypeScript rejeita.
+Duas alterações em relação ao código atual:
 
-**Correção:** Substituir linha 167 por condicional explícito:
+### 1. Janela padrão de sincronização: 2 → 7 dias
+**Arquivo:** `supabase/functions/sync-simplifica/index.ts` (linha 135)
+
+Alterar de:
 ```typescript
-const updateData = field === 'sabado_ativo'
-  ? { sabado_ativo: newVal, atualizado_em: new Date().toISOString() }
-  : { domingo_ativo: newVal, atualizado_em: new Date().toISOString() };
-await supabase.from('pcp_config_semana').update(updateData).eq('id', config.id);
+const diasImportacao = diasOverride || (isFirstSync ? (config?.dias_importacao_inicial || 15) : 2);
+```
+Para:
+```typescript
+const diasImportacao = diasOverride || (isFirstSync ? (config?.dias_importacao_inicial || 15) : 7);
 ```
 
-### 2. Atualizar edge function sync-simplifica
+Isso amplia a janela de busca padrão, capturando vendas que possam ter sido perdidas em sincronizações anteriores.
 
-Substituir o arquivo `supabase/functions/sync-simplifica/index.ts` com o código completo que o usuário forneceu, que inclui:
-- `AGUARDANDO_CIENCIA_COMERCIAL` nos `terminalStates` e `postLojaStates`
-- `API_URL` via `Deno.env.get('SIMPLIFICA_API_URL')` em vez de hardcoded
+### 2. Reconciliação de status inconsistentes (pedidos antigos)
+**Arquivo:** `supabase/functions/sync-simplifica/index.ts` (linhas 269-300)
 
-**Pré-requisito:** Verificar se o secret `SIMPLIFICA_API_URL` existe. Se não, será necessário adicioná-lo antes do deploy.
+Substituir a lógica de `processarExistente` que atualmente só reconcilia quando `status_api` muda, para também corrigir pedidos onde `status_api` já é "Finalizado" mas o `status_atual` interno ainda está em um estado inválido. Isso resolve inconsistências acumuladas antes do cron ser ativado.
 
-### 3. Aplicar migration SQL
+A nova lógica:
+- Define `terminalStatesOk` para verificar se o estado interno já está correto
+- Detecta `statusInconsistente = statusApi === 'Finalizado' && !terminalStatesOk.includes(status_atual)`
+- Executa reconciliação tanto em mudança de `status_api` quanto em inconsistência detectada
+- Diferencia a mensagem no histórico entre "mudança" e "correção automática"
 
-Executar via migration tool o SQL fornecido pelo usuário:
-- **Sequence** `pedido_numero_seq` + função `next_numero_pedido()` para gerar números atômicos
-- **Cron job** a cada 5 minutos para sincronização automática (substituindo o de 15 min)
-- **Realtime** habilitado nas tabelas `pedidos`, `ordens_producao`, `op_etapas`, `pedido_itens`
-
-**Nota sobre o cron:** O SQL usa `current_setting('app.supabase_url')` que pode não estar configurado. Será necessário usar a URL e anon key diretamente no SQL do cron, seguindo o padrão do Lovable Cloud.
-
-### Ordem de execução
-
-1. Fix build error (ConfigurarPcpDialog.tsx)
-2. Criar secret `SIMPLIFICA_API_URL` se necessário
-3. Atualizar e deploy da edge function sync-simplifica
-4. Aplicar migration SQL (sequence + cron + realtime)
+### Execução
+1. Aplicar as duas alterações no arquivo da edge function
+2. Deploy da edge function
 
