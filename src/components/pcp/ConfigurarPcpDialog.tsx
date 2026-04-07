@@ -164,7 +164,10 @@ function CalendarioTab({ onSaved }: { onSaved?: () => void }) {
   const toggleDia = async (field: 'sabado_ativo' | 'domingo_ativo') => {
     if (!config) return;
     const newVal = !config[field];
-    await supabase.from('pcp_config_semana').update({ [field]: newVal, atualizado_em: new Date().toISOString() }).eq('id', config.id);
+    const updateData = field === 'sabado_ativo'
+      ? { sabado_ativo: newVal, atualizado_em: new Date().toISOString() }
+      : { domingo_ativo: newVal, atualizado_em: new Date().toISOString() };
+    await supabase.from('pcp_config_semana').update(updateData).eq('id', config.id);
     setConfig({ ...config, [field]: newVal });
     onSaved?.();
   };
