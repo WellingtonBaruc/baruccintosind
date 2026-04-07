@@ -1,36 +1,40 @@
 
 
-## Plano: Mover pedido para AGUARDANDO_COMERCIAL ao clicar em "Abrir WhatsApp"
+## Plano: Corrigir build + Atualizar sync-simplifica + Aplicar migration SQL
 
-### O que muda
+### 1. Corrigir build error em ConfigurarPcpDialog.tsx (linha 167)
 
-**Arquivo: `src/pages/KanbanProducao.tsx`**
+**Problema:** `{ [field]: newVal }` gera tipo dinâmico que TypeScript rejeita.
 
-Expandir a função `registerWhatsappReferral` (linhas 1068-1080) para:
+**Correção:** Substituir linha 167 por condicional explícito:
+```typescript
+const updateData = field === 'sabado_ativo'
+  ? { sabado_ativo: newVal, atualizado_em: new Date().toISOString() }
+  : { domingo_ativo: newVal, atualizado_em: new Date().toISOString() };
+await supabase.from('pcp_config_semana').update(updateData).eq('id', config.id);
+```
 
-1. **Atualizar o status do pedido** para `AGUARDANDO_COMERCIAL`:
-   ```typescript
-   await supabase.from('pedidos')
-     .update({ status_atual: 'AGUARDANDO_COMERCIAL' })
-     .eq('id', card.pedido_id);
-   ```
+### 2. Atualizar edge function sync-simplifica
 
-2. **Inserir dois registros no histórico** (em vez de apenas um comentário):
-   - `TRANSICAO` com `status_anterior: card.status_pedido` e `status_novo: 'AGUARDANDO_COMERCIAL'`
-   - `COMENTARIO` com a observação do encaminhamento para a vendedora
+Substituir o arquivo `supabase/functions/sync-simplifica/index.ts` com o código completo que o usuário forneceu, que inclui:
+- `AGUARDANDO_CIENCIA_COMERCIAL` nos `terminalStates` e `postLojaStates`
+- `API_URL` via `Deno.env.get('SIMPLIFICA_API_URL')` em vez de hardcoded
 
-3. **Recarregar o kanban** chamando `fetchCards()` após sucesso, para que o card desapareça da produção
+**Pré-requisito:** Verificar se o secret `SIMPLIFICA_API_URL` existe. Se não, será necessário adicioná-lo antes do deploy.
 
-4. **Exibir toast de confirmação**: `"Pedido enviado para o Kanban Comercial!"`
+### 3. Aplicar migration SQL
 
-### Resultado esperado
+Executar via migration tool o SQL fornecido pelo usuário:
+- **Sequence** `pedido_numero_seq` + função `next_numero_pedido()` para gerar números atômicos
+- **Cron job** a cada 5 minutos para sincronização automática (substituindo o de 15 min)
+- **Realtime** habilitado nas tabelas `pedidos`, `ordens_producao`, `op_etapas`, `pedido_itens`
 
-- Ao clicar em "Abrir WhatsApp", o WhatsApp abre normalmente E o card é movido automaticamente para a coluna "Comercial" do Kanban Venda (`/kanban-venda`)
-- O card desaparece do Kanban de Produção imediatamente
+**Nota sobre o cron:** O SQL usa `current_setting('app.supabase_url')` que pode não estar configurado. Será necessário usar a URL e anon key diretamente no SQL do cron, seguindo o padrão do Lovable Cloud.
 
-### Seção técnica
+### Ordem de execução
 
-- O status `AGUARDANDO_COMERCIAL` já é reconhecido pelo `KanbanVenda.tsx` como pertencente à coluna "Comercial"
-- A RLS permite update por perfis autorizados (admin, gestor, comercial, supervisor_producao, etc.)
-- Nenhuma migração de banco necessária
+1. Fix build error (ConfigurarPcpDialog.tsx)
+2. Criar secret `SIMPLIFICA_API_URL` se necessário
+3. Atualizar e deploy da edge function sync-simplifica
+4. Aplicar migration SQL (sequence + cron + realtime)
 
