@@ -487,8 +487,10 @@ async function inserirNovoPedido(
   const statusAtual = statusApi === 'Em Produção' ? 'AGUARDANDO_PRODUCAO' : 'AGUARDANDO_LOJA';
   const shouldCreateOPs = statusApi === 'Em Produção';
 
-  const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true });
-  const numeroPedido = `PED-${String((count || 0) + 1).padStart(5, '0')}`;
+  // Usar sequence atômica para evitar race condition em sincronizações simultâneas
+  const { data: seqData, error: seqErr } = await supabase.rpc('next_numero_pedido');
+  if (seqErr) throw new Error(`Falha ao gerar número de pedido: ${seqErr.message}`);
+  const numeroPedido = seqData as string;
 
   // Calculate lead time from previsao_entrega
   const dataPrevisao = parseDateBR(venda.dt_previsao_entrega);

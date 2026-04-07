@@ -1420,6 +1420,7 @@ export type Database = {
     Functions: {
       get_user_perfil: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
+      next_numero_pedido: { Args: never; Returns: string }
     }
     Enums: {
       perfil_usuario:
