@@ -4,12 +4,9 @@ import { supabase } from '@/lib/supabase';
 import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertTriangle, Wifi, Layers, RotateCcw } from 'lucide-react';
+import { RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertTriangle, Layers, RotateCcw } from 'lucide-react';
 import ImportPlanilha from '@/components/integracao/ImportPlanilha';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
@@ -18,9 +15,6 @@ import { ptBR } from 'date-fns/locale';
 
 interface Config {
   id: string;
-  ativa: boolean;
-  intervalo_minutos: number;
-  dias_importacao_inicial: number;
   ultima_sincronizacao: string | null;
 }
 
@@ -56,10 +50,10 @@ export default function Integracao() {
   const [historicLoading, setHistoricLoading] = useState(false);
   const [historicProgress, setHistoricProgress] = useState<string | null>(null);
   const [historicDone, setHistoricDone] = useState<{ date: string; count: number } | null>(null);
-  const [syncExpandido, setSyncExpandido] = useState(false);
   const [lastDailyLog, setLastDailyLog] = useState<LogEntry | null>(null);
   const [resetting, setResetting] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [syncExpandido, setSyncExpandido] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -100,7 +94,7 @@ export default function Integracao() {
       const key = p.status_api || '(vazio)';
       apiCounts[key] = (apiCounts[key] || 0) + 1;
 
-      if (p.status_api === 'Finalizado' && p.status_atual !== 'ENTREGUE' && p.status_atual !== 'CANCELADO' && p.status_atual !== 'FINALIZADO_SIMPLIFICA') {
+      if (p.status_api === 'Finalizado' && p.status_atual !== 'ENTREGUE' && p.status_atual !== 'CANCELADO' && p.status_atual !== 'FINALIZADO_SIMPLIFICA' && p.status_atual !== 'AGUARDANDO_CIENCIA_COMERCIAL') {
         mismatchTotal++;
         mismatchStatuses[p.status_atual] = (mismatchStatuses[p.status_atual] || 0) + 1;
       }
@@ -120,7 +114,7 @@ export default function Integracao() {
         .from('pedidos')
         .select('id, status_atual')
         .eq('status_api', 'Finalizado')
-        .not('status_atual', 'in', '("ENTREGUE","CANCELADO","FINALIZADO_SIMPLIFICA")');
+        .not('status_atual', 'in', '("ENTREGUE","CANCELADO","FINALIZADO_SIMPLIFICA","AGUARDANDO_CIENCIA_COMERCIAL")');
 
       if (!toFix || toFix.length === 0) {
         toast.info('Nenhum pedido para corrigir.');
@@ -491,20 +485,6 @@ export default function Integracao() {
     fetchData();
   };
 
-  const handleToggleAuto = async (checked: boolean) => {
-    if (!config) return;
-    await supabase.from('integracao_configuracao').update({ ativa: checked }).eq('id', config.id);
-    setConfig({ ...config, ativa: checked });
-    toast.success(checked ? 'Sincronização automática ativada.' : 'Sincronização automática desativada.');
-  };
-
-  const handleChangeInterval = async (value: string) => {
-    if (!config) return;
-    const mins = parseInt(value);
-    await supabase.from('integracao_configuracao').update({ intervalo_minutos: mins }).eq('id', config.id);
-    setConfig({ ...config, intervalo_minutos: mins });
-    toast.success(`Intervalo atualizado para ${mins} minutos.`);
-  };
 
   const statusBadge = (status: string) => {
     switch (status) {
@@ -526,23 +506,32 @@ export default function Integracao() {
         <p className="text-muted-foreground mt-0.5">Sincronize pedidos da API Simplifica para o sistema interno.</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6">
         {/* Manual sync */}
-        <Card className="border-border/60 shadow-sm">
+        <Card className="border-border/60 shadow-sm md:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <RefreshCw className="h-4 w-4" /> Sincronização Manual
             </CardTitle>
-            <CardDescription>Execute a importação de pedidos sob demanda.</CardDescription>
+            <CardDescription>Execute a importação sob demanda ou com janela maior para buscar pedidos antigos.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Button onClick={handleSync} disabled={syncing} className="w-full">
-              {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-              {syncing ? 'Sincronizando...' : 'Sincronizar agora'}
-            </Button>
-            {syncProgress && (
-              <p className="text-sm text-muted-foreground animate-pulse">{syncProgress}</p>
-            )}
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={handleSync} disabled={syncing} className="gap-2">
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Sincronizar agora (2 dias)
+              </Button>
+              <Button onClick={() => handleSyncExpandido(15)} disabled={syncExpandido} variant="outline" size="sm">
+                {syncExpandido ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} 15 dias
+              </Button>
+              <Button onClick={() => handleSyncExpandido(30)} disabled={syncExpandido} variant="outline" size="sm">
+                30 dias
+              </Button>
+              <Button onClick={() => handleSyncExpandido(60)} disabled={syncExpandido} variant="outline" size="sm">
+                60 dias
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Use os períodos maiores quando pedidos antigos não aparecem no sistema.</p>
             {config?.ultima_sincronizacao && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" />
@@ -551,122 +540,7 @@ export default function Integracao() {
             )}
           </CardContent>
         </Card>
-
-        {/* Auto sync config */}
-        <Card className="border-border/60 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Wifi className="h-4 w-4" /> Sincronização Automática
-            </CardTitle>
-            <CardDescription>Configure a importação periódica.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="auto-sync">Ativar sincronização automática</Label>
-              <Switch
-                id="auto-sync"
-                checked={config?.ativa || false}
-                onCheckedChange={handleToggleAuto}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Intervalo</Label>
-              <Select
-                value={String(config?.intervalo_minutos || 15)}
-                onValueChange={handleChangeInterval}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">A cada 10 minutos</SelectItem>
-                  <SelectItem value="15">A cada 15 minutos</SelectItem>
-                  <SelectItem value="30">A cada 30 minutos</SelectItem>
-                  <SelectItem value="60">A cada 60 minutos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {config?.ativa && config?.ultima_sincronizacao && (() => {
-              const ultima = new Date(config.ultima_sincronizacao);
-              const agora = new Date();
-              // Próximo slot: a cada 15min, seg-sex 07:50-18:30 BRT
-              const getNextSync = (from: Date): Date => {
-                const d = new Date(from);
-                // Avança 15 minutos a partir da última sync
-                d.setMinutes(d.getMinutes() + 15);
-                // Arredonda para próximo slot de 15min (minutos 5,20,35,50)
-                const slots = [5, 20, 35, 50];
-                const m = d.getMinutes();
-                let nextSlot = slots.find(s => s >= m);
-                if (nextSlot === undefined) {
-                  nextSlot = slots[0];
-                  d.setHours(d.getHours() + 1);
-                }
-                d.setMinutes(nextSlot, 0, 0);
-                
-                // Converter para BRT para verificar horário comercial
-                const brt = new Date(d.getTime() - 3 * 60 * 60 * 1000);
-                const brtH = brt.getUTCHours();
-                const brtM = brt.getUTCMinutes();
-                const brtDay = brt.getUTCDay(); // 0=dom, 6=sab
-                
-                // Se fim de semana, avança para segunda 07:50
-                if (brtDay === 0 || brtDay === 6) {
-                  const daysToMon = brtDay === 0 ? 1 : 2;
-                  brt.setUTCDate(brt.getUTCDate() + daysToMon);
-                  brt.setUTCHours(7, 50, 0, 0);
-                  return new Date(brt.getTime() + 3 * 60 * 60 * 1000);
-                }
-                // Se antes das 07:50, ajusta para 07:50
-                if (brtH < 7 || (brtH === 7 && brtM < 50)) {
-                  brt.setUTCHours(7, 50, 0, 0);
-                  return new Date(brt.getTime() + 3 * 60 * 60 * 1000);
-                }
-                // Se depois das 18:30, avança para próximo dia útil 07:50
-                if (brtH > 18 || (brtH === 18 && brtM > 30)) {
-                  brt.setUTCDate(brt.getUTCDate() + 1);
-                  const nextDay = brt.getUTCDay();
-                  if (nextDay === 0) brt.setUTCDate(brt.getUTCDate() + 1);
-                  if (nextDay === 6) brt.setUTCDate(brt.getUTCDate() + 2);
-                  brt.setUTCHours(7, 50, 0, 0);
-                  return new Date(brt.getTime() + 3 * 60 * 60 * 1000);
-                }
-                return d;
-              };
-              const nextSync = getNextSync(ultima);
-              return (
-                <p className="text-xs text-muted-foreground">
-                  Próxima sync prevista: {format(nextSync, "dd/MM 'às' HH:mm", { locale: ptBR })}
-                  <span className="ml-2 opacity-70">(Seg-Sex 07:50–18:30)</span>
-                </p>
-              );
-            })()}
-          </CardContent>
-        </Card>
       </div>
-
-      {/* Sync expandida */}
-      <Card className="border-border/60 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <RefreshCw className="h-4 w-4" /> Sincronização Expandida
-          </CardTitle>
-          <CardDescription>Importa vendas com janela de tempo maior para buscar pedidos antigos que ficaram fora da janela padrão de 2 dias.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex gap-2">
-            <Button onClick={() => handleSyncExpandido(15)} disabled={syncExpandido} variant="outline" size="sm">
-              {syncExpandido ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              15 dias
-            </Button>
-            <Button onClick={() => handleSyncExpandido(30)} disabled={syncExpandido} variant="outline" size="sm">
-              30 dias
-            </Button>
-            <Button onClick={() => handleSyncExpandido(60)} disabled={syncExpandido} variant="outline" size="sm">
-              60 dias
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">Use quando vendas antigas não aparecem no sistema. A sync normal busca apenas os últimos 2 dias.</p>
-        </CardContent>
-      </Card>
 
       {/* Historical load + Daily sync */}
       <div className="grid gap-6 md:grid-cols-2">
@@ -760,7 +634,7 @@ export default function Integracao() {
           {/* Mismatch: Finalizado but still active */}
           <div className="border-t pt-4">
             <h4 className="text-sm font-medium mb-1">Pedidos "Finalizado" no Simplifica ainda ativos internamente</h4>
-            <p className="text-xs text-muted-foreground mb-3">Pedidos com status_api = Finalizado cujo status_atual não é ENTREGUE, CANCELADO ou FINALIZADO_SIMPLIFICA.</p>
+            <p className="text-xs text-muted-foreground mb-3">Pedidos com status_api = Finalizado cujo status_atual não é ENTREGUE, CANCELADO, FINALIZADO_SIMPLIFICA ou AGUARDANDO_CIENCIA_COMERCIAL.</p>
             {mismatch.total === 0 ? (
               <div className="flex items-center gap-2 text-sm text-emerald-600">
                 <CheckCircle2 className="h-4 w-4" /> Nenhuma inconsistência encontrada.
