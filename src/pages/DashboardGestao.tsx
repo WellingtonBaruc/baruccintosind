@@ -63,6 +63,16 @@ interface EntradaOPs {
   porTipo: OpLinha[];
 }
 
+interface DrillItem {
+  pedidoId: string;
+  numeroPedido: string;
+  clienteNome: string;
+  unidades: number;
+  valor: number;
+  dataCriacao: string;
+  ops: { id: string; tipoProduto: string; status: string; origemOp: string | null }[];
+}
+
 interface EntradaSimplifica {
   totalPedidos: number;
   totalItens: number;
@@ -82,6 +92,10 @@ export default function DashboardGestao() {
   const [dataFimCustom, setDataFimCustom] = useState('');
   const [periodoLabel, setPeriodoLabel] = useState('');
   const [loading, setLoading] = useState(true);
+  const [drillKey, setDrillKey] = useState<string | null>(null); // 'PRODUCAO-Cinto Sintético'
+  const [drillItems, setDrillItems] = useState<DrillItem[]>([]);
+  const [drillLoading, setDrillLoading] = useState(false);
+  const [fluxoAberto, setFluxoAberto] = useState<string | null>('PRODUCAO');
 
   useEffect(() => {
     fetchAll();
@@ -410,6 +424,76 @@ export default function DashboardGestao() {
 
   useEffect(() => { if (entradaPeriodo !== 'custom') fetchEntrada(entradaPeriodo); }, [entradaPeriodo, fetchEntrada]);
 
+  const fetchDrill = async (fluxo: string, descricao: string, dataInicio: string, dataFim: string) => {
+    const key = `${fluxo}-${descricao}`;
+    if (drillKey === key) { setDrillKey(null); return; }
+    setDrillKey(key);
+    setDrillLoading(true);
+    setDrillItems([]);
+
+    const inicio = (d: string) => `${d}T00:00:00-03:00`;
+    const fim = (d: string) => `${d}T23:59:59-03:00`;
+
+    const tipoFluxos = fluxo === 'PRODUCAO' ? ['PRODUCAO'] : ['PRONTA_ENTREGA'];
+
+    const CATEGORIAS_DRILL: Record<string, string[]> = {
+      'Cinto Sintético': ['CINTO SINTETICO', 'CINTO SINTÉTICO'],
+      'Tira Sintético':  ['TIRA SINTETICO', 'TIRA SINTÉTICO'],
+      'Fivela Coberta':  ['FIVELA COBERTA'],
+      'Cinto Tecido':    ['CINTO TECIDO'],
+      'Tira Tecido':     ['TIRA TECIDO'],
+    };
+    const keywords = CATEGORIAS_DRILL[descricao] || [];
+
+    const { data: pedidosRaw } = await supabase
+      .from('pedidos')
+      .select('id, numero_pedido, cliente_nome, valor_liquido, criado_em, ordens_producao(id, tipo_produto, status, origem_op), pedido_itens(quantidade, quantidade_faltante, descricao_produto)')
+      .in('tipo_fluxo', tipoFluxos)
+      .gte('criado_em', dataInicio)
+      .lte('criado_em', dataFim)
+      .order('criado_em', { ascending: false });
+
+    const items: DrillItem[] = [];
+    for (const p of (pedidosRaw || [])) {
+      const itens = (p as any).pedido_itens || [];
+      const unidades = itens
+        .filter((i: any) => keywords.some(kw => (i.descricao_produto || '').toUpperCase().includes(kw)))
+        .reduce((s: number, i: any) => {
+          const qtd = i.quantidade || 1;
+          const falt = i.quantidade_faltante || 0;
+          return s + (fluxo !== 'PRODUCAO' && falt > 0 ? Math.max(0, qtd - falt) : qtd);
+        }, 0);
+      if (unidades <= 0) continue;
+
+      items.push({
+        pedidoId: p.id,
+        numeroPedido: p.numero_pedido,
+        clienteNome: p.cliente_nome,
+        unidades,
+        valor: p.valor_liquido || 0,
+        dataCriacao: p.criado_em,
+        ops: ((p as any).ordens_producao || []).map((o: any) => ({
+          id: o.id,
+          tipoProduto: o.tipo_produto,
+          status: o.status,
+          origemOp: o.origem_op,
+        })),
+      });
+    }
+
+    setDrillItems(items);
+    setDrillLoading(false);
+  };
+
+  const statusOpBadge = (status: string, origem: string | null) => {
+    const label = origem === 'LOJA' ? 'OP Loja' : status === 'CONCLUIDA' ? 'Concluída' : status === 'EM_ANDAMENTO' ? 'Em andamento' : 'Aguardando';
+    const cls = origem === 'LOJA' ? 'bg-purple-500/15 text-purple-700 border-purple-500/20' :
+      status === 'CONCLUIDA' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/20' :
+      status === 'EM_ANDAMENTO' ? 'bg-amber-500/15 text-amber-700 border-amber-500/20' :
+      'bg-blue-500/15 text-blue-700 border-blue-500/20';
+    return <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${cls}`}>{label}</span>;
+  };
+
   const fmt = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   if (loading) return <div className="flex justify-center py-20"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
@@ -526,38 +610,128 @@ export default function DashboardGestao() {
                 )}
               </div>
 
-              {/* Breakdown por fluxo */}
+              {/* Breakdown por fluxo com drill-down */}
               {entrada.fluxos.length > 0 && (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {entrada.fluxos.map(f => (
-                    <div key={f.fluxo} className={`rounded-lg border p-4 ${f.fluxo === 'PRONTA_ENTREGA_OP_LOJA' ? 'border-purple-500/30 bg-purple-500/5' : 'border-border/60'}`}>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-foreground">{f.label}</span>
+                <div className="rounded-lg border border-border/60 overflow-hidden">
+                  {entrada.fluxos.map((f, fi) => (
+                    <div key={f.fluxo} className={fi > 0 ? 'border-t border-border/60' : ''}>
+                      {/* Header do fluxo — clicável para expandir */}
+                      <div
+                        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-accent/40 transition-colors"
+                        onClick={() => setFluxoAberto(fluxoAberto === f.fluxo ? null : f.fluxo)}
+                      >
+                        <svg
+                          className={`h-3.5 w-3.5 text-muted-foreground transition-transform flex-shrink-0 ${fluxoAberto === f.fluxo ? 'rotate-90' : ''}`}
+                          viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"
+                        ><path d="M5 3l4 4-4 4"/></svg>
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-sm font-semibold">{f.label}</span>
                           {f.fluxo === 'PRONTA_ENTREGA_OP_LOJA' && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 border border-purple-500/20">OP Loja</span>
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-700 border border-purple-500/20">OP Loja</span>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <span className="tabular-nums font-medium text-foreground">{f.pedidos} ped.</span>
                           <span className="tabular-nums font-medium text-primary">{f.itens} prod.</span>
                           {f.valor > 0 && <span className="tabular-nums">{fmt(f.valor)}</span>}
                         </div>
                       </div>
-                      <div className="space-y-1.5">
-                        {f.produtos.map(p => (
-                          <div key={p.descricao} className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground flex items-center gap-1.5">
-                              <span className="w-1 h-1 rounded-full bg-muted-foreground/50 inline-block" />
-                              {p.descricao}
-                            </span>
-                            <div className="flex items-center gap-3 text-xs tabular-nums">
-                              <span className="text-muted-foreground">{p.pedidos} ped.</span>
-                              <span className="font-medium text-foreground">{p.itens} un.</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+
+                      {/* Produtos do fluxo */}
+                      {fluxoAberto === f.fluxo && (
+                        <div className="border-t border-border/40 bg-muted/20">
+                          {f.produtos.map((p, pi) => {
+                            const key = `${f.fluxo}-${p.descricao}`;
+                            const isOpen = drillKey === key;
+                            return (
+                              <div key={p.descricao} className={pi > 0 ? 'border-t border-border/30' : ''}>
+                                {/* Linha do produto — clicável para abrir drill */}
+                                <div
+                                  className={`flex items-center gap-3 px-4 py-2.5 pl-10 cursor-pointer transition-colors ${isOpen ? 'bg-primary/5' : 'hover:bg-accent/30'}`}
+                                  onClick={() => {
+                                    const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+                                    const brtFmt = (d: Date) => d.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+                                    let di: string, df: string;
+                                    if (entradaPeriodo === 'custom' && dataInicioCustom) {
+                                      di = dataInicioCustom; df = dataFimCustom || dataInicioCustom;
+                                    } else if (entradaPeriodo === 'hoje') {
+                                      di = hoje; df = hoje;
+                                    } else if (entradaPeriodo === 'semana') {
+                                      di = brtFmt(new Date(new Date().setDate(new Date().getDate() - new Date().getDay() + 1))); df = hoje;
+                                    } else if (entradaPeriodo === 'mes') {
+                                      di = hoje.slice(0, 8) + '01'; df = hoje;
+                                    } else if (entradaPeriodo === '7dias') {
+                                      di = brtFmt(new Date(Date.now() - 7 * 86400000)); df = hoje;
+                                    } else {
+                                      di = brtFmt(new Date(Date.now() - 30 * 86400000)); df = hoje;
+                                    }
+                                    fetchDrill(f.fluxo, p.descricao, di, df);
+                                  }}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isOpen ? 'bg-primary' : 'bg-muted-foreground/40'}`} />
+                                  <span className={`text-sm flex-1 ${isOpen ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>{p.descricao}</span>
+                                  <div className="flex items-center gap-4 text-xs tabular-nums">
+                                    <span className="text-muted-foreground">{p.pedidos} ped.</span>
+                                    <span className={`font-medium ${isOpen ? 'text-primary' : 'text-foreground'}`}>{p.itens} un.</span>
+                                    <svg className={`h-3 w-3 text-muted-foreground transition-transform ${isOpen ? 'rotate-90' : ''}`} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 2l4 4-4 4"/></svg>
+                                  </div>
+                                </div>
+
+                                {/* Drill-down: tabela de vendas e OPs */}
+                                {isOpen && (
+                                  <div className="border-t border-primary/20 bg-background">
+                                    <div className="flex items-center justify-between px-4 py-2 border-b border-border/40">
+                                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{p.descricao} — vendas e OPs</span>
+                                      <button className="text-xs text-muted-foreground hover:text-foreground px-2 py-0.5 rounded" onClick={() => setDrillKey(null)}>fechar ×</button>
+                                    </div>
+                                    {drillLoading ? (
+                                      <div className="flex justify-center py-6"><div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
+                                    ) : drillItems.length === 0 ? (
+                                      <p className="text-sm text-muted-foreground text-center py-4">Nenhum pedido encontrado.</p>
+                                    ) : (
+                                      <div className="overflow-x-auto">
+                                        <table className="w-full text-xs">
+                                          <thead>
+                                            <tr className="border-b border-border/40">
+                                              <th className="text-left px-4 py-2 text-muted-foreground font-medium">Pedido</th>
+                                              <th className="text-left px-4 py-2 text-muted-foreground font-medium">Cliente</th>
+                                              <th className="text-right px-4 py-2 text-muted-foreground font-medium">Un.</th>
+                                              <th className="text-right px-4 py-2 text-muted-foreground font-medium">Valor</th>
+                                              <th className="text-left px-4 py-2 text-muted-foreground font-medium">Entrada</th>
+                                              <th className="text-left px-4 py-2 text-muted-foreground font-medium">OPs</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {drillItems.map(item => (
+                                              <tr key={item.pedidoId} className="border-b border-border/30 hover:bg-muted/40 transition-colors">
+                                                <td className="px-4 py-2 font-medium text-foreground">{item.numeroPedido}</td>
+                                                <td className="px-4 py-2 text-muted-foreground max-w-[140px] truncate">{item.clienteNome}</td>
+                                                <td className="px-4 py-2 text-right tabular-nums font-medium">{item.unidades}</td>
+                                                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{fmt(item.valor)}</td>
+                                                <td className="px-4 py-2 text-muted-foreground">{format(new Date(item.dataCriacao), 'dd/MM/yy', { locale: ptBR })}</td>
+                                                <td className="px-4 py-2">
+                                                  <div className="flex flex-wrap gap-1">
+                                                    {item.ops.length === 0
+                                                      ? <span className="text-muted-foreground">—</span>
+                                                      : item.ops.map(op => (
+                                                        <span key={op.id}>{statusOpBadge(op.status, op.origemOp)}</span>
+                                                      ))
+                                                    }
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
