@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const API_URL = 'https://app.simplificagestao.com.br/simplifica/api/bi/v2/venda_com_item/1MORY0PAW7';
+const API_URL = Deno.env.get('SIMPLIFICA_API_URL') ?? '';
 
 const PIPELINE_IDS: Record<string, string> = {
   SINTETICO: '00000000-0000-0000-0000-000000000001',
