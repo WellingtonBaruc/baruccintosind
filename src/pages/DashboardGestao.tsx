@@ -451,8 +451,8 @@ export default function DashboardGestao() {
       .from('pedidos')
       .select('id, numero_pedido, api_venda_id, cliente_nome, valor_liquido, criado_em, pedido_itens(quantidade, quantidade_faltante, disponivel, descricao_produto)')
       .in('tipo_fluxo', tipoFluxos)
-      .gte('criado_em', dataInicio)
-      .lte('criado_em', dataFim)
+      .gte('criado_em', inicio(dataInicio))
+      .lte('criado_em', fim(dataFim))
       .order('criado_em', { ascending: false });
 
     // Buscar OPs separadamente para garantir que todas são retornadas (join pode ser limitado)
