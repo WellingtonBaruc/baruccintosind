@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Package, CheckCircle2, CalendarCheck, AlertTriangle } from 'lucide-react';
+import { Package, CheckCircle2, CalendarCheck, AlertTriangle, TrendingUp } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { format, subDays } from 'date-fns';
+import { format, subDays, startOfMonth, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TIPO_PRODUTO_LABELS } from '@/lib/pcp';
 
@@ -29,10 +29,19 @@ interface TypeProgress {
   realizado: number;
 }
 
+interface EntradaSimplifica {
+  count: number;
+  valor: number;
+  porTipo: { tipo: string; label: string; count: number; valor: number }[];
+}
+
 export default function DashboardGestao() {
   const [cards, setCards] = useState<OverviewCard[]>([]);
   const [chart, setChart] = useState<DayBar[]>([]);
   const [typeProgress, setTypeProgress] = useState<TypeProgress[]>([]);
+  const [entradaPeriodo, setEntradaPeriodo] = useState<'hoje' | 'semana' | 'mes' | '7dias' | '30dias'>('hoje');
+  const [entrada, setEntrada] = useState<EntradaSimplifica>({ count: 0, valor: 0, porTipo: [] });
+  const [loadingEntrada, setLoadingEntrada] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -104,6 +113,72 @@ export default function DashboardGestao() {
     setLoading(false);
   };
 
+  const fetchEntrada = useCallback(async (periodo: typeof entradaPeriodo) => {
+    setLoadingEntrada(true);
+    const now = new Date();
+    const tzOffset = -3 * 60;
+    const localNow = new Date(now.getTime() + (tzOffset - now.getTimezoneOffset()) * 60000);
+
+    let dataInicio: string;
+    if (periodo === 'hoje') {
+      dataInicio = format(localNow, 'yyyy-MM-dd') + 'T00:00:00';
+    } else if (periodo === 'semana') {
+      dataInicio = format(startOfWeek(localNow, { weekStartsOn: 1 }), 'yyyy-MM-dd') + 'T00:00:00';
+    } else if (periodo === 'mes') {
+      dataInicio = format(startOfMonth(localNow), 'yyyy-MM-dd') + 'T00:00:00';
+    } else if (periodo === '7dias') {
+      dataInicio = format(subDays(localNow, 7), 'yyyy-MM-dd') + 'T00:00:00';
+    } else {
+      dataInicio = format(subDays(localNow, 30), 'yyyy-MM-dd') + 'T00:00:00';
+    }
+
+    const { data } = await supabase
+      .from('pedidos')
+      .select('valor_liquido, criado_em')
+      .eq('status_api', 'Em Produção')
+      .gte('criado_em', dataInicio);
+
+    // Buscar tipos de produto para cada pedido
+
+    // Contar por tipo via ordens_producao
+    const { data: ordens } = await supabase
+      .from('pedidos')
+      .select('id, valor_liquido, criado_em, ordens_producao(tipo_produto)')
+      .eq('status_api', 'Em Produção')
+      .gte('criado_em', dataInicio);
+
+    const tipoLabels: Record<string, string> = {
+      SINTETICO: 'Sintético', TECIDO: 'Tecido', FIVELA_COBERTA: 'Fivela Coberta', OUTROS: 'Outros',
+    };
+
+    const tipoMap: Record<string, { count: number; valor: number }> = {};
+    let totalCount = 0;
+    let totalValor = 0;
+
+    for (const p of (ordens || [])) {
+      totalCount++;
+      totalValor += p.valor_liquido || 0;
+      const ops = (p as any).ordens_producao || [];
+      const tipos = ops.length > 0
+        ? [...new Set(ops.map((o: any) => o.tipo_produto || 'OUTROS'))] as string[]
+        : ['OUTROS'];
+      for (const tipo of tipos) {
+        if (!tipoMap[tipo]) tipoMap[tipo] = { count: 0, valor: 0 };
+        tipoMap[tipo].count++;
+        tipoMap[tipo].valor += p.valor_liquido || 0;
+      }
+    }
+
+    const porTipo = Object.entries(tipoMap)
+      .map(([tipo, v]) => ({ tipo, label: tipoLabels[tipo] || tipo, count: v.count, valor: v.valor }))
+      .sort((a, b) => b.count - a.count);
+
+    setEntrada({ count: totalCount, valor: totalValor, porTipo });
+    setLoadingEntrada(false);
+  }, []);
+
+  useEffect(() => { fetchEntrada(entradaPeriodo); }, [entradaPeriodo, fetchEntrada]);
+
   const fmt = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   if (loading) return <div className="flex justify-center py-20"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
@@ -136,6 +211,59 @@ export default function DashboardGestao() {
           </Card>
         ))}
       </div>
+
+      {/* Entradas do Simplifica */}
+      <Card className="border-border/60">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" /> Pedidos Recebidos do Simplifica
+            </CardTitle>
+            <div className="flex gap-1 flex-wrap">
+              {(['hoje', 'semana', 'mes', '7dias', '30dias'] as const).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setEntradaPeriodo(p)}
+                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                    entradaPeriodo === p
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-border/60 text-muted-foreground hover:bg-accent'
+                  }`}
+                >
+                  {p === 'hoje' ? 'Hoje' : p === 'semana' ? 'Esta semana' : p === 'mes' ? 'Este mês' : p === '7dias' ? '7 dias' : '30 dias'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingEntrada ? (
+            <div className="flex justify-center py-6"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-baseline gap-3">
+                <span className="text-4xl font-bold tabular-nums">{entrada.count}</span>
+                <span className="text-muted-foreground text-sm">pedidos</span>
+                {entrada.valor > 0 && <span className="text-sm font-medium text-primary ml-auto">{fmt(entrada.valor)}</span>}
+              </div>
+              {entrada.porTipo.length > 0 && (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {entrada.porTipo.map(t => (
+                    <div key={t.tipo} className="rounded-lg border border-border/60 p-3">
+                      <p className="text-xs text-muted-foreground mb-1">{t.label}</p>
+                      <p className="text-xl font-bold tabular-nums">{t.count}</p>
+                      {t.valor > 0 && <p className="text-xs text-muted-foreground mt-1">{fmt(t.valor)}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {entrada.count === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhum pedido recebido neste período.</p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* KPIs do dia */}
       {typeProgress.length > 0 && (
