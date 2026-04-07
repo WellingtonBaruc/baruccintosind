@@ -449,7 +449,7 @@ export default function DashboardGestao() {
 
     const { data: pedidosRaw } = await supabase
       .from('pedidos')
-      .select('id, numero_pedido, api_venda_id, cliente_nome, valor_liquido, criado_em, ordens_producao(id, tipo_produto, status, origem_op), pedido_itens(quantidade, quantidade_faltante, descricao_produto)')
+      .select('id, numero_pedido, api_venda_id, cliente_nome, valor_liquido, criado_em, ordens_producao(id, tipo_produto, status, origem_op), pedido_itens(quantidade, quantidade_faltante, disponivel, descricao_produto)')
       .in('tipo_fluxo', tipoFluxos)
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim)
@@ -467,10 +467,29 @@ export default function DashboardGestao() {
         }, 0);
       if (unidades <= 0) continue;
 
-      // Calcular itens que viraram OP (quantidade_faltante dos itens reconhecidos)
-      const itensOp = itens
-        .filter((i: any) => keywords.some(kw => (i.descricao_produto || '').toUpperCase().includes(kw)))
-        .reduce((s: number, i: any) => s + (i.quantidade_faltante || 0), 0);
+      // Calcular itens que viraram OP para pedidos PRONTA_ENTREGA:
+      // Estratégia em ordem de prioridade:
+      // 1. quantidade_faltante preenchida → valor exato
+      // 2. disponivel=false → quantidade total do item
+      // 3. Tem OP de loja mas nenhum item marcado → usa quantidade total dos itens reconhecidos
+      const temOpLoja = ((p as any).ordens_producao || []).some((o: any) => o.origem_op === 'LOJA');
+      const itensFiltrados = itens.filter((i: any) =>
+        keywords.some(kw => (i.descricao_produto || '').toUpperCase().includes(kw))
+      );
+
+      let itensOpFinal = 0;
+      if (temOpLoja) {
+        // Somar por item: preferir quantidade_faltante, depois quantidade se disponivel=false
+        const somaExplicita = itensFiltrados.reduce((s: number, i: any) => {
+          if (i.quantidade_faltante != null && i.quantidade_faltante > 0) return s + i.quantidade_faltante;
+          if (i.disponivel === false) return s + (i.quantidade || 1);
+          return s;
+        }, 0);
+        // Se nenhum item explicitamente marcado, usar quantidade total (OP gerou tudo)
+        itensOpFinal = somaExplicita > 0
+          ? somaExplicita
+          : itensFiltrados.reduce((s: number, i: any) => s + (i.quantidade || 1), 0);
+      }
 
       items.push({
         pedidoId: p.id,
@@ -478,7 +497,7 @@ export default function DashboardGestao() {
         apiVendaId: (p as any).api_venda_id || null,
         clienteNome: p.cliente_nome,
         unidades,
-        itensOp,
+        itensOp: itensOpFinal,
         valor: p.valor_liquido || 0,
         dataCriacao: p.criado_em,
         ops: ((p as any).ordens_producao || []).map((o: any) => ({
