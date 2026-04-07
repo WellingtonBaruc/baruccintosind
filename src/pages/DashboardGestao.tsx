@@ -29,11 +29,27 @@ interface TypeProgress {
   realizado: number;
 }
 
-interface EntradaSimplifica {
-  count: number;
+interface ProdutoLinha {
+  descricao: string;
+  pedidos: number;
+  itens: number;
   valor: number;
+}
+
+interface FluxoEntrada {
+  fluxo: 'PRODUCAO' | 'PRONTA_ENTREGA';
+  label: string;
+  pedidos: number;
+  itens: number;
+  valor: number;
+  produtos: ProdutoLinha[];
+}
+
+interface EntradaSimplifica {
+  totalPedidos: number;
   totalItens: number;
-  porTipo: { tipo: string; label: string; count: number; itens: number; valor: number }[];
+  totalValor: number;
+  fluxos: FluxoEntrada[];
 }
 
 export default function DashboardGestao() {
@@ -41,7 +57,7 @@ export default function DashboardGestao() {
   const [chart, setChart] = useState<DayBar[]>([]);
   const [typeProgress, setTypeProgress] = useState<TypeProgress[]>([]);
   const [entradaPeriodo, setEntradaPeriodo] = useState<'hoje' | 'semana' | 'mes' | '7dias' | '30dias' | 'custom'>('hoje');
-  const [entrada, setEntrada] = useState<EntradaSimplifica>({ count: 0, valor: 0, totalItens: 0, porTipo: [] });
+  const [entrada, setEntrada] = useState<EntradaSimplifica>({ totalPedidos: 0, totalItens: 0, totalValor: 0, fluxos: [] });
   const [loadingEntrada, setLoadingEntrada] = useState(false);
   const [dataInicioCustom, setDataInicioCustom] = useState('');
   const [dataFimCustom, setDataFimCustom] = useState('');
@@ -167,61 +183,88 @@ export default function DashboardGestao() {
     // independente do status atual (Finalizado, Enviado, etc.)
     const { data: pedidos } = await supabase
       .from('pedidos')
-      .select('id, valor_liquido, criado_em, ordens_producao(tipo_produto), pedido_itens(quantidade, categoria_produto, descricao_produto, referencia_produto)')
+      .select('id, valor_liquido, tipo_fluxo, criado_em, pedido_itens(quantidade, descricao_produto, categoria_produto, referencia_produto, valor_total)')
       .in('tipo_fluxo', ['PRODUCAO', 'PRONTA_ENTREGA'])
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim);
 
-    const tipoLabels: Record<string, string> = {
-      SINTETICO: 'Sintético', TECIDO: 'Tecido', FIVELA_COBERTA: 'Fivela Coberta', OUTROS: 'Outros',
+    // Normalizar descrição do produto para agrupamento
+    const normalizarDescricao = (desc: string): string => {
+      const u = (desc || '').toUpperCase().trim();
+      if (u.includes('CINTO SINTETICO') || u.includes('CINTO SINTÉTICO')) return 'Cinto Sintético';
+      if (u.includes('TIRA SINTETICO') || u.includes('TIRA SINTÉTICO')) return 'Tira Sintético';
+      if (u.includes('CINTO TECIDO')) return 'Cinto Tecido';
+      if (u.includes('TIRA TECIDO')) return 'Tira Tecido';
+      if (u.includes('FIVELA COBERTA')) return 'Fivela Coberta';
+      if (u.includes('FIVELA MATRIZ')) return 'Fivela Matriz';
+      if (u.includes('FIVELA')) return 'Fivela';
+      if (u.includes('PASSANTE')) return 'Passante';
+      // Retorna a descrição original capitalizada se não reconhecer
+      return desc.trim();
     };
 
-    const classificarItem = (desc: string, cat: string, ref: string): string => {
-      const u = (desc || '').toUpperCase();
-      const c = (cat || '').toUpperCase();
-      const r = (ref || '').toUpperCase();
-      if (u.includes('FIVELA') || u.includes('PASSANTE') || c.includes('FIVELA') || r.startsWith('FVC')) return 'FIVELA_COBERTA';
-      if (u.includes('CINTO SINTETICO') || u.includes('TIRA SINTETICO') || u.includes('SINTÉTICO')) return 'SINTETICO';
-      if (u.includes('CINTO TECIDO') || u.includes('TIRA TECIDO')) return 'TECIDO';
-      return 'OUTROS';
+    // Agrupar por fluxo → produto
+    const fluxoMap: Record<string, {
+      label: string;
+      pedidos: number;
+      itens: number;
+      valor: number;
+      produtos: Record<string, { pedidos: number; itens: number; valor: number }>;
+    }> = {
+      PRODUCAO: { label: 'Produção', pedidos: 0, itens: 0, valor: 0, produtos: {} },
+      PRONTA_ENTREGA: { label: 'Pedido Enviado', pedidos: 0, itens: 0, valor: 0, produtos: {} },
     };
 
-    const tipoMap: Record<string, { count: number; itens: number; valor: number }> = {};
-    let totalCount = 0;
-    let totalValor = 0;
+    let totalPedidos = 0;
     let totalItens = 0;
+    let totalValor = 0;
 
     for (const p of (pedidos || [])) {
-      totalCount++;
+      const fluxo = (p as any).tipo_fluxo === 'PRONTA_ENTREGA' ? 'PRONTA_ENTREGA' : 'PRODUCAO';
+      const f = fluxoMap[fluxo];
+      f.pedidos++;
+      f.valor += p.valor_liquido || 0;
+      totalPedidos++;
       totalValor += p.valor_liquido || 0;
 
-      // Contar itens por tipo
       const itensArray = (p as any).pedido_itens || [];
       for (const item of itensArray) {
-        const tipo = classificarItem(item.descricao_produto, item.categoria_produto, item.referencia_produto);
-        if (!tipoMap[tipo]) tipoMap[tipo] = { count: 0, itens: 0, valor: 0 };
-        tipoMap[tipo].itens += item.quantidade || 1;
-        totalItens += item.quantidade || 1;
+        const desc = normalizarDescricao(item.descricao_produto || 'Outros');
+        if (!f.produtos[desc]) f.produtos[desc] = { pedidos: 0, itens: 0, valor: 0 };
+        const qtd = item.quantidade || 1;
+        f.produtos[desc].itens += qtd;
+        f.produtos[desc].valor += (item.valor_total || 0);
+        f.itens += qtd;
+        totalItens += qtd;
       }
-
-      // Contar pedidos por tipo (via ordens)
-      const ops = (p as any).ordens_producao || [];
-      const tipos = ops.length > 0
-        ? [...new Set(ops.map((o: any) => o.tipo_produto || 'OUTROS'))] as string[]
-        : ['OUTROS'];
-      for (const tipo of tipos) {
-        if (!tipoMap[tipo]) tipoMap[tipo] = { count: 0, itens: 0, valor: 0 };
-        tipoMap[tipo].count++;
-        tipoMap[tipo].valor += p.valor_liquido || 0;
+      // Contar pedido por produto se não tiver itens detalhados
+      if (itensArray.length === 0) {
+        const desc = 'Sem itens';
+        if (!f.produtos[desc]) f.produtos[desc] = { pedidos: 0, itens: 0, valor: 0 };
+        f.produtos[desc].pedidos++;
+      } else {
+        // Contar pedido no produto mais representativo (maior quantidade)
+        const mainItem = [...itensArray].sort((a: any, b: any) => (b.quantidade || 1) - (a.quantidade || 1))[0];
+        const mainDesc = normalizarDescricao(mainItem.descricao_produto || 'Outros');
+        f.produtos[mainDesc].pedidos++;
       }
     }
 
-    const porTipo = Object.entries(tipoMap)
-      .filter(([tipo]) => tipo !== 'OUTROS' || tipoMap['OUTROS']?.count > 0)
-      .map(([tipo, v]) => ({ tipo, label: tipoLabels[tipo] || tipo, count: v.count, itens: v.itens, valor: v.valor }))
-      .sort((a, b) => b.itens - a.itens);
+    const fluxos: FluxoEntrada[] = Object.entries(fluxoMap)
+      .filter(([, f]) => f.pedidos > 0)
+      .map(([fluxo, f]) => ({
+        fluxo: fluxo as 'PRODUCAO' | 'PRONTA_ENTREGA',
+        label: f.label,
+        pedidos: f.pedidos,
+        itens: f.itens,
+        valor: f.valor,
+        produtos: Object.entries(f.produtos)
+          .map(([descricao, v]) => ({ descricao, ...v }))
+          .filter(p => p.itens > 0 || p.pedidos > 0)
+          .sort((a, b) => b.itens - a.itens),
+      }));
 
-    setEntrada({ count: totalCount, valor: totalValor, totalItens, porTipo });
+    setEntrada({ totalPedidos, totalItens, totalValor, fluxos });
     setLoadingEntrada(false);
   }, []);
 
@@ -324,44 +367,58 @@ export default function DashboardGestao() {
             <div className="flex justify-center py-6"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center gap-6 flex-wrap">
+              {/* Totais gerais */}
+              <div className="flex items-center gap-6 flex-wrap pb-2 border-b border-border/40">
                 <div>
-                  <span className="text-4xl font-bold tabular-nums">{entrada.count}</span>
+                  <span className="text-3xl font-bold tabular-nums">{entrada.totalPedidos}</span>
                   <span className="text-muted-foreground text-sm ml-2">pedidos</span>
                 </div>
-                <div className="h-10 w-px bg-border/60 hidden sm:block" />
+                <div className="h-8 w-px bg-border/60 hidden sm:block" />
                 <div>
-                  <span className="text-4xl font-bold tabular-nums">{entrada.totalItens}</span>
+                  <span className="text-3xl font-bold tabular-nums">{entrada.totalItens}</span>
                   <span className="text-muted-foreground text-sm ml-2">produtos</span>
                 </div>
-                {entrada.valor > 0 && (
+                {entrada.totalValor > 0 && (
                   <>
-                    <div className="h-10 w-px bg-border/60 hidden sm:block" />
-                    <div>
-                      <span className="text-xl font-semibold text-primary">{fmt(entrada.valor)}</span>
-                    </div>
+                    <div className="h-8 w-px bg-border/60 hidden sm:block" />
+                    <span className="text-lg font-semibold text-primary">{fmt(entrada.totalValor)}</span>
                   </>
                 )}
               </div>
-              {entrada.porTipo.length > 0 && (
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {entrada.porTipo.map(t => (
-                    <div key={t.tipo} className="rounded-lg border border-border/60 p-3">
-                      <p className="text-xs text-muted-foreground mb-2">{t.label}</p>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-xl font-bold tabular-nums">{t.count}</span>
-                        <span className="text-xs text-muted-foreground">pedidos</span>
+
+              {/* Breakdown por fluxo */}
+              {entrada.fluxos.length > 0 && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {entrada.fluxos.map(f => (
+                    <div key={f.fluxo} className="rounded-lg border border-border/60 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm font-semibold text-foreground">{f.label}</p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="tabular-nums font-medium text-foreground">{f.pedidos} ped.</span>
+                          <span className="tabular-nums font-medium text-primary">{f.itens} prod.</span>
+                          {f.valor > 0 && <span className="tabular-nums">{fmt(f.valor)}</span>}
+                        </div>
                       </div>
-                      <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-lg font-semibold tabular-nums text-primary">{t.itens}</span>
-                        <span className="text-xs text-muted-foreground">produtos</span>
+                      <div className="space-y-1.5">
+                        {f.produtos.map(p => (
+                          <div key={p.descricao} className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground flex items-center gap-1.5">
+                              <span className="w-1 h-1 rounded-full bg-muted-foreground/50 inline-block" />
+                              {p.descricao}
+                            </span>
+                            <div className="flex items-center gap-3 text-xs tabular-nums">
+                              <span className="text-muted-foreground">{p.pedidos} ped.</span>
+                              <span className="font-medium text-foreground">{p.itens} un.</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      {t.valor > 0 && <p className="text-xs text-muted-foreground mt-1">{fmt(t.valor)}</p>}
                     </div>
                   ))}
                 </div>
               )}
-              {entrada.count === 0 && (
+
+              {entrada.totalPedidos === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">Nenhum pedido recebido neste período.</p>
               )}
             </div>
