@@ -43,6 +43,7 @@ interface OpLinha {
   concluidas: number;
   aguardando: number;
   emAndamento: number;
+  deLoja: number;
 }
 
 interface FluxoEntrada {
@@ -57,6 +58,7 @@ interface FluxoEntrada {
 interface EntradaOPs {
   total: number;
   concluidas: number;
+  deLoja: number;
   porTipo: OpLinha[];
 }
 
@@ -74,7 +76,7 @@ export default function DashboardGestao() {
   const [entradaPeriodo, setEntradaPeriodo] = useState<'hoje' | 'semana' | 'mes' | '7dias' | '30dias' | 'custom'>('hoje');
   const [entrada, setEntrada] = useState<EntradaSimplifica>({ totalPedidos: 0, totalItens: 0, totalValor: 0, fluxos: [] });
   const [loadingEntrada, setLoadingEntrada] = useState(false);
-  const [ops, setOps] = useState<EntradaOPs>({ total: 0, concluidas: 0, porTipo: [] });
+  const [ops, setOps] = useState<EntradaOPs>({ total: 0, concluidas: 0, deLoja: 0, porTipo: [] });
   const [dataInicioCustom, setDataInicioCustom] = useState('');
   const [dataFimCustom, setDataFimCustom] = useState('');
   const [periodoLabel, setPeriodoLabel] = useState('');
@@ -315,7 +317,7 @@ export default function DashboardGestao() {
     // Buscar OPs geradas no mesmo período
     const { data: opsData } = await supabase
       .from('ordens_producao')
-      .select('tipo_produto, status, criado_em')
+      .select('tipo_produto, status, criado_em, origem_op')
       .in('tipo_produto', ['SINTETICO', 'TECIDO', 'FIVELA_COBERTA'])
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim);
@@ -325,11 +327,12 @@ export default function DashboardGestao() {
     };
     const OP_ORDEM = ['SINTETICO', 'TECIDO', 'FIVELA_COBERTA'];
 
-    const opMap: Record<string, { total: number; concluidas: number; aguardando: number; emAndamento: number }> = {};
+    const opMap: Record<string, { total: number; concluidas: number; aguardando: number; emAndamento: number; deLoja: number }> = {};
     for (const op of (opsData || [])) {
-      const t = op.tipo_produto || 'OUTROS';
-      if (!opMap[t]) opMap[t] = { total: 0, concluidas: 0, aguardando: 0, emAndamento: 0 };
+      const t = (op as any).tipo_produto || 'OUTROS';
+      if (!opMap[t]) opMap[t] = { total: 0, concluidas: 0, aguardando: 0, emAndamento: 0, deLoja: 0 };
       opMap[t].total++;
+      if ((op as any).origem_op === 'LOJA') opMap[t].deLoja++;
       if (op.status === 'CONCLUIDA') opMap[t].concluidas++;
       else if (op.status === 'AGUARDANDO') opMap[t].aguardando++;
       else if (op.status === 'EM_ANDAMENTO') opMap[t].emAndamento++;
@@ -344,11 +347,13 @@ export default function DashboardGestao() {
         concluidas: opMap[t].concluidas,
         aguardando: opMap[t].aguardando,
         emAndamento: opMap[t].emAndamento,
+        deLoja: opMap[t].deLoja,
       }));
 
     const totalOps = (opsData || []).length;
     const concluidasOps = (opsData || []).filter(o => o.status === 'CONCLUIDA').length;
-    setOps({ total: totalOps, concluidas: concluidasOps, porTipo: opsPorTipo });
+    const deLoja = (opsData || []).filter((o: any) => o.origem_op === 'LOJA').length;
+    setOps({ total: totalOps, concluidas: concluidasOps, deLoja, porTipo: opsPorTipo });
 
     setEntrada({ totalPedidos, totalItens, totalValor, fluxos });
     setLoadingEntrada(false);
@@ -523,7 +528,14 @@ export default function DashboardGestao() {
                       const pct = op.total > 0 ? Math.round((op.concluidas / op.total) * 100) : 0;
                       return (
                         <div key={op.tipo} className="flex items-center gap-3">
-                          <span className="text-sm text-muted-foreground w-32 flex-shrink-0">{op.label}</span>
+                          <div className="w-36 flex-shrink-0 flex items-center gap-1.5">
+                            <span className="text-sm text-muted-foreground">{op.label}</span>
+                            {op.deLoja > 0 && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 border border-purple-500/20">
+                                {op.deLoja} loja
+                              </span>
+                            )}
+                          </div>
                           <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                             <div
                               className="h-full bg-emerald-500 rounded-full transition-all"
