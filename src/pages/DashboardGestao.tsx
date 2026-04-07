@@ -494,7 +494,11 @@ export default function DashboardGestao() {
     const inicio = (d: string) => `${d}T00:00:00-03:00`;
     const fim = (d: string) => `${d}T23:59:59-03:00`;
 
-    const tipoFluxos = fluxo === 'PRODUCAO' ? ['PRODUCAO'] : ['PRONTA_ENTREGA', 'PRONTA_ENTREGA_OP_LOJA'];
+    const tipoFluxos = fluxo === 'PRODUCAO'
+      ? ['PRODUCAO']
+      : fluxo === 'PCP_INTERNO'
+      ? ['PCP_INTERNO']
+      : ['PRONTA_ENTREGA', 'PRONTA_ENTREGA_OP_LOJA'];
 
     const CATEGORIAS_DRILL: Record<string, string[]> = {
       'Cinto Sintético': ['CINTO SINTETICO', 'CINTO SINTÉTICO'],
@@ -531,13 +535,39 @@ export default function DashboardGestao() {
     const items: DrillItem[] = [];
     for (const p of (pedidosRaw || [])) {
       const itens = (p as any).pedido_itens || [];
-      const unidades = itens
-        .filter((i: any) => keywords.some(kw => (i.descricao_produto || '').toUpperCase().includes(kw)))
-        .reduce((s: number, i: any) => {
-          const qtd = i.quantidade || 1;
-          const falt = i.quantidade_faltante || 0;
-          return s + (fluxo !== 'PRODUCAO' && falt > 0 ? Math.max(0, qtd - falt) : qtd);
-        }, 0);
+      // Para PCP_INTERNO: contar unidades via tipo_produto da OP + pedido_itens
+      // Para outros fluxos: contar via keywords nos pedido_itens
+      let unidades = 0;
+      if (fluxo === 'PCP_INTERNO') {
+        // Buscar a OP do pedido para verificar tipo_produto
+        const opsPedido = opsPorPedido[p.id] || [];
+        const tipoProdutoMap: Record<string, string[]> = {
+          SINTETICO: ['CINTO SINTETICO', 'CINTO SINTÉTICO', 'TIRA SINTETICO', 'TIRA SINTÉTICO'],
+          TECIDO: ['CINTO TECIDO', 'TIRA TECIDO'],
+          FIVELA_COBERTA: ['FIVELA COBERTA'],
+        };
+        const tipoOp = opsPedido[0]?.tipo_produto || '';
+        const kwsOp = tipoProdutoMap[tipoOp] || keywords;
+        unidades = itens
+          .filter((i: any) => kwsOp.some(kw => (i.descricao_produto || '').toUpperCase().includes(kw)))
+          .reduce((s: number, i: any) => s + (i.quantidade || 1), 0);
+        // Se não achou por pedido_itens, contar tudo (OP PCP pode não ter itens detalhados)
+        if (unidades === 0 && opsPedido.some(o => o.tipo_produto && keywords.some(kw => 
+          (o.tipo_produto === 'SINTETICO' && (descricao.includes('Sintético') || descricao.includes('Sintetico'))) ||
+          (o.tipo_produto === 'TECIDO' && descricao.includes('Tecido')) ||
+          (o.tipo_produto === 'FIVELA_COBERTA' && descricao.includes('Fivela'))
+        ))) {
+          unidades = itens.reduce((s: number, i: any) => s + (i.quantidade || 1), 0) || 1;
+        }
+      } else {
+        unidades = itens
+          .filter((i: any) => keywords.some(kw => (i.descricao_produto || '').toUpperCase().includes(kw)))
+          .reduce((s: number, i: any) => {
+            const qtd = i.quantidade || 1;
+            const falt = i.quantidade_faltante || 0;
+            return s + (fluxo !== 'PRODUCAO' && falt > 0 ? Math.max(0, qtd - falt) : qtd);
+          }, 0);
+      }
       if (unidades <= 0) continue;
 
       // Calcular itens que viraram OP para pedidos PRONTA_ENTREGA:
