@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
       .single();
 
     const isFirstSync = !config?.ultima_sincronizacao;
-    const diasImportacao = diasOverride || (isFirstSync ? (config?.dias_importacao_inicial || 15) : 2);
+    const diasImportacao = diasOverride || (isFirstSync ? (config?.dias_importacao_inicial || 15) : 7);
 
     const dataInicio = new Date();
     dataInicio.setDate(dataInicio.getDate() - diasImportacao);
