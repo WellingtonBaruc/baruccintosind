@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const API_URL = 'https://app.simplificagestao.com.br/simplifica/api/bi/v2/venda_com_item/1MORY0PAW7';
+const API_URL = Deno.env.get('SIMPLIFICA_API_URL') ?? '';
 
 const PIPELINE_IDS: Record<string, string> = {
   SINTETICO: '00000000-0000-0000-0000-000000000001',
@@ -58,7 +58,7 @@ function reconcileStatusAtual(
   const normalized = (newStatusApi || '').trim();
 
   if (normalized === 'Finalizado') {
-    const terminalStates = ['CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'ENVIADO', 'ENTREGUE'];
+    const terminalStates = ['CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'ENVIADO', 'ENTREGUE', 'AGUARDANDO_CIENCIA_COMERCIAL'];
     if (terminalStates.includes(currentStatusAtual)) return null;
     return 'FINALIZADO_SIMPLIFICA';
   }
@@ -68,7 +68,7 @@ function reconcileStatusAtual(
       'AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL',
       'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO',
       'LIBERADO_LOGISTICA', 'EM_SEPARACAO',
-      'ENVIADO', 'ENTREGUE', 'CANCELADO',
+      'ENVIADO', 'ENTREGUE', 'AGUARDANDO_CIENCIA_COMERCIAL', 'CANCELADO',
       'FINALIZADO_SIMPLIFICA', 'HISTORICO',
     ];
     if (postLojaStates.includes(currentStatusAtual)) return null;
@@ -487,8 +487,10 @@ async function inserirNovoPedido(
   const statusAtual = statusApi === 'Em Produção' ? 'AGUARDANDO_PRODUCAO' : 'AGUARDANDO_LOJA';
   const shouldCreateOPs = statusApi === 'Em Produção';
 
-  const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true });
-  const numeroPedido = `PED-${String((count || 0) + 1).padStart(5, '0')}`;
+  // Usar sequence atômica para evitar race condition em sincronizações simultâneas
+  const { data: seqData, error: seqErr } = await supabase.rpc('next_numero_pedido');
+  if (seqErr) throw new Error(`Falha ao gerar número de pedido: ${seqErr.message}`);
+  const numeroPedido = seqData as string;
 
   // Calculate lead time from previsao_entrega
   const dataPrevisao = parseDateBR(venda.dt_previsao_entrega);
