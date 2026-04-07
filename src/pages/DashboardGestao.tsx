@@ -72,7 +72,7 @@ interface DrillItem {
   itensOp: number;
   valor: number;
   dataCriacao: string;
-  ops: { id: string; tipoProduto: string; status: string; origemOp: string | null }[];
+  ops: { id: string; tipoProduto: string; status: string; origemOp: string | null; sequencia: number }[];
 }
 
 interface EntradaSimplifica {
@@ -449,7 +449,7 @@ export default function DashboardGestao() {
 
     const { data: pedidosRaw } = await supabase
       .from('pedidos')
-      .select('id, numero_pedido, api_venda_id, cliente_nome, valor_liquido, criado_em, ordens_producao(id, tipo_produto, status, origem_op), pedido_itens(quantidade, quantidade_faltante, disponivel, descricao_produto)')
+      .select('id, numero_pedido, api_venda_id, cliente_nome, valor_liquido, criado_em, ordens_producao(id, tipo_produto, status, origem_op, sequencia), pedido_itens(quantidade, quantidade_faltante, disponivel, descricao_produto)')
       .in('tipo_fluxo', tipoFluxos)
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim)
@@ -472,7 +472,8 @@ export default function DashboardGestao() {
       // 1. quantidade_faltante preenchida → valor exato
       // 2. disponivel=false → quantidade total do item
       // 3. Tem OP de loja mas nenhum item marcado → usa quantidade total dos itens reconhecidos
-      const temOpLoja = ((p as any).ordens_producao || []).some((o: any) => o.origem_op === 'LOJA');
+      // OPs de loja: origem_op='LOJA' (novas) OU sequencia>1 (antigas sem origem_op)
+      const temOpLoja = ((p as any).ordens_producao || []).some((o: any) => o.origem_op === 'LOJA' || (o.sequencia > 1 && !o.origem_op));
       const itensFiltrados = itens.filter((i: any) =>
         keywords.some(kw => (i.descricao_produto || '').toUpperCase().includes(kw))
       );
@@ -505,6 +506,7 @@ export default function DashboardGestao() {
           tipoProduto: o.tipo_produto,
           status: o.status,
           origemOp: o.origem_op,
+          sequencia: o.sequencia,
         })),
       });
     }
@@ -513,9 +515,10 @@ export default function DashboardGestao() {
     setDrillLoading(false);
   };
 
-  const statusOpBadge = (status: string, origem: string | null) => {
-    const label = origem === 'LOJA' ? 'OP Loja' : status === 'CONCLUIDA' ? 'Concluída' : status === 'EM_ANDAMENTO' ? 'Em andamento' : 'Aguardando';
-    const cls = origem === 'LOJA' ? 'bg-purple-500/15 text-purple-700 border-purple-500/20' :
+  const statusOpBadge = (status: string, origem: string | null, sequencia?: number) => {
+    const isLoja = origem === 'LOJA' || (sequencia != null && sequencia > 1 && !origem);
+    const label = isLoja ? 'OP Loja' : status === 'CONCLUIDA' ? 'Concluída' : status === 'EM_ANDAMENTO' ? 'Em andamento' : 'Aguardando';
+    const cls = isLoja ? 'bg-purple-500/15 text-purple-700 border-purple-500/20' :
       status === 'CONCLUIDA' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/20' :
       status === 'EM_ANDAMENTO' ? 'bg-amber-500/15 text-amber-700 border-amber-500/20' :
       'bg-blue-500/15 text-blue-700 border-blue-500/20';
@@ -753,7 +756,7 @@ export default function DashboardGestao() {
                                                     {item.ops.length === 0
                                                       ? <span className="text-muted-foreground">—</span>
                                                       : item.ops.map(op => (
-                                                        <span key={op.id}>{statusOpBadge(op.status, op.origemOp)}</span>
+                                                        <span key={op.id}>{statusOpBadge(op.status, op.origemOp, op.sequencia)}</span>
                                                       ))
                                                     }
                                                   </div>
