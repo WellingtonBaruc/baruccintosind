@@ -32,7 +32,8 @@ interface TypeProgress {
 interface EntradaSimplifica {
   count: number;
   valor: number;
-  porTipo: { tipo: string; label: string; count: number; valor: number }[];
+  totalItens: number;
+  porTipo: { tipo: string; label: string; count: number; itens: number; valor: number }[];
 }
 
 export default function DashboardGestao() {
@@ -40,7 +41,7 @@ export default function DashboardGestao() {
   const [chart, setChart] = useState<DayBar[]>([]);
   const [typeProgress, setTypeProgress] = useState<TypeProgress[]>([]);
   const [entradaPeriodo, setEntradaPeriodo] = useState<'hoje' | 'semana' | 'mes' | '7dias' | '30dias'>('hoje');
-  const [entrada, setEntrada] = useState<EntradaSimplifica>({ count: 0, valor: 0, porTipo: [] });
+  const [entrada, setEntrada] = useState<EntradaSimplifica>({ count: 0, valor: 0, totalItens: 0, porTipo: [] });
   const [loadingEntrada, setLoadingEntrada] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -141,9 +142,9 @@ export default function DashboardGestao() {
     // Buscar tipos de produto para cada pedido
 
     // Contar por tipo via ordens_producao
-    const { data: ordens } = await supabase
+    const { data: pedidos } = await supabase
       .from('pedidos')
-      .select('id, valor_liquido, criado_em, ordens_producao(tipo_produto)')
+      .select('id, valor_liquido, criado_em, ordens_producao(tipo_produto), pedido_itens(quantidade, categoria_produto, descricao_produto, referencia_produto)')
       .eq('status_api', 'Em Produção')
       .gte('criado_em', dataInicio);
 
@@ -151,29 +152,52 @@ export default function DashboardGestao() {
       SINTETICO: 'Sintético', TECIDO: 'Tecido', FIVELA_COBERTA: 'Fivela Coberta', OUTROS: 'Outros',
     };
 
-    const tipoMap: Record<string, { count: number; valor: number }> = {};
+    const classificarItem = (desc: string, cat: string, ref: string): string => {
+      const u = (desc || '').toUpperCase();
+      const c = (cat || '').toUpperCase();
+      const r = (ref || '').toUpperCase();
+      if (u.includes('FIVELA') || u.includes('PASSANTE') || c.includes('FIVELA') || r.startsWith('FVC')) return 'FIVELA_COBERTA';
+      if (u.includes('CINTO SINTETICO') || u.includes('TIRA SINTETICO') || u.includes('SINTÉTICO')) return 'SINTETICO';
+      if (u.includes('CINTO TECIDO') || u.includes('TIRA TECIDO')) return 'TECIDO';
+      return 'OUTROS';
+    };
+
+    const tipoMap: Record<string, { count: number; itens: number; valor: number }> = {};
     let totalCount = 0;
     let totalValor = 0;
+    let totalItens = 0;
 
-    for (const p of (ordens || [])) {
+    for (const p of (pedidos || [])) {
       totalCount++;
       totalValor += p.valor_liquido || 0;
+
+      // Contar itens por tipo
+      const itensArray = (p as any).pedido_itens || [];
+      for (const item of itensArray) {
+        const tipo = classificarItem(item.descricao_produto, item.categoria_produto, item.referencia_produto);
+        if (!tipoMap[tipo]) tipoMap[tipo] = { count: 0, itens: 0, valor: 0 };
+        tipoMap[tipo].itens += item.quantidade || 1;
+        totalItens += item.quantidade || 1;
+      }
+
+      // Contar pedidos por tipo (via ordens)
       const ops = (p as any).ordens_producao || [];
       const tipos = ops.length > 0
         ? [...new Set(ops.map((o: any) => o.tipo_produto || 'OUTROS'))] as string[]
         : ['OUTROS'];
       for (const tipo of tipos) {
-        if (!tipoMap[tipo]) tipoMap[tipo] = { count: 0, valor: 0 };
+        if (!tipoMap[tipo]) tipoMap[tipo] = { count: 0, itens: 0, valor: 0 };
         tipoMap[tipo].count++;
         tipoMap[tipo].valor += p.valor_liquido || 0;
       }
     }
 
     const porTipo = Object.entries(tipoMap)
-      .map(([tipo, v]) => ({ tipo, label: tipoLabels[tipo] || tipo, count: v.count, valor: v.valor }))
-      .sort((a, b) => b.count - a.count);
+      .filter(([tipo]) => tipo !== 'OUTROS' || tipoMap['OUTROS']?.count > 0)
+      .map(([tipo, v]) => ({ tipo, label: tipoLabels[tipo] || tipo, count: v.count, itens: v.itens, valor: v.valor }))
+      .sort((a, b) => b.itens - a.itens);
 
-    setEntrada({ count: totalCount, valor: totalValor, porTipo });
+    setEntrada({ count: totalCount, valor: totalValor, totalItens, porTipo });
     setLoadingEntrada(false);
   }, []);
 
@@ -241,17 +265,38 @@ export default function DashboardGestao() {
             <div className="flex justify-center py-6"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-baseline gap-3">
-                <span className="text-4xl font-bold tabular-nums">{entrada.count}</span>
-                <span className="text-muted-foreground text-sm">pedidos</span>
-                {entrada.valor > 0 && <span className="text-sm font-medium text-primary ml-auto">{fmt(entrada.valor)}</span>}
+              <div className="flex items-center gap-6 flex-wrap">
+                <div>
+                  <span className="text-4xl font-bold tabular-nums">{entrada.count}</span>
+                  <span className="text-muted-foreground text-sm ml-2">pedidos</span>
+                </div>
+                <div className="h-10 w-px bg-border/60 hidden sm:block" />
+                <div>
+                  <span className="text-4xl font-bold tabular-nums">{entrada.totalItens}</span>
+                  <span className="text-muted-foreground text-sm ml-2">produtos</span>
+                </div>
+                {entrada.valor > 0 && (
+                  <>
+                    <div className="h-10 w-px bg-border/60 hidden sm:block" />
+                    <div>
+                      <span className="text-xl font-semibold text-primary">{fmt(entrada.valor)}</span>
+                    </div>
+                  </>
+                )}
               </div>
               {entrada.porTipo.length > 0 && (
                 <div className="grid gap-2 sm:grid-cols-3">
                   {entrada.porTipo.map(t => (
                     <div key={t.tipo} className="rounded-lg border border-border/60 p-3">
-                      <p className="text-xs text-muted-foreground mb-1">{t.label}</p>
-                      <p className="text-xl font-bold tabular-nums">{t.count}</p>
+                      <p className="text-xs text-muted-foreground mb-2">{t.label}</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-xl font-bold tabular-nums">{t.count}</span>
+                        <span className="text-xs text-muted-foreground">pedidos</span>
+                      </div>
+                      <div className="flex items-baseline gap-2 mt-1">
+                        <span className="text-lg font-semibold tabular-nums text-primary">{t.itens}</span>
+                        <span className="text-xs text-muted-foreground">produtos</span>
+                      </div>
                       {t.valor > 0 && <p className="text-xs text-muted-foreground mt-1">{fmt(t.valor)}</p>}
                     </div>
                   ))}
