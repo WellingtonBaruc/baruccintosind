@@ -48,7 +48,7 @@ interface OpLinha {
 }
 
 interface FluxoEntrada {
-  fluxo: 'PRODUCAO' | 'PRONTA_ENTREGA' | 'PRONTA_ENTREGA_OP_LOJA';
+  fluxo: 'PRODUCAO' | 'PRONTA_ENTREGA' | 'PRONTA_ENTREGA_OP_LOJA' | 'PCP_INTERNO';
   label: string;
   pedidos: number;
   itens: number;
@@ -218,8 +218,8 @@ export default function DashboardGestao() {
     // independente do status atual (Finalizado, Enviado, etc.)
     const { data: pedidos } = await supabase
       .from('pedidos')
-      .select('id, valor_liquido, tipo_fluxo, status_atual, criado_em, pedido_itens(quantidade, quantidade_faltante, disponivel, descricao_produto, categoria_produto, referencia_produto, valor_total)')
-      .in('tipo_fluxo', ['PRODUCAO', 'PRONTA_ENTREGA'])
+      .select('id, valor_liquido, tipo_fluxo, status_atual, criado_em, pedido_itens(quantidade, quantidade_faltante, disponivel, descricao_produto, categoria_produto, referencia_produto, valor_total), ordens_producao(tipo_produto, produtos_descricao, origem_op)')
+      .in('tipo_fluxo', ['PRODUCAO', 'PRONTA_ENTREGA', 'PCP_INTERNO'])
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim);
 
@@ -260,7 +260,8 @@ export default function DashboardGestao() {
       valor: number;
       produtos: Record<string, { pedidos: number; itens: number; valor: number }>;
     }> = {
-      PRODUCAO: { label: 'Produção', pedidos: 0, itens: 0, valor: 0, produtos: {} },
+      PRODUCAO: { label: 'Produção (Simplifica)', pedidos: 0, itens: 0, valor: 0, produtos: {} },
+      PCP_INTERNO: { label: 'Produção (PCP Interno)', pedidos: 0, itens: 0, valor: 0, produtos: {} },
       PRONTA_ENTREGA: { label: 'Pedido Enviado', pedidos: 0, itens: 0, valor: 0, produtos: {} },
       PRONTA_ENTREGA_OP_LOJA: { label: 'Pronta Entrega c/ OP Loja', pedidos: 0, itens: 0, valor: 0, produtos: {} },
     };
@@ -288,13 +289,51 @@ export default function DashboardGestao() {
 
     for (const p of (pedidos || [])) {
       const tipoFluxoBase = (p as any).tipo_fluxo;
-      const fluxo = tipoFluxoBase === 'PRONTA_ENTREGA' && pedidosComOpLoja.has(p.id)
+      const fluxo = tipoFluxoBase === 'PCP_INTERNO'
+        ? 'PCP_INTERNO'
+        : tipoFluxoBase === 'PRONTA_ENTREGA' && pedidosComOpLoja.has(p.id)
         ? 'PRONTA_ENTREGA_OP_LOJA'
         : tipoFluxoBase === 'PRONTA_ENTREGA'
         ? 'PRONTA_ENTREGA'
         : 'PRODUCAO';
       const f = fluxoMap[fluxo];
       const itensArray = (p as any).pedido_itens || [];
+
+      // Para PCP_INTERNO: classificar pelo tipo_produto da OP (não pelos pedido_itens)
+      if (fluxo === 'PCP_INTERNO') {
+        const ops = (p as any).ordens_producao || [];
+        for (const op of ops) {
+          // Mapear tipo_produto da OP para label
+          const opLabel: Record<string, string> = {
+            SINTETICO: 'Cinto Sintético',
+            TECIDO: 'Cinto Tecido',
+            FIVELA_COBERTA: 'Fivela Coberta',
+          };
+          const label = opLabel[op.tipo_produto || ''] || null;
+          if (!label) continue;
+
+          if (!pedidosComItemReconhecido.has(p.id)) {
+            pedidosComItemReconhecido.add(p.id);
+            f.pedidos++;
+            f.valor += p.valor_liquido || 0;
+            totalPedidos++;
+            totalValor += p.valor_liquido || 0;
+          }
+          if (!f.produtos[label]) f.produtos[label] = { pedidos: 0, itens: 0, valor: 0 };
+          // Quantidade da OP PCP via pedido_itens ou produtos_descricao
+          const qtdItens = itensArray.reduce((s: number, i: any) => {
+            const u = (i.descricao_produto || '').toUpperCase();
+            const match = (label === 'Cinto Sintético' && (u.includes('SINTETICO') || u.includes('SINTÉTICO')))
+              || (label === 'Cinto Tecido' && u.includes('TECIDO'))
+              || (label === 'Fivela Coberta' && u.includes('FIVELA'));
+            return s + (match ? (i.quantidade || 1) : 0);
+          }, 0);
+          f.produtos[label].itens += qtdItens;
+          f.itens += qtdItens;
+          totalItens += qtdItens;
+        }
+        continue; // pular processamento normal de itens para PCP
+      }
 
       // Só processar itens reconhecidos
       for (const item of itensArray) {
@@ -356,7 +395,7 @@ export default function DashboardGestao() {
     const fluxos: FluxoEntrada[] = Object.entries(fluxoMap)
       .filter(([, f]) => f.pedidos > 0)
       .map(([fluxo, f]) => ({
-        fluxo: fluxo as 'PRODUCAO' | 'PRONTA_ENTREGA' | 'PRONTA_ENTREGA_OP_LOJA',
+        fluxo: fluxo as 'PRODUCAO' | 'PRONTA_ENTREGA' | 'PRONTA_ENTREGA_OP_LOJA' | 'PCP_INTERNO',
         label: f.label,
         pedidos: f.pedidos,
         itens: f.itens,
@@ -694,7 +733,7 @@ export default function DashboardGestao() {
               {entrada.fluxos.length > 0 && (
                 <div className="rounded-lg border border-border/60 overflow-hidden">
                   {entrada.fluxos.map((f, fi) => (
-                    <div key={f.fluxo} className={fi > 0 ? 'border-t border-border/60' : ''}>
+                    <div key={f.fluxo} className={`${fi > 0 ? 'border-t border-border/60' : ''} ${f.fluxo === 'PCP_INTERNO' ? 'bg-orange-500/5' : ''}`}>
                       {/* Header do fluxo — clicável para expandir */}
                       <div
                         className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-accent/40 transition-colors"
@@ -708,6 +747,9 @@ export default function DashboardGestao() {
                           <span className="text-sm font-semibold">{f.label}</span>
                           {f.fluxo === 'PRONTA_ENTREGA_OP_LOJA' && (
                             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-700 border border-purple-500/20">OP Loja</span>
+                          )}
+                          {f.fluxo === 'PCP_INTERNO' && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-700 border border-orange-500/20">PCP</span>
                           )}
                         </div>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
