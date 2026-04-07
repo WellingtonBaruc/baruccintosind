@@ -266,9 +266,16 @@ async function processarExistente(
 ) {
   let hadChanges = false;
 
-  // ── STATUS_API change → reconcile status_atual ──
-  if (existente.status_api !== statusApi) {
-    // Check for active complementary OPs (sequencia > 1)
+  // ── Reconciliação de status ──
+  // Atua quando:
+  // 1. status_api mudou no Simplifica (fluxo normal), OU
+  // 2. status_api já é "Finalizado" mas status_atual interno ainda está errado
+  //    (pedidos antigos que acumularam inconsistência antes do cron ser ativado)
+  const terminalStatesOk = ['CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'ENVIADO', 'ENTREGUE', 'AGUARDANDO_CIENCIA_COMERCIAL'];
+  const statusApiMudou = existente.status_api !== statusApi;
+  const statusInconsistente = statusApi === 'Finalizado' && !terminalStatesOk.includes(existente.status_atual);
+
+  if (statusApiMudou || statusInconsistente) {
     const { data: activeOps } = await supabase
       .from('ordens_producao')
       .select('id, sequencia')
@@ -278,11 +285,11 @@ async function processarExistente(
 
     const hasActiveComplementaryOp = (activeOps || []).length > 0;
 
-    // Update status_api
-    await supabase.from('pedidos').update({ status_api: statusApi }).eq('id', existente.id);
-    hadChanges = true;
+    if (statusApiMudou) {
+      await supabase.from('pedidos').update({ status_api: statusApi }).eq('id', existente.id);
+      hadChanges = true;
+    }
 
-    // Reconcile status_atual
     const newStatusAtual = reconcileStatusAtual(statusApi, existente.status_atual, hasActiveComplementaryOp);
     if (newStatusAtual) {
       await supabase.from('pedidos').update({ status_atual: newStatusAtual }).eq('id', existente.id);
@@ -291,11 +298,13 @@ async function processarExistente(
         tipo_acao: 'TRANSICAO',
         status_anterior: existente.status_atual,
         status_novo: newStatusAtual,
-        observacao: `Status reconciliado automaticamente: Simplifica mudou para "${statusApi}". ${existente.status_atual} → ${newStatusAtual}.`,
+        observacao: statusApiMudou
+          ? `Status reconciliado: Simplifica mudou para "${statusApi}". ${existente.status_atual} → ${newStatusAtual}.`
+          : `Status corrigido automaticamente: Simplifica já estava "${statusApi}" mas interno era ${existente.status_atual}. Corrigido para ${newStatusAtual}.`,
       });
+      hadChanges = true;
     }
 
-    // Alert if Finalizado but was in production
     if (statusApi === 'Finalizado' && ['AGUARDANDO_PRODUCAO', 'EM_PRODUCAO'].includes(existente.status_atual)) {
       await supabase.from('pedido_historico').insert({
         pedido_id: existente.id,
