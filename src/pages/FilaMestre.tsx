@@ -484,6 +484,7 @@ export default function FilaMestre() {
       .select('id, api_venda_id, numero_pedido, cliente_nome, valor_liquido, data_venda_api, data_previsao_entrega, data_entrega_ajustada_pcp, status_atual, status_prazo, status_api, observacao_api, criado_em, is_piloto, status_piloto, fivelas_separadas, tipo_fluxo')
       .eq('is_deleted', false)
       .eq('status_api', 'Em Produção')
+      .eq('tipo_fluxo', 'PRODUCAO')
       .not('status_atual', 'in', '("HISTORICO","CANCELADO","FINALIZADO_SIMPLIFICA","AGUARDANDO_COMERCIAL","VALIDADO_COMERCIAL","AGUARDANDO_FINANCEIRO","VALIDADO_FINANCEIRO","LIBERADO_LOGISTICA","EM_SEPARACAO","ENVIADO","ENTREGUE","AGUARDANDO_CIENCIA_COMERCIAL")')
       .order('criado_em', { ascending: false });
 
@@ -509,7 +510,7 @@ export default function FilaMestre() {
 
     const { data: todasOrdens } = await supabase
       .from('ordens_producao')
-      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp, sequencia')
+      .select('id, pedido_id, tipo_produto, status, data_inicio_pcp, data_fim_pcp, sequencia, origem_op')
       .not('status', 'in', '("CONCLUIDA","CANCELADA")');
 
     const emProducaoIds = new Set((pedidosEmProducao || []).map(p => p.id));
@@ -518,7 +519,9 @@ export default function FilaMestre() {
     const allKnownIds = new Set([...emProducaoIds, ...pcpIds, ...novaVendaIds]);
     const complementaryOpPedidoIds = new Set<string>();
     for (const o of (todasOrdens || [])) {
-      if ((o as any).sequencia > 1 && !allKnownIds.has(o.pedido_id)) {
+      // Capturar OPs complementares: origem_op='LOJA' OU sequencia>1 sem origem (OPs antigas)
+      const isOpLoja = (o as any).origem_op === 'LOJA' || ((o as any).sequencia > 1 && !(o as any).origem_op);
+      if (isOpLoja && !allKnownIds.has(o.pedido_id)) {
         complementaryOpPedidoIds.add(o.pedido_id);
       }
     }
