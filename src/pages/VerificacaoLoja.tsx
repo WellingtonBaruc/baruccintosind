@@ -162,6 +162,7 @@ export default function VerificacaoLoja() {
         sequencia: 2,
         status: 'AGUARDANDO',
         tipo_produto: 'SINTETICO',
+        origem_op: 'LOJA',
         observacao: `OP Complementar — Itens faltantes: ${itensFaltantes.map(i => `${i.descricao_produto} (${i.quantidade_faltante ?? i.quantidade} un)`).join(', ')}`,
       }).select().single();
 
@@ -256,6 +257,7 @@ export default function VerificacaoLoja() {
             sequencia: 2,
             status: 'AGUARDANDO',
             tipo_produto: 'SINTETICO',
+            origem_op: 'LOJA',
             observacao: `OP Complementar — Itens faltantes (produção): ${faltantesProd.map(i => `${i.descricao_produto} (${i.quantidade_faltante ?? i.quantidade} un)`).join(', ')}`,
           }).select().single();
 
