@@ -188,19 +188,21 @@ export default function DashboardGestao() {
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim);
 
-    // Normalizar descrição do produto para agrupamento
-    const normalizarDescricao = (desc: string): string => {
+    // Apenas estas 5 categorias são consideradas — tudo mais é ignorado
+    const CATEGORIAS: { label: string; match: (u: string) => boolean }[] = [
+      { label: 'Cinto Sintético', match: u => u.includes('CINTO SINTETICO') || u.includes('CINTO SINTÉTICO') },
+      { label: 'Tira Sintético',  match: u => u.includes('TIRA SINTETICO')  || u.includes('TIRA SINTÉTICO') },
+      { label: 'Fivela Coberta',  match: u => u.includes('FIVELA COBERTA') },
+      { label: 'Cinto Tecido',    match: u => u.includes('CINTO TECIDO') },
+      { label: 'Tira Tecido',     match: u => u.includes('TIRA TECIDO') },
+    ];
+
+    const classificarItem = (desc: string): string | null => {
       const u = (desc || '').toUpperCase().trim();
-      if (u.includes('CINTO SINTETICO') || u.includes('CINTO SINTÉTICO')) return 'Cinto Sintético';
-      if (u.includes('TIRA SINTETICO') || u.includes('TIRA SINTÉTICO')) return 'Tira Sintético';
-      if (u.includes('CINTO TECIDO')) return 'Cinto Tecido';
-      if (u.includes('TIRA TECIDO')) return 'Tira Tecido';
-      if (u.includes('FIVELA COBERTA')) return 'Fivela Coberta';
-      if (u.includes('FIVELA MATRIZ')) return 'Fivela Matriz';
-      if (u.includes('FIVELA')) return 'Fivela';
-      if (u.includes('PASSANTE')) return 'Passante';
-      // Retorna a descrição original capitalizada se não reconhecer
-      return desc.trim();
+      for (const cat of CATEGORIAS) {
+        if (cat.match(u)) return cat.label;
+      }
+      return null; // ignora tudo que não se encaixa
     };
 
     // Agrupar por fluxo → produto
@@ -219,36 +221,59 @@ export default function DashboardGestao() {
     let totalItens = 0;
     let totalValor = 0;
 
+    // Controle de quais pedidos têm ao menos 1 item reconhecido
+    const pedidosComItemReconhecido = new Set<string>();
+
     for (const p of (pedidos || [])) {
       const fluxo = (p as any).tipo_fluxo === 'PRONTA_ENTREGA' ? 'PRONTA_ENTREGA' : 'PRODUCAO';
       const f = fluxoMap[fluxo];
-      f.pedidos++;
-      f.valor += p.valor_liquido || 0;
-      totalPedidos++;
-      totalValor += p.valor_liquido || 0;
-
       const itensArray = (p as any).pedido_itens || [];
+
+      // Só processar itens reconhecidos
       for (const item of itensArray) {
-        const desc = normalizarDescricao(item.descricao_produto || 'Outros');
-        if (!f.produtos[desc]) f.produtos[desc] = { pedidos: 0, itens: 0, valor: 0 };
+        const label = classificarItem(item.descricao_produto || '');
+        if (!label) continue; // ignora KIT, ADICIONAL, BOLSA, etc.
+
+        if (!pedidosComItemReconhecido.has(p.id)) {
+          pedidosComItemReconhecido.add(p.id);
+          f.pedidos++;
+          f.valor += p.valor_liquido || 0;
+          totalPedidos++;
+          totalValor += p.valor_liquido || 0;
+        }
+
+        if (!f.produtos[label]) f.produtos[label] = { pedidos: 0, itens: 0, valor: 0 };
         const qtd = item.quantidade || 1;
-        f.produtos[desc].itens += qtd;
-        f.produtos[desc].valor += (item.valor_total || 0);
+        f.produtos[label].itens += qtd;
         f.itens += qtd;
         totalItens += qtd;
       }
-      // Contar pedido por produto se não tiver itens detalhados
-      if (itensArray.length === 0) {
-        const desc = 'Sem itens';
-        if (!f.produtos[desc]) f.produtos[desc] = { pedidos: 0, itens: 0, valor: 0 };
-        f.produtos[desc].pedidos++;
-      } else {
-        // Contar pedido no produto mais representativo (maior quantidade)
-        const mainItem = [...itensArray].sort((a: any, b: any) => (b.quantidade || 1) - (a.quantidade || 1))[0];
-        const mainDesc = normalizarDescricao(mainItem.descricao_produto || 'Outros');
-        f.produtos[mainDesc].pedidos++;
-      }
     }
+
+    // Contar pedidos por produto principal (maior quantidade de itens reconhecidos)
+    const pedidoProdutoPrincipal = new Map<string, string>();
+    for (const p of (pedidos || [])) {
+      if (!pedidosComItemReconhecido.has(p.id)) continue;
+      const itensArray = (p as any).pedido_itens || [];
+      const countPorLabel: Record<string, number> = {};
+      for (const item of itensArray) {
+        const label = classificarItem(item.descricao_produto || '');
+        if (!label) continue;
+        countPorLabel[label] = (countPorLabel[label] || 0) + (item.quantidade || 1);
+      }
+      const principal = Object.entries(countPorLabel).sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (principal) pedidoProdutoPrincipal.set(p.id, principal);
+    }
+
+    for (const p of (pedidos || [])) {
+      const principal = pedidoProdutoPrincipal.get(p.id);
+      if (!principal) continue;
+      const fluxo = (p as any).tipo_fluxo === 'PRONTA_ENTREGA' ? 'PRONTA_ENTREGA' : 'PRODUCAO';
+      const f = fluxoMap[fluxo];
+      if (f.produtos[principal]) f.produtos[principal].pedidos++;
+    }
+
+    const ORDEM_CATEGORIAS = ['Cinto Sintético', 'Tira Sintético', 'Fivela Coberta', 'Cinto Tecido', 'Tira Tecido'];
 
     const fluxos: FluxoEntrada[] = Object.entries(fluxoMap)
       .filter(([, f]) => f.pedidos > 0)
@@ -260,8 +285,15 @@ export default function DashboardGestao() {
         valor: f.valor,
         produtos: Object.entries(f.produtos)
           .map(([descricao, v]) => ({ descricao, ...v }))
-          .filter(p => p.itens > 0 || p.pedidos > 0)
-          .sort((a, b) => b.itens - a.itens),
+          .filter(p => p.itens > 0)
+          .sort((a, b) => {
+            const ia = ORDEM_CATEGORIAS.indexOf(a.descricao);
+            const ib = ORDEM_CATEGORIAS.indexOf(b.descricao);
+            if (ia !== -1 && ib !== -1) return ia - ib;
+            if (ia !== -1) return -1;
+            if (ib !== -1) return 1;
+            return b.itens - a.itens;
+          }),
       }));
 
     setEntrada({ totalPedidos, totalItens, totalValor, fluxos });
