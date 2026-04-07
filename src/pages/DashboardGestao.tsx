@@ -72,7 +72,7 @@ interface DrillItem {
   itensOp: number;
   valor: number;
   dataCriacao: string;
-  ops: { id: string; tipoProduto: string; status: string; origemOp: string | null; sequencia: number }[];
+  ops: { id: string; tipoProduto: string; status: string; origemOp: string | null; sequencia: number; observacao: string | null }[];
 }
 
 interface EntradaSimplifica {
@@ -460,7 +460,7 @@ export default function DashboardGestao() {
     const { data: opsMap } = pedidoIds.length > 0
       ? await supabase
           .from('ordens_producao')
-          .select('id, pedido_id, tipo_produto, status, origem_op, sequencia')
+          .select('id, pedido_id, tipo_produto, status, origem_op, sequencia, observacao')
           .in('pedido_id', pedidoIds)
       : { data: [] };
 
@@ -487,25 +487,38 @@ export default function DashboardGestao() {
       // 1. quantidade_faltante preenchida → valor exato
       // 2. disponivel=false → quantidade total do item
       // 3. Tem OP de loja mas nenhum item marcado → usa quantidade total dos itens reconhecidos
-      // OPs de loja: origem_op='LOJA' (novas) OU sequencia>1 (antigas sem origem_op)
+      // OPs de loja: origem_op='LOJA' (novas) OU sequencia>1 sem origem (antigas)
       const pedidoOps = opsPorPedido[p.id] || [];
-      const temOpLoja = pedidoOps.some((o: any) => o.origem_op === 'LOJA' || (o.sequencia > 1 && !o.origem_op));
-      const itensFiltrados = itens.filter((i: any) =>
-        keywords.some(kw => (i.descricao_produto || '').toUpperCase().includes(kw))
-      );
+      const opsLoja = pedidoOps.filter((o: any) => o.origem_op === 'LOJA' || (o.sequencia > 1 && !o.origem_op));
+      const temOpLoja = opsLoja.length > 0;
 
       let itensOpFinal = 0;
       if (temOpLoja) {
-        // Somar por item: preferir quantidade_faltante, depois quantidade se disponivel=false
-        const somaExplicita = itensFiltrados.reduce((s: number, i: any) => {
-          if (i.quantidade_faltante != null && i.quantidade_faltante > 0) return s + i.quantidade_faltante;
-          if (i.disponivel === false) return s + (i.quantidade || 1);
-          return s;
-        }, 0);
-        // Se nenhum item explicitamente marcado, usar quantidade total (OP gerou tudo)
-        itensOpFinal = somaExplicita > 0
-          ? somaExplicita
-          : itensFiltrados.reduce((s: number, i: any) => s + (i.quantidade || 1), 0);
+        // Estrategia 1: parsear observacao da OP formato '(700 un)'
+        let somaObs = 0;
+        for (const op of opsLoja) {
+          const obs = (op.observacao || '') as string;
+          const regex = /\((\d+)\s*un\)/gi;
+          let m = regex.exec(obs);
+          while (m) { somaObs += parseInt(m[1]) || 0; m = regex.exec(obs); }
+        }
+        if (somaObs > 0) {
+          itensOpFinal = somaObs;
+        } else {
+          // Estrategia 2: quantidade_faltante ou disponivel=false
+          const itensFiltrados = itens.filter((i: any) =>
+            keywords.some(kw => (i.descricao_produto || '').toUpperCase().includes(kw))
+          );
+          const somaExplicita = itensFiltrados.reduce((s: number, i: any) => {
+            if (i.quantidade_faltante != null && i.quantidade_faltante > 0) return s + i.quantidade_faltante;
+            if (i.disponivel === false) return s + (i.quantidade || 1);
+            return s;
+          }, 0);
+          // Estrategia 3: total dos itens reconhecidos
+          itensOpFinal = somaExplicita > 0
+            ? somaExplicita
+            : itensFiltrados.reduce((s: number, i: any) => s + (i.quantidade || 1), 0);
+        }
       }
 
       items.push({
@@ -523,6 +536,7 @@ export default function DashboardGestao() {
           status: o.status,
           origemOp: o.origem_op,
           sequencia: o.sequencia,
+          observacao: o.observacao || null,
         })),
       });
     }
