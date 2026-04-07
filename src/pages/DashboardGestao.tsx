@@ -218,7 +218,7 @@ export default function DashboardGestao() {
     // independente do status atual (Finalizado, Enviado, etc.)
     const { data: pedidos } = await supabase
       .from('pedidos')
-      .select('id, valor_liquido, tipo_fluxo, criado_em, pedido_itens(quantidade, quantidade_faltante, disponivel, descricao_produto, categoria_produto, referencia_produto, valor_total)')
+      .select('id, valor_liquido, tipo_fluxo, status_atual, criado_em, pedido_itens(quantidade, quantidade_faltante, disponivel, descricao_produto, categoria_produto, referencia_produto, valor_total)')
       .in('tipo_fluxo', ['PRODUCAO', 'PRONTA_ENTREGA'])
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim);
@@ -242,11 +242,16 @@ export default function DashboardGestao() {
 
     // Agrupar por fluxo → produto
     // Buscar quais pedidos PRONTA_ENTREGA têm OP de loja
+    // Buscar OPs de loja: origem_op='LOJA' OU sequencia>1 sem origem (OPs antigas)
     const { data: opsLoja } = await supabase
       .from('ordens_producao')
-      .select('pedido_id')
-      .eq('origem_op', 'LOJA');
-    const pedidosComOpLoja = new Set((opsLoja || []).map((o: any) => o.pedido_id));
+      .select('pedido_id, origem_op, sequencia')
+      .or('origem_op.eq.LOJA,sequencia.gt.1');
+    const pedidosComOpLoja = new Set(
+      (opsLoja || [])
+        .filter((o: any) => o.origem_op === 'LOJA' || (o.sequencia > 1 && !o.origem_op))
+        .map((o: any) => o.pedido_id)
+    );
 
     const fluxoMap: Record<string, {
       label: string;
@@ -266,6 +271,20 @@ export default function DashboardGestao() {
 
     // Controle de quais pedidos têm ao menos 1 item reconhecido
     const pedidosComItemReconhecido = new Set<string>();
+
+    // DEBUG temporário — remover após identificar problema
+    const debugVenda = (pedidos || []).find((p: any) => (p as any).api_venda_id === '3120903');
+    if (debugVenda) {
+      console.log('[DEBUG 3120903]', {
+        id: (debugVenda as any).id,
+        tipo_fluxo: (debugVenda as any).tipo_fluxo,
+        status_atual: (debugVenda as any).status_atual,
+        temOpLoja: pedidosComOpLoja.has((debugVenda as any).id),
+        itens: ((debugVenda as any).pedido_itens || []).map((i: any) => i.descricao_produto),
+      });
+    } else {
+      console.log('[DEBUG 3120903] pedido NÃO encontrado na query — fora do período ou tipo_fluxo diferente');
+    }
 
     for (const p of (pedidos || [])) {
       const tipoFluxoBase = (p as any).tipo_fluxo;
