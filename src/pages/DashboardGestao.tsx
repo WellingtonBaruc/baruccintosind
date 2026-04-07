@@ -44,6 +44,7 @@ interface OpLinha {
   aguardando: number;
   emAndamento: number;
   deLoja: number;
+  itens: number;
 }
 
 interface FluxoEntrada {
@@ -201,7 +202,7 @@ export default function DashboardGestao() {
     // independente do status atual (Finalizado, Enviado, etc.)
     const { data: pedidos } = await supabase
       .from('pedidos')
-      .select('id, valor_liquido, tipo_fluxo, criado_em, pedido_itens(quantidade, descricao_produto, categoria_produto, referencia_produto, valor_total)')
+      .select('id, valor_liquido, tipo_fluxo, criado_em, pedido_itens(quantidade, quantidade_faltante, disponivel, descricao_produto, categoria_produto, referencia_produto, valor_total)')
       .in('tipo_fluxo', ['PRODUCAO', 'PRONTA_ENTREGA'])
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim);
@@ -274,7 +275,13 @@ export default function DashboardGestao() {
         }
 
         if (!f.produtos[label]) f.produtos[label] = { pedidos: 0, itens: 0, valor: 0 };
-        const qtd = item.quantidade || 1;
+        // Para PRONTA_ENTREGA e PRONTA_ENTREGA_OP_LOJA: descontar itens que viraram OP (quantidade_faltante)
+        const qtdTotal = item.quantidade || 1;
+        const qtdFaltante = item.quantidade_faltante || 0;
+        const qtd = (fluxo === 'PRONTA_ENTREGA' || fluxo === 'PRONTA_ENTREGA_OP_LOJA') && qtdFaltante > 0
+          ? Math.max(0, qtdTotal - qtdFaltante)
+          : qtdTotal;
+        if (qtd <= 0) continue; // ignorar se todos viraram OP
         f.produtos[label].itens += qtd;
         f.itens += qtd;
         totalItens += qtd;
@@ -332,10 +339,10 @@ export default function DashboardGestao() {
           }),
       }));
 
-    // Buscar OPs geradas no mesmo período
+    // Buscar OPs geradas no mesmo período com itens faltantes
     const { data: opsData } = await supabase
       .from('ordens_producao')
-      .select('tipo_produto, status, criado_em, origem_op')
+      .select('tipo_produto, status, criado_em, origem_op, pedido_id, pedidos!inner(pedido_itens(quantidade, quantidade_faltante, descricao_produto, disponivel))')
       .in('tipo_produto', ['SINTETICO', 'TECIDO', 'FIVELA_COBERTA'])
       .gte('criado_em', dataInicio)
       .lte('criado_em', dataFim);
@@ -345,15 +352,38 @@ export default function DashboardGestao() {
     };
     const OP_ORDEM = ['SINTETICO', 'TECIDO', 'FIVELA_COBERTA'];
 
-    const opMap: Record<string, { total: number; concluidas: number; aguardando: number; emAndamento: number; deLoja: number }> = {};
+    const CATEGORIAS_OP: Record<string, string[]> = {
+      SINTETICO: ['CINTO SINTETICO', 'CINTO SINTÉTICO', 'TIRA SINTETICO', 'TIRA SINTÉTICO'],
+      TECIDO: ['CINTO TECIDO', 'TIRA TECIDO'],
+      FIVELA_COBERTA: ['FIVELA COBERTA'],
+    };
+
+    const itemPertenceTipo = (desc: string, tipo: string): boolean => {
+      const u = (desc || '').toUpperCase();
+      return (CATEGORIAS_OP[tipo] || []).some(kw => u.includes(kw));
+    };
+
+    const opMap: Record<string, { total: number; concluidas: number; aguardando: number; emAndamento: number; deLoja: number; itens: number }> = {};
     for (const op of (opsData || [])) {
       const t = (op as any).tipo_produto || 'OUTROS';
-      if (!opMap[t]) opMap[t] = { total: 0, concluidas: 0, aguardando: 0, emAndamento: 0, deLoja: 0 };
+      if (!opMap[t]) opMap[t] = { total: 0, concluidas: 0, aguardando: 0, emAndamento: 0, deLoja: 0, itens: 0 };
       opMap[t].total++;
       if ((op as any).origem_op === 'LOJA') opMap[t].deLoja++;
       if (op.status === 'CONCLUIDA') opMap[t].concluidas++;
       else if (op.status === 'AGUARDANDO') opMap[t].aguardando++;
       else if (op.status === 'EM_ANDAMENTO') opMap[t].emAndamento++;
+
+      // Contar itens do pedido que pertencem a este tipo de OP
+      const pedidoItens = (op as any).pedidos?.pedido_itens || [];
+      for (const item of pedidoItens) {
+        if (!itemPertenceTipo(item.descricao_produto || '', t)) continue;
+        // Se OP de loja: usar quantidade_faltante (itens que precisam ser produzidos)
+        // Se OP normal: usar quantidade total do item
+        const qtd = (op as any).origem_op === 'LOJA'
+          ? (item.quantidade_faltante ?? item.quantidade ?? 1)
+          : (item.quantidade ?? 1);
+        opMap[t].itens += qtd;
+      }
     }
 
     const opsPorTipo: OpLinha[] = OP_ORDEM
@@ -366,6 +396,7 @@ export default function DashboardGestao() {
         aguardando: opMap[t].aguardando,
         emAndamento: opMap[t].emAndamento,
         deLoja: opMap[t].deLoja,
+        itens: opMap[t].itens,
       }));
 
     const totalOps = (opsData || []).length;
@@ -566,8 +597,9 @@ export default function DashboardGestao() {
                             />
                           </div>
                           <div className="flex items-center gap-2 text-xs tabular-nums text-right">
+                            {op.itens > 0 && <span className="text-muted-foreground">{op.itens} un.</span>}
                             <span className="text-emerald-600 font-medium">{op.concluidas}</span>
-                            <span className="text-muted-foreground">/ {op.total}</span>
+                            <span className="text-muted-foreground">/ {op.total} OPs</span>
                             <span className="text-muted-foreground w-8">({pct}%)</span>
                           </div>
                         </div>
