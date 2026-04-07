@@ -58,7 +58,7 @@ function reconcileStatusAtual(
   const normalized = (newStatusApi || '').trim();
 
   if (normalized === 'Finalizado') {
-    const terminalStates = ['CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'ENVIADO', 'ENTREGUE'];
+    const terminalStates = ['CANCELADO', 'FINALIZADO_SIMPLIFICA', 'HISTORICO', 'ENVIADO', 'ENTREGUE', 'AGUARDANDO_CIENCIA_COMERCIAL'];
     if (terminalStates.includes(currentStatusAtual)) return null;
     return 'FINALIZADO_SIMPLIFICA';
   }
