@@ -68,7 +68,7 @@ function reconcileStatusAtual(
       'AGUARDANDO_COMERCIAL', 'VALIDADO_COMERCIAL',
       'AGUARDANDO_FINANCEIRO', 'VALIDADO_FINANCEIRO',
       'LIBERADO_LOGISTICA', 'EM_SEPARACAO',
-      'ENVIADO', 'ENTREGUE', 'CANCELADO',
+      'ENVIADO', 'ENTREGUE', 'AGUARDANDO_CIENCIA_COMERCIAL', 'CANCELADO',
       'FINALIZADO_SIMPLIFICA', 'HISTORICO',
     ];
     if (postLojaStates.includes(currentStatusAtual)) return null;
