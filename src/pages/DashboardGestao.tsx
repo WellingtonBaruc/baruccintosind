@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Package, CheckCircle2, CalendarCheck, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Package, CheckCircle2, CalendarCheck, AlertTriangle, TrendingUp, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { format, subDays, startOfMonth, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -40,9 +40,12 @@ export default function DashboardGestao() {
   const [cards, setCards] = useState<OverviewCard[]>([]);
   const [chart, setChart] = useState<DayBar[]>([]);
   const [typeProgress, setTypeProgress] = useState<TypeProgress[]>([]);
-  const [entradaPeriodo, setEntradaPeriodo] = useState<'hoje' | 'semana' | 'mes' | '7dias' | '30dias'>('hoje');
+  const [entradaPeriodo, setEntradaPeriodo] = useState<'hoje' | 'semana' | 'mes' | '7dias' | '30dias' | 'custom'>('hoje');
   const [entrada, setEntrada] = useState<EntradaSimplifica>({ count: 0, valor: 0, totalItens: 0, porTipo: [] });
   const [loadingEntrada, setLoadingEntrada] = useState(false);
+  const [dataInicioCustom, setDataInicioCustom] = useState('');
+  const [dataFimCustom, setDataFimCustom] = useState('');
+  const [periodoLabel, setPeriodoLabel] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -114,30 +117,47 @@ export default function DashboardGestao() {
     setLoading(false);
   };
 
-  const fetchEntrada = useCallback(async (periodo: typeof entradaPeriodo) => {
+  const fetchEntrada = useCallback(async (periodo: typeof entradaPeriodo, customInicio?: string, customFim?: string) => {
     setLoadingEntrada(true);
     const now = new Date();
     const tzOffset = -3 * 60;
     const localNow = new Date(now.getTime() + (tzOffset - now.getTimezoneOffset()) * 60000);
 
     let dataInicio: string;
-    if (periodo === 'hoje') {
+    let dataFim: string = format(localNow, 'yyyy-MM-dd') + 'T23:59:59';
+    if (periodo === 'custom' && customInicio) {
+      dataInicio = customInicio + 'T00:00:00';
+      dataFim = (customFim || customInicio) + 'T23:59:59';
+      const ini = format(new Date(customInicio + 'T12:00:00'), 'dd/MM/yyyy');
+      const fim = format(new Date((customFim || customInicio) + 'T12:00:00'), 'dd/MM/yyyy');
+      setPeriodoLabel(customFim && customFim !== customInicio ? `${ini} até ${fim}` : ini);
+    } else if (periodo === 'hoje') {
       dataInicio = format(localNow, 'yyyy-MM-dd') + 'T00:00:00';
+      setPeriodoLabel(format(localNow, "dd/MM/yyyy"));
     } else if (periodo === 'semana') {
-      dataInicio = format(startOfWeek(localNow, { weekStartsOn: 1 }), 'yyyy-MM-dd') + 'T00:00:00';
+      const ini = startOfWeek(localNow, { weekStartsOn: 1 });
+      dataInicio = format(ini, 'yyyy-MM-dd') + 'T00:00:00';
+      setPeriodoLabel(`${format(ini, 'dd/MM')} até ${format(localNow, 'dd/MM/yyyy')}`);
     } else if (periodo === 'mes') {
-      dataInicio = format(startOfMonth(localNow), 'yyyy-MM-dd') + 'T00:00:00';
+      const ini = startOfMonth(localNow);
+      dataInicio = format(ini, 'yyyy-MM-dd') + 'T00:00:00';
+      setPeriodoLabel(`${format(ini, 'dd/MM')} até ${format(localNow, 'dd/MM/yyyy')}`);
     } else if (periodo === '7dias') {
-      dataInicio = format(subDays(localNow, 7), 'yyyy-MM-dd') + 'T00:00:00';
+      const ini = subDays(localNow, 7);
+      dataInicio = format(ini, 'yyyy-MM-dd') + 'T00:00:00';
+      setPeriodoLabel(`${format(ini, 'dd/MM')} até ${format(localNow, 'dd/MM/yyyy')}`);
     } else {
-      dataInicio = format(subDays(localNow, 30), 'yyyy-MM-dd') + 'T00:00:00';
+      const ini = subDays(localNow, 30);
+      dataInicio = format(ini, 'yyyy-MM-dd') + 'T00:00:00';
+      setPeriodoLabel(`${format(ini, 'dd/MM')} até ${format(localNow, 'dd/MM/yyyy')}`);
     }
 
     const { data } = await supabase
       .from('pedidos')
       .select('valor_liquido, criado_em')
       .eq('status_api', 'Em Produção')
-      .gte('criado_em', dataInicio);
+      .gte('criado_em', dataInicio)
+      .lte('criado_em', dataFim);
 
     // Buscar tipos de produto para cada pedido
 
@@ -146,7 +166,8 @@ export default function DashboardGestao() {
       .from('pedidos')
       .select('id, valor_liquido, criado_em, ordens_producao(tipo_produto), pedido_itens(quantidade, categoria_produto, descricao_produto, referencia_produto)')
       .eq('status_api', 'Em Produção')
-      .gte('criado_em', dataInicio);
+      .gte('criado_em', dataInicio)
+      .lte('criado_em', dataFim);
 
     const tipoLabels: Record<string, string> = {
       SINTETICO: 'Sintético', TECIDO: 'Tecido', FIVELA_COBERTA: 'Fivela Coberta', OUTROS: 'Outros',
@@ -201,7 +222,7 @@ export default function DashboardGestao() {
     setLoadingEntrada(false);
   }, []);
 
-  useEffect(() => { fetchEntrada(entradaPeriodo); }, [entradaPeriodo, fetchEntrada]);
+  useEffect(() => { if (entradaPeriodo !== 'custom') fetchEntrada(entradaPeriodo); }, [entradaPeriodo, fetchEntrada]);
 
   const fmt = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -239,11 +260,18 @@ export default function DashboardGestao() {
       {/* Entradas do Simplifica */}
       <Card className="border-border/60">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" /> Pedidos Recebidos do Simplifica
-            </CardTitle>
-            <div className="flex gap-1 flex-wrap">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" /> Pedidos Recebidos do Simplifica
+              </CardTitle>
+              {periodoLabel && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Calendar className="h-3 w-3" /> {periodoLabel}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-1 flex-wrap items-center">
               {(['hoje', 'semana', 'mes', '7dias', '30dias'] as const).map(p => (
                 <button
                   key={p}
@@ -257,6 +285,33 @@ export default function DashboardGestao() {
                   {p === 'hoje' ? 'Hoje' : p === 'semana' ? 'Esta semana' : p === 'mes' ? 'Este mês' : p === '7dias' ? '7 dias' : '30 dias'}
                 </button>
               ))}
+              <div className="flex items-center gap-1 ml-1">
+                <input
+                  type="date"
+                  value={dataInicioCustom}
+                  onChange={e => setDataInicioCustom(e.target.value)}
+                  className="text-xs border border-border/60 rounded-md px-2 py-1 bg-background text-foreground h-7"
+                />
+                <span className="text-xs text-muted-foreground">até</span>
+                <input
+                  type="date"
+                  value={dataFimCustom}
+                  onChange={e => setDataFimCustom(e.target.value)}
+                  className="text-xs border border-border/60 rounded-md px-2 py-1 bg-background text-foreground h-7"
+                />
+                <button
+                  onClick={() => {
+                    if (dataInicioCustom) {
+                      setEntradaPeriodo('custom');
+                      fetchEntrada('custom', dataInicioCustom, dataFimCustom || dataInicioCustom);
+                    }
+                  }}
+                  disabled={!dataInicioCustom}
+                  className="px-3 py-1 text-xs rounded-full border border-primary text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors h-7"
+                >
+                  Buscar
+                </button>
+              </div>
             </div>
           </div>
         </CardHeader>
